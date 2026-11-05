@@ -1,7 +1,8 @@
 import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import sharp from 'sharp'
-import { getConfig } from '../config'
+import { del, put } from '@vercel/blob'
+import { getConfig, isBlobStorage } from '../config'
 import type { MediaVariants } from '../content/doc'
 import { createMedia } from '../db/queries/media'
 
@@ -33,6 +34,21 @@ export function uploadDir(): string {
 
 export function publicUploadUrl(filename: string): string {
   return `/uploads/${filename}`
+}
+
+async function writeAsset(filename: string, body: Buffer, contentType: string): Promise<string> {
+  if (isBlobStorage()) {
+    const { url } = await put(filename, body, {
+      access: 'public',
+      token: getConfig().BLOB_READ_WRITE_TOKEN,
+      addRandomSuffix: false,
+      contentType,
+      cacheControlMaxAge: 31536000,
+    })
+    return url
+  }
+  await Bun.write(join(uploadDir(), filename), body)
+  return publicUploadUrl(filename)
 }
 
 export type ImageKind = 'jpeg' | 'png' | 'gif' | 'webp' | 'avif' | 'svg'
@@ -84,7 +100,6 @@ export async function storeImage(
   if (originalWidth > 12000 || originalHeight > 12000) throw new Error('Image dimensions are too large')
 
   const id = options.id ?? crypto.randomUUID().replace(/-/g, '').slice(0, 20)
-  const dir = uploadDir()
   const widths = UPLOAD_WIDTHS.filter((width) => width < originalWidth)
   if (!widths.length) widths.push(Math.min(originalWidth, 1600))
   const rendered = [...widths, Math.min(originalWidth, 1600)]
@@ -93,6 +108,8 @@ export async function storeImage(
 
   const webp: MediaVariants['webp'] = []
   const avif: MediaVariants['avif'] = []
+  const largest = rendered[rendered.length - 1]
+  let masterBuffer: Buffer | null = null
 
   for (const width of rendered) {
     const base = sharp(buffer, { limitInputPixels: 60_000_000 }).rotate().resize({
@@ -102,25 +119,24 @@ export async function storeImage(
 
     const webpName = `${id}-${width}.webp`
     const webpBuffer = await base.clone().webp({ quality: 82, effort: 4 }).toBuffer()
-    await Bun.write(join(dir, webpName), webpBuffer)
-    webp.push({ w: width, src: publicUploadUrl(webpName) })
+    const webpSrc = await writeAsset(webpName, webpBuffer, 'image/webp')
+    webp.push({ w: width, src: webpSrc })
+    if (width === largest) masterBuffer = webpBuffer
 
     try {
       const avifName = `${id}-${width}.avif`
       const avifBuffer = await base.clone().avif({ quality: 52, effort: 3 }).toBuffer()
-      await Bun.write(join(dir, avifName), avifBuffer)
-      avif.push({ w: width, src: publicUploadUrl(avifName) })
+      const avifSrc = await writeAsset(avifName, avifBuffer, 'image/avif')
+      avif.push({ w: width, src: avifSrc })
     } catch {
       // AVIF encoding is optional; WebP remains the fallback.
     }
   }
 
   const stats = await sharp(buffer, { limitInputPixels: 60_000_000 }).stats()
-  const largest = rendered[rendered.length - 1]
   const masterName = `${id}-${largest}.webp`
-  const masterPath = join(dir, masterName)
-  const size = (await Bun.file(masterPath).stat()).size
-  const processed = await sharp(masterPath).metadata()
+  const master = masterBuffer ?? (await sharp(buffer).rotate().resize({ width: largest }).webp().toBuffer())
+  const processed = await sharp(master).metadata()
   const displayWidth = processed.width ?? Math.min(originalWidth, largest)
   const displayHeight = processed.height ?? Math.round((originalHeight / originalWidth) * displayWidth)
 
@@ -132,8 +148,7 @@ export async function storeImage(
       .resize({ width: 1200, height: 630, fit: 'cover', position: 'attention' })
       .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer()
-    await Bun.write(join(dir, ogName), ogBuffer)
-    ogSrc = publicUploadUrl(ogName)
+    ogSrc = await writeAsset(ogName, ogBuffer, 'image/jpeg')
   } catch {
     // The Open Graph crop is optional.
   }
@@ -143,13 +158,13 @@ export async function storeImage(
     filename: masterName,
     originalName: options.originalName,
     mimeType: 'image/webp',
-    byteSize: size,
+    byteSize: master.byteLength,
     width: displayWidth,
     height: displayHeight,
     alt: options.alt ?? '',
     caption: options.caption ?? null,
     dominantColor: averageColor(stats),
-    src: publicUploadUrl(masterName),
+    src: webp.find((variant) => variant.w === largest)?.src ?? webp[webp.length - 1].src,
     variants: { webp, avif, ...(ogSrc ? { og: ogSrc } : {}) },
     uploadedBy: options.uploadedBy ?? null,
     createdAt: new Date().toISOString(),
@@ -168,25 +183,36 @@ export async function saveUpload(
   return persistStoredImage(stored)
 }
 
-export function deleteStoredFiles(asset: { variants: string }): void {
-  const dir = uploadDir()
+export async function deleteStoredFiles(asset: { variants: string }): Promise<void> {
+  let sources: string[]
   try {
     const parsed = JSON.parse(asset.variants) as MediaVariants
-    const filenames = new Set<string>()
+    const all = new Set<string>()
     for (const variant of [...(parsed.webp ?? []), ...(parsed.avif ?? [])]) {
-      filenames.add(variant.src.split('/').pop() ?? '')
+      all.add(variant.src)
     }
-    if (parsed.og) filenames.add(parsed.og.split('/').pop() ?? '')
-    for (const filename of filenames) {
-      if (/^[a-zA-Z0-9_-]+\.(webp|avif|jpg)$/.test(filename)) {
-        try {
-          rmSync(join(dir, filename))
-        } catch {
-          // Missing files are safe to ignore.
-        }
-      }
-    }
+    if (parsed.og) all.add(parsed.og)
+    sources = [...all]
   } catch {
-    // ignore malformed metadata
+    return
+  }
+
+  if (isBlobStorage()) {
+    const urls = sources.filter((src) => /^https?:\/\//.test(src))
+    if (urls.length) {
+      await del(urls, { token: getConfig().BLOB_READ_WRITE_TOKEN })
+    }
+    return
+  }
+
+  const dir = uploadDir()
+  for (const source of sources) {
+    const filename = source.split('/').pop() ?? ''
+    if (!/^[a-zA-Z0-9_-]+\.(webp|avif|jpg)$/.test(filename)) continue
+    try {
+      rmSync(join(dir, filename))
+    } catch {
+      // Missing files are safe to ignore.
+    }
   }
 }

@@ -1,0 +1,8 @@
+.env
+.env.*
+.vercel
+.commandcode
+data
+dist
+node_modules
+*.log

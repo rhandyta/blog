@@ -5,7 +5,7 @@ import { ensureDb } from '../lib/db/migrate'
 import { publishDueArticles } from '../lib/db/queries/articles'
 import { purgeExpiredSessions } from '../lib/auth/session'
 
-ensureDb()
+await ensureDb()
 const config = getConfig()
 const app = createApp()
 

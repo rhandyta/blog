@@ -665,7 +665,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
       return c.json(articleResponse(article), 201)
     }
 
-    const existing = await getArticleById(c.req.param('id'))
+    const existing = await getArticleById(c.req.param('id') ?? '')
     if (!existing) return c.json({ error: 'Not found' }, 404)
     const ownAuthor = await getAuthorForUser(user.id)
     if (!canEditArticle(user, existing, ownAuthor?.id)) return c.json({ error: 'Forbidden' }, 403)
@@ -860,7 +860,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         409,
       )
     }
-    deleteStoredFiles(asset)
+    await deleteStoredFiles(asset)
     await deleteMedia(asset.id)
     return c.json({ ok: true })
   })
@@ -1056,13 +1056,15 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     const expertise = parsed.expertise
       ? parsed.expertise.split(',').map((item) => item.trim()).filter(Boolean).slice(0, 12)
       : []
+    const socialLinks: Record<string, string> = {}
+    if (parsed.website) socialLinks.website = parsed.website
     return {
       displayName: parsed.displayName,
       roleTitle: parsed.roleTitle || null,
       bio: parsed.bio ?? '',
       longBio: parsed.longBio || null,
       expertise,
-      socialLinks: parsed.website ? { website: parsed.website } : {},
+      socialLinks,
     }
   }
 

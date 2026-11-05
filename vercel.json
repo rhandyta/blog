@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "bun",
+  "bunVersion": "1.x",
+  "installCommand": "bun install",
+  "buildCommand": "bun run build",
+  "outputDirectory": "dist/client",
+  "regions": ["hnd1"],
+  "functions": {
+    "server.ts": {
+      "maxDuration": 60,
+      "includeFiles": "dist/client/**"
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { and, eq, like, or, sql } from 'drizzle-orm'
-import { getDb, getSqlite, hasFts5 } from '../client'
+import { all, getDb, hasFts5 } from '../client'
 import { articles } from '../schema'
 import { getArticleBodyTexts, getCardsByIds, type ArticleCard } from './articles'
 
@@ -113,16 +113,15 @@ export async function searchPublished(query: string, limit = 20): Promise<Search
   const terms = splitTerms(trimmed)
 
   let ids: string[] = []
-  if (hasFts5()) {
+  if (await hasFts5()) {
     const ftsQuery = buildFtsQuery(trimmed)
     if (ftsQuery) {
       try {
-        const rows = getSqlite()
-          .query(
-            `SELECT article_id AS id FROM article_fts
-             WHERE article_fts MATCH ? ORDER BY bm25(article_fts) LIMIT ?`,
-          )
-          .all(ftsQuery, limit) as Array<{ id: string }>
+        const rows = await all<{ id: string }>(
+          `SELECT article_id AS id FROM article_fts
+           WHERE article_fts MATCH ? ORDER BY bm25(article_fts) LIMIT ?`,
+          [ftsQuery, limit],
+        )
         ids = rows.map((row) => row.id)
       } catch {
         ids = []

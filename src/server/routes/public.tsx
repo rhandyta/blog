@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Hono } from 'hono'
 import { getConnInfo } from 'hono/bun'
-import { getConfig } from '../../lib/config'
+import { getConfig, isProd } from '../../lib/config'
 import { absoluteUrl } from '../../lib/content/html'
 import { collectMediaIds, countWords, parseDoc } from '../../lib/content/doc'
 import { renderDoc } from '../../lib/content/render'
@@ -19,6 +19,7 @@ import {
   listArticlesByTag,
   listEditorsPicks,
   listPublished,
+  publishDueArticles,
   recordArticleView,
 } from '../../lib/db/queries/articles'
 import {
@@ -659,6 +660,19 @@ Sitemap: ${origin}/sitemap.xml
   /* ---------------------------- public API ---------------------------- */
 
   app.get('/api/health', (c) => c.json({ ok: true, at: new Date().toISOString() }))
+
+  app.get('/api/cron/publish', async (c) => {
+    const secret = getConfig().CRON_SECRET
+    if (secret) {
+      if (c.req.header('authorization') !== `Bearer ${secret}`) {
+        return c.json({ error: 'Unauthorized' }, 401)
+      }
+    } else if (isProd()) {
+      return c.json({ error: 'CRON_SECRET is not configured' }, 403)
+    }
+    const published = await publishDueArticles()
+    return c.json({ published })
+  })
 
   app.get('/api/search', async (c) => {
     const ip = clientIp(c)

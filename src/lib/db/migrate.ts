@@ -1,14 +1,17 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import type { Database } from 'bun:sqlite'
-import { getSqlite } from './client'
+import { all, exec, run } from './client'
+import { migrations } from './migration-sql'
 
-const migrationsDir = join(import.meta.dir, 'migrations')
+let migrated: Promise<void> | null = null
 
-let migrated = false
+export function ensureDb(): Promise<void> {
+  if (!migrated) {
+    migrated = runMigrations()
+  }
+  return migrated
+}
 
-export function runMigrations(sqlite: Database = getSqlite()): void {
-  sqlite.exec(`
+export async function runMigrations(): Promise<void> {
+  await exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
       name TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL
@@ -16,38 +19,27 @@ export function runMigrations(sqlite: Database = getSqlite()): void {
   `)
 
   const applied = new Set(
-    (sqlite.query('SELECT name FROM _migrations').all() as Array<{ name: string }>).map((row) => row.name),
+    (await all<{ name: string }>('SELECT name FROM _migrations')).map((row) => row.name),
   )
 
-  const files = readdirSync(migrationsDir)
-    .filter((file) => file.endsWith('.sql'))
-    .sort()
-
-  for (const file of files) {
-    if (applied.has(file)) continue
-    const sql = readFileSync(join(migrationsDir, file), 'utf8')
+  for (const migration of migrations) {
+    if (applied.has(migration.name)) continue
     try {
-      sqlite.exec(sql)
+      await exec(migration.sql)
     } catch (error) {
-      if (file.includes('search')) {
+      if (migration.name.includes('search')) {
         console.warn(`[db] full-text search unavailable — falling back to LIKE queries (${String(error)})`)
       } else {
         throw error
       }
     }
-    sqlite.query('INSERT INTO _migrations (name, applied_at) VALUES (?, ?)').run(file, new Date().toISOString())
+    await run('INSERT OR IGNORE INTO _migrations (name, applied_at) VALUES (?, ?)', [
+      migration.name,
+      new Date().toISOString(),
+    ])
   }
-}
-
-export function ensureDb(): Database {
-  const sqlite = getSqlite()
-  if (!migrated) {
-    runMigrations(sqlite)
-    migrated = true
-  }
-  return sqlite
 }
 
 export function resetMigrationState(): void {
-  migrated = false
+  migrated = null
 }

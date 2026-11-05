@@ -15,7 +15,7 @@ const { createUser, getUserByEmail } = await import('../src/lib/auth/session')
 const { upsertAuthor, upsertCategory } = await import('../src/lib/db/queries/taxonomy')
 const { createArticle } = await import('../src/lib/db/queries/articles')
 
-ensureDb()
+await ensureDb()
 
 const existing = await getDb().select({ n: count() }).from(articles)
 if ((existing[0]?.n ?? 0) === 0) {

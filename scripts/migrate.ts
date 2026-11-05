@@ -1,4 +1,4 @@
 import { ensureDb } from '../src/lib/db/migrate'
 
-ensureDb()
+await ensureDb()
 console.log('[db] migrations applied')

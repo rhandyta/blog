@@ -4,7 +4,7 @@ import { docToText, makeExcerpt, readingMinutes } from '../content/doc'
 import { parseMarkdown } from '../content/markdown'
 import { coverAlt, coverSvg } from '../media/cover'
 import { saveUpload } from '../media/storage'
-import { getDb, getSqlite } from './client'
+import { getDb, run } from './client'
 import { ensureDb } from './migrate'
 import { articles, tags } from './schema'
 import { seedArticles, seedAuthors, seedCategories, seedTags } from './seed-data'
@@ -13,7 +13,7 @@ import { createArticle } from './queries/articles'
 import { ACCENTS, defaultSettings, saveSiteSettings, upsertAuthor, upsertCategory } from './queries/taxonomy'
 
 export async function seedDatabase(): Promise<void> {
-  ensureDb()
+  await ensureDb()
   const existing = await getDb().select({ n: count() }).from(articles)
   if ((existing[0]?.n ?? 0) > 0) {
     console.log('[seed] content already present — skipping. Run `bun run db:reset` to start over.')
@@ -135,9 +135,7 @@ export async function seedDatabase(): Promise<void> {
       tagIds,
     })
     if (seedArticle.publishedAt) {
-      getSqlite()
-        .query('UPDATE articles SET updated_at = ? WHERE id = ?')
-        .run(seedArticle.publishedAt, seedArticle.id)
+      await run('UPDATE articles SET updated_at = ? WHERE id = ?', [seedArticle.publishedAt, seedArticle.id])
     }
   }
 

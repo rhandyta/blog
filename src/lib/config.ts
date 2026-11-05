@@ -1,5 +1,10 @@
 import { z } from 'zod'
 
+const optionalString = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().min(1).optional(),
+)
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PUBLIC_ORIGIN: z.string().url().default('http://localhost:3000'),
@@ -10,19 +15,35 @@ const envSchema = z.object({
   ADMIN_EMAIL: z.string().email().default('editor@commonplace.local'),
   ADMIN_PASSWORD: z.string().min(8).default('commonplace-dev'),
   SITE_NAME: z.string().min(1).default('Commonplace'),
-  DISABLE_SCHEDULER: z.string().optional(),
+  DISABLE_SCHEDULER: optionalString,
+  CRON_SECRET: optionalString,
+  TURSO_DATABASE_URL: optionalString,
+  TURSO_AUTH_TOKEN: optionalString,
+  BLOB_READ_WRITE_TOKEN: optionalString,
 })
 
 export type AppConfig = z.infer<typeof envSchema>
 
 let cached: AppConfig | undefined
 
+function defaultOrigin(): string | undefined {
+  const host =
+    process.env.VERCEL_ENV === 'preview'
+      ? process.env.VERCEL_URL
+      : process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL
+  return host ? `https://${host.replace(/^https?:\/\//, '')}` : undefined
+}
+
 export function getConfig(): AppConfig {
   if (!cached) {
     if (process.argv.includes('--prod')) {
       process.env.NODE_ENV = 'production'
     }
-    const parsed = envSchema.safeParse(process.env)
+    const env = {
+      ...process.env,
+      ...(process.env.PUBLIC_ORIGIN ? {} : defaultOrigin() ? { PUBLIC_ORIGIN: defaultOrigin() } : {}),
+    }
+    const parsed = envSchema.safeParse(env)
     if (!parsed.success) {
       const issues = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ')
       throw new Error(`Invalid environment configuration — ${issues}`)
@@ -44,4 +65,12 @@ export function resetConfigCache(): void {
 
 export function isProd(): boolean {
   return getConfig().NODE_ENV === 'production'
+}
+
+export function isRemoteDatabase(): boolean {
+  return Boolean(getConfig().TURSO_DATABASE_URL)
+}
+
+export function isBlobStorage(): boolean {
+  return Boolean(getConfig().BLOB_READ_WRITE_TOKEN)
 }

@@ -15,10 +15,10 @@ A self-contained editorial publishing platform: server-rendered React, a real SQ
 | Views | React 19, rendered to HTML on the server; only interactive islands ship JavaScript |
 | Client build | Vite 6 (dev server + hashed production assets) |
 | Styles | Tailwind CSS 4 utilities, a hand-written editorial design system, self-hosted fonts |
-| Data | SQLite (`bun:sqlite`) + Drizzle ORM + hand-written SQL migrations |
+| Data | SQLite (`bun:sqlite`) locally, [Turso](https://turso.tech) (libSQL) on Vercel + Drizzle ORM + hand-written SQL migrations |
 | Search | SQLite FTS5 with BM25 ranking (LIKE fallback if unavailable) |
 | Editor | TipTap / ProseMirror (stored as JSON, rendered through a strict server-side serializer) |
-| Images | `sharp` — WebP + AVIF variants, resized masters, 1200×630 social crops |
+| Images | `sharp` — WebP + AVIF variants, resized masters, 1200×630 social crops; local disk or [Vercel Blob](https://vercel.com/storage/blob) |
 | Validation | Zod |
 | Tests | `bun test` (42 unit + integration tests) |
 
@@ -111,6 +111,12 @@ Validated at boot by Zod (`src/lib/config.ts`).
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | at seed time | Used only by `db:seed` |
 | `SITE_NAME` | no | Used for logging only |
 | `DISABLE_SCHEDULER` | no | Set to `1` to disable the scheduled-publishing timer |
+| `TURSO_DATABASE_URL` | Vercel only | `libsql://…` URL. When unset, the app uses the local SQLite file at `DATABASE_PATH`. |
+| `TURSO_AUTH_TOKEN` | Vercel only | Token for the Turso database. |
+| `BLOB_READ_WRITE_TOKEN` | Vercel only | Vercel Blob token. When unset, uploads go to `UPLOAD_DIR` on local disk. |
+| `CRON_SECRET` | Vercel only | Bearer token protecting `GET /api/cron/publish`, used to run scheduled publishing. |
+
+On Vercel, `PUBLIC_ORIGIN` is derived automatically from `VERCEL_PROJECT_PRODUCTION_URL` (or `VERCEL_URL` on preview deployments) when it is not set explicitly.
 
 The server refuses to boot in production with the placeholder session secret.
 
@@ -227,6 +233,58 @@ Set a real `SESSION_SECRET` and `PUBLIC_ORIGIN`. Put Nginx/Caddy in front for TL
 
 SQLite and uploads live under `data/`. Back up that directory. Run a single application instance (SQLite is single-writer and rate limits are in-memory).
 
+### Vercel
+
+Vercel Functions have a read-only filesystem, so the local SQLite file and uploads directory cannot be used there. The project ships with:
+
+- [`server.ts`](./server.ts) — the entrypoint detected by Vercel's Bun runtime preset (`vercel.json` sets `bunVersion: "1.x"`).
+- Turso (libSQL) for the database. Migrations run automatically on the first request.
+- Vercel Blob for uploaded and generated images.
+
+1. Create a Turso database and copy its URL and token:
+
+   ```bash
+   turso db create commonplace
+   turso db show commonplace --url
+   turso db tokens create commonplace
+   ```
+
+2. Create a Blob store in the Vercel dashboard (Storage → Blob) and copy `BLOB_READ_WRITE_TOKEN`.
+
+3. Add the environment variables in Vercel (Production and Preview):
+
+   ```
+   SESSION_SECRET=<long random string>
+   TURSO_DATABASE_URL=libsql://…
+   TURSO_AUTH_TOKEN=…
+   BLOB_READ_WRITE_TOKEN=…
+   CRON_SECRET=<long random string>
+   ```
+
+   `PUBLIC_ORIGIN` is optional and derived from the deployment URL.
+
+4. Apply the schema and seed demo content once from your machine, pointing at the same services:
+
+   ```bash
+   TURSO_DATABASE_URL=libsql://… TURSO_AUTH_TOKEN=… \
+   BLOB_READ_WRITE_TOKEN=… bun run db:migrate
+   ```
+
+   ```bash
+   TURSO_DATABASE_URL=libsql://… TURSO_AUTH_TOKEN=… \
+   BLOB_READ_WRITE_TOKEN=… ADMIN_EMAIL=… ADMIN_PASSWORD=… bun run db:seed
+   ```
+
+5. Deploy with the Vercel CLI or by connecting the repository:
+
+   ```bash
+   bunx vercel deploy
+   ```
+
+Scheduled publishing does not run in-process on Vercel. Add a Vercel Cron job that calls `GET /api/cron/publish` with `Authorization: Bearer $CRON_SECRET` at the interval your plan allows (for example `"crons": [{ "path": "/api/cron/publish", "schedule": "0 * * * *" }]` in `vercel.json`).
+
+SQLite FTS5 may not be available on every Turso database; the search layer detects it and falls back to `LIKE` queries automatically.
+
 ### Docker
 
 ```bash
@@ -243,7 +301,7 @@ Health check: `GET /api/health` returns `{ "ok": true }`.
 ## Limitations and next steps
 
 - **Email delivery** — newsletter addresses are stored, deduplicated, exportable, and unsubscribable, but no transactional provider is connected. A mail hook belongs in `subscribeEmail` / the admin subscribers view. The UI does not claim an email was sent.
-- **Single instance** — in-memory rate limiting and local uploads assume one server. Moving to Postgres + S3 + Redis rate limiting is a documented migration, not implemented here.
+- **Single instance** — in-memory rate limiting assumes one server. On Vercel that limit is per function instance; move it to Redis or another shared store if you need a global limit. Filesystem storage is replaced by Turso + Vercel Blob there.
 - **Popularity** — “Most read” appears only after real views have been recorded; no seeded fake numbers.
 - **Slug changes** — editing a slug changes the public URL. A redirect-history table would be the next step for long-lived archives.
 - **Scheduled publishing** runs in-process; for multiple instances, move it to a shared cron job.

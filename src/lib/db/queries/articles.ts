@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, inArray, like, lte, notInArray, or, sql } from 'drizzle-orm'
 import type { MediaInfo } from '../../content/doc'
-import { getDb, getSqlite, hasFts5 } from '../client'
+import { all, exec, get, getDb, hasFts5, run } from '../client'
 import {
   articleRevisions,
   articleTags,
@@ -281,30 +281,28 @@ export async function getRelatedArticles(
   let ids: string[] = []
   if (tagIds.length) {
     const placeholders = tagIds.map(() => '?').join(', ')
-    const rows = getSqlite()
-      .query(
-        `SELECT a.id AS id, COUNT(*) AS shared
-         FROM articles a
-         JOIN article_tags at ON at.article_id = a.id
-         WHERE a.status = 'published' AND a.id != ? AND at.tag_id IN (${placeholders})
-         GROUP BY a.id
-         ORDER BY shared DESC, a.published_at DESC
-         LIMIT ?`,
-      )
-      .all(article.id, ...tagIds, limit) as Array<{ id: string }>
+    const rows = await all<{ id: string }>(
+      `SELECT a.id AS id, COUNT(*) AS shared
+       FROM articles a
+       JOIN article_tags at ON at.article_id = a.id
+       WHERE a.status = 'published' AND a.id != ? AND at.tag_id IN (${placeholders})
+       GROUP BY a.id
+       ORDER BY shared DESC, a.published_at DESC
+       LIMIT ?`,
+      [article.id, ...tagIds, limit],
+    )
     ids = rows.map((row) => row.id)
   }
 
   if (ids.length < limit && article.categoryId) {
     const remaining = limit - ids.length
     const exclude = ids.length ? `AND id NOT IN (${ids.map(() => '?').join(', ')})` : ''
-    const rows = getSqlite()
-      .query(
-        `SELECT id FROM articles
-         WHERE status = 'published' AND id != ? AND category_id = ? ${exclude}
-         ORDER BY published_at DESC LIMIT ?`,
-      )
-      .all(article.id, article.categoryId, ...ids, remaining) as Array<{ id: string }>
+    const rows = await all<{ id: string }>(
+      `SELECT id FROM articles
+       WHERE status = 'published' AND id != ? AND category_id = ? ${exclude}
+       ORDER BY published_at DESC LIMIT ?`,
+      [article.id, article.categoryId, ...ids, remaining],
+    )
     ids = [...ids, ...rows.map((row) => row.id)]
   }
 
@@ -387,13 +385,12 @@ export async function recordArticleView(articleId: string): Promise<void> {
 
 export async function getMostRead(limit = 4, days = 14): Promise<ArticleCard[]> {
   const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
-  const rows = getSqlite()
-    .query(
-      `SELECT article_id AS articleId, SUM(count) AS total
-       FROM article_views WHERE day >= ?
-       GROUP BY article_id ORDER BY total DESC LIMIT ?`,
-    )
-    .all(since, limit) as Array<{ articleId: string; total: number }>
+  const rows = await all<{ articleId: string; total: number }>(
+    `SELECT article_id AS articleId, SUM(count) AS total
+     FROM article_views WHERE day >= ?
+     GROUP BY article_id ORDER BY total DESC LIMIT ?`,
+    [since, limit],
+  )
   if (!rows.length) return []
   const cards = await listPublishedByIds(rows.map((row) => row.articleId))
   const order = new Map(rows.map((row, index) => [row.articleId, index]))
@@ -415,9 +412,10 @@ export async function getCardsByIds(ids: string[]): Promise<ArticleCard[]> {
 
 export async function getArticleBodyTexts(ids: string[]): Promise<Map<string, string>> {
   if (!ids.length) return new Map()
-  const rows = getSqlite()
-    .query(`SELECT id, body_text AS bodyText FROM articles WHERE id IN (${ids.map(() => '?').join(', ')})`)
-    .all(...ids) as Array<{ id: string; bodyText: string }>
+  const rows = await all<{ id: string; bodyText: string }>(
+    `SELECT id, body_text AS bodyText FROM articles WHERE id IN (${ids.map(() => '?').join(', ')})`,
+    ids,
+  )
   return new Map(rows.map((row) => [row.id, row.bodyText]))
 }
 
@@ -700,10 +698,9 @@ export async function restoreRevision(
  * ------------------------------------------------------------------ */
 
 export async function syncArticleSearch(articleId: string): Promise<void> {
-  if (!hasFts5()) return
+  if (!(await hasFts5())) return
   const article = await getArticleById(articleId)
-  const sqlite = getSqlite()
-  sqlite.query('DELETE FROM article_fts WHERE article_id = ?').run(articleId)
+  await run('DELETE FROM article_fts WHERE article_id = ?', [articleId])
   if (!article || article.status !== 'published') return
   const tagRows = await getArticleTags(articleId)
   let categoryName = ''
@@ -716,30 +713,30 @@ export async function syncArticleSearch(articleId: string): Promise<void> {
     categoryName = categoryRows[0]?.name ?? ''
   }
   try {
-    sqlite
-      .query('INSERT INTO article_fts (article_id, title, subtitle, excerpt, body, tags) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(
+    await run(
+      'INSERT INTO article_fts (article_id, title, subtitle, excerpt, body, tags) VALUES (?, ?, ?, ?, ?, ?)',
+      [
         article.id,
         article.title,
         article.subtitle ?? '',
         article.excerpt,
         article.bodyText,
         [tagRows.map((tag) => tag.name).join(' '), categoryName].filter(Boolean).join(' '),
-      )
+      ],
+    )
   } catch (error) {
     console.warn('[search] failed to index article', articleId, error)
   }
 }
 
 export async function clearArticleSearch(articleId: string): Promise<void> {
-  if (!hasFts5()) return
-  getSqlite().query('DELETE FROM article_fts WHERE article_id = ?').run(articleId)
+  if (!(await hasFts5())) return
+  await run('DELETE FROM article_fts WHERE article_id = ?', [articleId])
 }
 
 export async function rebuildSearchIndex(): Promise<number> {
-  if (!hasFts5()) return 0
-  const sqlite = getSqlite()
-  sqlite.exec('DELETE FROM article_fts')
+  if (!(await hasFts5())) return 0
+  await exec('DELETE FROM article_fts')
   const published = await getDb()
     .select({ id: articles.id })
     .from(articles)
@@ -761,11 +758,13 @@ export async function getDashboardStats() {
     db.select({ n: count() }).from(articles).where(eq(articles.status, 'scheduled')),
     db.select({ n: count() }).from(subscribers).where(eq(subscribers.status, 'subscribed')),
     db.select({ n: count() }).from(media),
-    (() => {
+    (async () => {
       const since = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)
-      return getSqlite()
-        .query('SELECT COALESCE(SUM(count), 0) AS n FROM article_views WHERE day >= ?')
-        .get(since) as { n: number }
+      const row = await get<{ n: number }>(
+        'SELECT COALESCE(SUM(count), 0) AS n FROM article_views WHERE day >= ?',
+        [since],
+      )
+      return row ?? { n: 0 }
     })(),
   ])
   return {

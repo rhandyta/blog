@@ -1,5 +1,9 @@
-PRAGMA foreign_keys = ON;
+export type Migration = { name: string; sql: string }
 
+export const migrations: Migration[] = [
+  {
+    name: '001_init.sql',
+    sql: `
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
@@ -151,3 +155,20 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
+`,
+  },
+  {
+    name: '002_search.sql',
+    sql: `
+CREATE VIRTUAL TABLE IF NOT EXISTS article_fts USING fts5(
+  article_id UNINDEXED,
+  title,
+  subtitle,
+  excerpt,
+  body,
+  tags,
+  tokenize = 'porter unicode61'
+);
+`,
+  },
+]

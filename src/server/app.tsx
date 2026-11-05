@@ -33,11 +33,12 @@ function contentSecurityPolicy(): string {
   const scriptSrc = dev ? `'self' 'unsafe-inline'${devSources}` : "'self'"
   const styleSrc = `'self' 'unsafe-inline'${dev ? devSources : ''}`
   const connectSrc = `'self'${dev ? devSources : ''}`
+  const blobSources = ' https://*.public.blob.vercel-storage.com'
   return [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     `style-src ${styleSrc}`,
-    `img-src 'self' data: blob:${dev ? devSources : ''}`,
+    `img-src 'self' data: blob:${blobSources}${dev ? devSources : ''}`,
     `font-src 'self' data:${dev ? devSources : ''}`,
     `connect-src ${connectSrc}`,
     "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com",
@@ -101,11 +102,14 @@ export function createApp(): Hono<AppEnv> {
     await next()
     if (c.res.ok) c.header('Cache-Control', 'public, max-age=3600')
   })
+  // Vite copies public assets into dist/client during a production build, so
+  // the deployed function only needs that directory.
+  const staticRoot = isProd() ? './dist/client' : './public'
   app.use('/assets/*', serveStatic({ root: './dist/client' }))
-  app.use('/fonts/*', serveStatic({ root: './public' }))
-  app.use('/theme.js', serveStatic({ root: './public' }))
-  app.use('/favicon.svg', serveStatic({ root: './public' }))
-  app.use('/manifest.webmanifest', serveStatic({ root: './public' }))
+  app.use('/fonts/*', serveStatic({ root: staticRoot }))
+  app.use('/theme.js', serveStatic({ root: staticRoot }))
+  app.use('/favicon.svg', serveStatic({ root: staticRoot }))
+  app.use('/manifest.webmanifest', serveStatic({ root: staticRoot }))
 
   app.get('/uploads/:file', async (c) => {
     const filename = c.req.param('file')
