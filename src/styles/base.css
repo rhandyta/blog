@@ -673,17 +673,6 @@ a.tag:hover { border-color: var(--cat, var(--accent)); color: var(--cat, var(--a
 }
 .saved-count:empty { display: none; }
 
-.demo-note {
-  margin-top: 2rem;
-  padding: 0.9rem 1rem;
-  border: 1px dashed var(--rule-strong);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  line-height: 1.7;
-  color: var(--ink-3);
-  text-transform: uppercase;
-}
 
 .empty-state {
   border-top: var(--rule-width) solid var(--ink);
