@@ -229,7 +229,7 @@ function setupNewsletter(): void {
         const payload = (await response.json()) as { status?: string }
         if (response.ok && payload.status === 'ok') {
           message.dataset.state = 'success'
-          message.textContent = 'You are on the list. No email is sent by this prototype.'
+          message.textContent = 'You are on the list. Thank you for subscribing.'
           form.reset()
         } else if (response.ok && payload.status === 'exists') {
           message.dataset.state = 'success'

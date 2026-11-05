@@ -313,7 +313,7 @@ export function AuthorsPage({
               <tbody>
                 {authors.map((author) => (
                   <tr key={author.id}>
-                    <td className="title-cell">{author.displayName}<div className="meta" style={{ marginTop: '0.2rem' }}>/{author.slug}{author.isDemo ? ' · demonstration' : ''}</div></td>
+                    <td className="title-cell">{author.displayName}<div className="meta" style={{ marginTop: '0.2rem' }}>/{author.slug}</div></td>
                     <td className="muted-cell">{author.roleTitle ?? '—'}</td>
                     <td className="num">{author.articleCount}</td>
                     <td><a className="btn btn--ghost btn--small" href={`/admin/authors/${author.id}`}>Edit</a></td>
@@ -433,9 +433,7 @@ export function AuthorEditPage({
         <aside className="admin-card" style={{ gridColumn: 'span 4' }}>
           <h2>Notes</h2>
           <p className="hint">
-            {author.isDemo
-              ? 'This is a demonstration author profile. Its biography explicitly says so on the public site.'
-              : 'Profiles are independent of login accounts. Removing an author requires reassigning their articles first.'}
+            Profiles are independent of login accounts. Removing an author requires reassigning their articles first.
           </p>
           <h2 style={{ marginTop: '1.5rem' }}>Danger zone</h2>
           <form method="post" action={`/admin/authors/${author.id}/delete`} data-confirm="Delete this author? Authors with articles cannot be deleted.">

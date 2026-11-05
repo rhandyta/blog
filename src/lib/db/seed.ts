@@ -142,7 +142,7 @@ export async function seedDatabase(): Promise<void> {
   await saveSiteSettings({
     ...defaultSettings,
     about:
-      'RhandytaVERSE is a record of what one person is reading, building, and thinking about. It takes its name from the commonplace books kept by readers for centuries: private collections of passages, observations, and ideas, copied out and returned to.\n\nThis site is a working demonstration of a small publishing platform. The publication, its authors, and its articles are sample content created for the prototype rather than the work of real contributors.',
+      'RhandytaVERSE is a record of what one person is reading, building, and thinking about. It takes its name from the commonplace books kept by readers for centuries: private collections of passages, observations, and ideas, copied out and returned to.\n\nEssays are published when there is something worth saying. The archive is kept in full, with no fixed schedule to keep up with.',
     email: 'hello@lab-rb.my.id',
     x: 'https://x.com/',
     github: 'https://github.com/',

@@ -58,9 +58,6 @@ export function AuthorPage({
                   ))}
                 </div>
               ) : null}
-              {author.isDemo ? (
-                <p className="demo-note">Demonstration author profile — illustrative, not a real person or set of credentials.</p>
-              ) : null}
             </div>
             <aside className="author-hero__aside">
               <ul className="author-facts">

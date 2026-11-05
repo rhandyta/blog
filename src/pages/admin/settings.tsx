@@ -188,7 +188,7 @@ export function SubscribersPage({
         query={{ q, status: status === 'all' ? undefined : status }}
       />
       <p className="hint" style={{ marginTop: '1rem' }}>
-        {total} total records. Email delivery is not connected in this prototype; the CSV is the export path.
+        {total} total records. Export the subscriber list as a CSV for your email provider.
       </p>
     </AdminLayout>
   )

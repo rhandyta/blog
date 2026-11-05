@@ -50,7 +50,7 @@ export function AboutPage({
             <h2>How it is made</h2>
             <p>
               RhandytaVERSE is a small, self-contained publishing platform. Pages are rendered on the server, the text is
-              stored in a local SQLite database, images are processed into modern formats at upload, and the only
+              stored in a serverless SQLite database, images are processed into modern formats at upload, and the only
               client-side JavaScript covers a handful of interactions: the theme switch, reading progress, search, and
               saving an article for later.
             </p>
@@ -59,12 +59,11 @@ export function AboutPage({
               trackers, no advertising scripts, and no external analytics.
             </p>
 
-            <h2>A note on the demonstration</h2>
+            <h2>Editorial independence</h2>
             <p>
-              This site is a working prototype, and its contents are demonstration material. The authors are
-              illustrative profiles rather than real people, and the essays were written for this project. The
-              editorial desk is real: signing in with the demonstration credentials described in the project README
-              allows you to create, edit, schedule, and publish articles.
+              RhandytaVERSE is independently written and edited. Nothing is published on a fixed schedule; pieces are
+              added when there is something worth saying. The archive is kept in full, and corrections are noted in the
+              piece rather than quietly removed.
             </p>
 
             <h2>Corrections and correspondence</h2>
@@ -91,7 +90,7 @@ export function AboutPage({
               <li><a href="/admin">Editorial desk</a></li>
             </ul>
             <p className="meta" style={{ marginTop: '2rem', lineHeight: 1.8 }}>
-              Built as a demonstration publishing platform. No third-party trackers, no advertising.
+              No third-party trackers. No advertising.
             </p>
           </aside>
         </div>

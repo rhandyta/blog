@@ -68,8 +68,7 @@ export function LoginPage({
             Enter the desk
           </button>
           <p className="hint">
-            Demonstration credentials are documented in the project README. Sessions are stored server-side and expire
-            after 30 days.
+            Sessions are stored server-side and expire after 30 days.
           </p>
         </form>
       </section>

@@ -13,7 +13,7 @@ export function SubscribePage({
 }) {
   const message =
     status === 'ok'
-      ? 'You are on the list. The address is stored in this site’s database — no email is sent by this prototype.'
+      ? 'You are on the list. Thank you for subscribing.'
       : status === 'exists'
         ? 'That address is already subscribed.'
         : status === 'invalid'
@@ -59,15 +59,14 @@ export function SubscribePage({
           <div className="about-copy">
             <h2 style={{ marginTop: 0 }}>What happens when you subscribe</h2>
             <p>
-              Your address is normalised, checked, and stored in this site’s own database. Nothing is shared with a
-              third party, because there is no third party. You can remove yourself at any time using the unsubscribe
-              link included in the demonstration letter flow.
+              Your address is checked and stored securely in this site’s own database. It is used only for the
+              newsletter and is never shared or sold. You can remove yourself at any time using the unsubscribe link
+              in any letter, or by contacting the editor.
             </p>
-            <h2>About this prototype</h2>
+            <h2>Privacy</h2>
             <p>
-              This deployment does not connect to a transactional email provider, so no message will actually arrive.
-              The subscription itself is real: it persists, it is visible in the editorial dashboard, and it can be
-              exported. The README documents where a mail provider would be connected.
+              Your address is used only to send the newsletter. It is never sold or shared. To request removal, use the
+              unsubscribe link in any letter or contact the editor directly.
             </p>
           </div>
           <aside className="about-aside">
@@ -103,7 +102,7 @@ export function UnsubscribePage({
           </h1>
           <p className="lede" style={{ marginTop: '1.5rem', maxWidth: '46ch' }}>
             {status === 'done'
-              ? 'Your address has been removed from the newsletter list. You will not receive any further letters from this prototype.'
+              ? 'Your address has been removed from the newsletter list. You will not receive any further letters.'
               : 'The unsubscribe token could not be verified. If you believe this is an error, use the contact address on the about page.'}
           </p>
           <p style={{ marginTop: '1.75rem' }}>

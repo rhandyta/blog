@@ -208,8 +208,8 @@ export function SiteFooter({
           </div>
         </div>
         <div className="footer-folio">
-          <span>© {new Date().getFullYear()} {settings.title}. Demonstration content.</span>
-          <span>Typeset in Fraunces &amp; Newsreader · Built with care</span>
+          <span>© {new Date().getFullYear()} {settings.title}. All rights reserved.</span>
+          <span>Typeset in Fraunces &amp; Newsreader</span>
         </div>
       </div>
     </footer>
@@ -277,8 +277,7 @@ export function NewsletterBand({ settings }: { settings: SiteSettings }) {
               Subscribe
             </button>
             <p className="newsletter-note">
-              A demonstration newsletter: your address is stored in this site's database, and no email is sent. You can
-              unsubscribe at any time.
+              Your address is stored securely and used only for this newsletter. You can unsubscribe at any time.
             </p>
             <p className="form-message" data-message role="status" aria-live="polite"></p>
           </form>

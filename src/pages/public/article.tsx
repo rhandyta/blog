@@ -6,7 +6,6 @@ import { SiteLayout } from '../../components/layout'
 import {
   AuthorInitials,
   Cover,
-  DemoNote,
   Kicker,
   ShareLinks,
   TagList,
@@ -177,7 +176,6 @@ export function ArticlePage({
 
                 <footer className="article-end">
                   <TagList tags={tags} />
-                  {article.isDemo ? <DemoNote /> : null}
                 </footer>
 
                 {author ? (
@@ -196,7 +194,6 @@ export function ArticlePage({
                         <a className="text-link" href={`/author/${author.slug}`}>
                           More from {author.displayName.split(' ')[0]} →
                         </a>
-                        {article.isDemo ? <span className="meta">Demonstration profile</span> : null}
                       </div>
                     </div>
                   </aside>

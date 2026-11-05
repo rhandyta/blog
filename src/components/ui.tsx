@@ -263,14 +263,6 @@ export function Pagination({
   )
 }
 
-export function DemoNote() {
-  return (
-    <p className="demo-note">
-      Demonstration content — written for this prototype. The author profile and publication are illustrative, not real.
-    </p>
-  )
-}
-
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="empty-state">
