@@ -68,10 +68,42 @@ function clientIp(c: Context<AppEnv>): string {
   }
 }
 
-function shouldCountView(c: Context<AppEnv>): boolean {
+const recentViewKeys = new Map<string, number>()
+const VIEW_DEDUPE_MS = 60 * 60 * 1000
+const VIEW_DEDUPE_LIMIT = 5_000
+const VIEW_WINDOW_MS = 60 * 1000
+const VIEW_WRITES_PER_WINDOW = 120
+let viewWindowStartedAt = 0
+let viewWindowCount = 0
+
+function shouldCountView(c: Context<AppEnv>, articleId: string): boolean {
   const ua = c.req.header('user-agent') ?? ''
   if (/bot|spider|crawl|preview|headless|facebookexternalhit|slack|twitterbot|linkedinbot|discord/i.test(ua)) return false
   if (c.req.header('sec-purpose') === 'prefetch' || c.req.header('purpose') === 'prefetch') return false
+
+  const now = Date.now()
+  const key = `${articleId}:${clientIp(c)}`
+  const last = recentViewKeys.get(key)
+  if (last !== undefined && now - last < VIEW_DEDUPE_MS) return false
+
+  if (now - viewWindowStartedAt >= VIEW_WINDOW_MS) {
+    viewWindowStartedAt = now
+    viewWindowCount = 0
+  }
+  if (viewWindowCount >= VIEW_WRITES_PER_WINDOW) return false
+  viewWindowCount += 1
+
+  recentViewKeys.set(key, now)
+  if (recentViewKeys.size > VIEW_DEDUPE_LIMIT) {
+    for (const [entry, at] of recentViewKeys) {
+      if (now - at >= VIEW_DEDUPE_MS) recentViewKeys.delete(entry)
+    }
+    while (recentViewKeys.size > VIEW_DEDUPE_LIMIT) {
+      const oldest = recentViewKeys.keys().next().value
+      if (oldest === undefined) break
+      recentViewKeys.delete(oldest)
+    }
+  }
   return true
 }
 
@@ -160,7 +192,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         settings,
         origin,
         title: page > 1 ? `Articles — page ${page}` : 'Articles',
-        description: 'Every essay and note in Commonplace, newest first.',
+        description: 'Every essay and note in RhandytaVERSE, newest first.',
         path: page > 1 ? `/articles?page=${page}` : '/articles',
         ogImage: items[0]?.media ? ogFromMedia(items[0].media) : null,
       }),
@@ -209,7 +241,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         origin,
       ),
     ]
-    if (shouldCountView(c)) {
+    if (shouldCountView(c, detail.article.id)) {
       await recordArticleView(detail.article.id).catch(() => undefined)
     }
     return renderPageResponse(c, {
@@ -590,7 +622,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       lastBuild: cards[0]?.publishedAt ?? new Date().toISOString(),
     })
     c.header('Content-Type', 'application/rss+xml; charset=utf-8')
-    c.header('Cache-Control', 'public, max-age=300')
+    c.header('Cache-Control', 'public, max-age=300, s-maxage=300')
     return c.body(xml)
   })
 
@@ -638,7 +670,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       })),
     ]
     c.header('Content-Type', 'application/xml; charset=utf-8')
-    c.header('Cache-Control', 'public, max-age=3600')
+    c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
     return c.body(renderSitemap(entries))
   })
 
@@ -699,6 +731,11 @@ Sitemap: ${origin}/sitemap.xml
   })
 
   app.get('/api/articles', async (c) => {
+    const limited = rateLimit(`articles:${clientIp(c)}`, 120, 60_000)
+    if (!limited.allowed) {
+      c.header('Retry-After', String(limited.retryAfterSeconds))
+      return c.json({ error: 'Too many requests. Please wait a moment.' }, 429)
+    }
     const slugs = (c.req.query('slugs') ?? '')
       .split(',')
       .map((value) => value.trim())

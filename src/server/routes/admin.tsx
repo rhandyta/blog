@@ -431,7 +431,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
           description: '',
           canonicalPath: c.req.path,
           robots: 'noindex, nofollow',
-          siteName: 'Commonplace',
+          siteName: 'RhandytaVERSE',
           origin: getConfig().PUBLIC_ORIGIN,
           jsonLd: [],
         },
@@ -1163,7 +1163,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     if (!canManageContent(user)) return c.text('Forbidden', 403)
     const csv = await exportSubscribersCsv()
     c.header('Content-Type', 'text/csv; charset=utf-8')
-    c.header('Content-Disposition', 'attachment; filename="commonplace-subscribers.csv"')
+    c.header('Content-Disposition', 'attachment; filename="rhandytaverse-subscribers.csv"')
     return c.body(csv)
   })
 

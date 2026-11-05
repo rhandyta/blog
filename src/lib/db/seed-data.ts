@@ -130,7 +130,7 @@ export const seedAuthors: SeedAuthor[] = [
     roleTitle: 'Editor',
     bio: 'Writes about software, design, and the habits of attention. Demonstration author profile created for this prototype.',
     longBio:
-      'Mira keeps this publication. Her essays tend to start with a small observation — a menu that feels wrong, a notebook that stops being used, a feature nobody asked for — and work outward from there. This biography is a demonstration profile for the Commonplace prototype, not a real person, and no credentials are implied.',
+      'Mira keeps this publication. Her essays tend to start with a small observation — a menu that feels wrong, a notebook that stops being used, a feature nobody asked for — and work outward from there. This biography is a demonstration profile for the RhandytaVERSE prototype, not a real person, and no credentials are implied.',
     expertise: ['software', 'design', 'attention', 'interfaces'],
   },
   {
@@ -140,7 +140,7 @@ export const seedAuthors: SeedAuthor[] = [
     roleTitle: 'Contributing editor',
     bio: 'Notes on business, systems, and the craft of making things. Demonstration author profile created for this prototype.',
     longBio:
-      'Tobias writes about systems that last longer than their authors expect. His interests include maintenance, small firms, and the economics of doing a thing carefully. This biography is a demonstration profile for the Commonplace prototype.',
+      'Tobias writes about systems that last longer than their authors expect. His interests include maintenance, small firms, and the economics of doing a thing carefully. This biography is a demonstration profile for the RhandytaVERSE prototype.',
     expertise: ['systems', 'maintenance', 'business', 'craft'],
   },
   {
@@ -150,7 +150,7 @@ export const seedAuthors: SeedAuthor[] = [
     roleTitle: 'Contributing editor',
     bio: 'Essays on science, culture, and the odd corners of everyday life. Demonstration author profile created for this prototype.',
     longBio:
-      'Inés reads widely and takes notes in the margins. Her pieces move between science, culture, and the small rituals of a working life. This biography is a demonstration profile for the Commonplace prototype.',
+      'Inés reads widely and takes notes in the margins. Her pieces move between science, culture, and the small rituals of a working life. This biography is a demonstration profile for the RhandytaVERSE prototype.',
     expertise: ['science', 'culture', 'memory', 'reading'],
   },
 ]

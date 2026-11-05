@@ -327,7 +327,7 @@ export function AdminLayout({
       <aside className="admin-side">
         <a href="/admin" className="wordmark" style={{ color: 'inherit' }}>
           <Fleuron size={18} />
-          {`Commonplace`}
+          {`RhandytaVERSE`}
         </a>
         <div className="admin-side__context">Editorial desk</div>
         <nav className="admin-nav" aria-label="Admin">

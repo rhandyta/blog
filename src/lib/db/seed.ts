@@ -142,8 +142,8 @@ export async function seedDatabase(): Promise<void> {
   await saveSiteSettings({
     ...defaultSettings,
     about:
-      'Commonplace is a record of what one person is reading, building, and thinking about. It takes its name from the commonplace books kept by readers for centuries: private collections of passages, observations, and ideas, copied out and returned to.\n\nThis site is a working demonstration of a small publishing platform. The publication, its authors, and its articles are sample content created for the prototype rather than the work of real contributors.',
-    email: 'hello@commonplace.local',
+      'RhandytaVERSE is a record of what one person is reading, building, and thinking about. It takes its name from the commonplace books kept by readers for centuries: private collections of passages, observations, and ideas, copied out and returned to.\n\nThis site is a working demonstration of a small publishing platform. The publication, its authors, and its articles are sample content created for the prototype rather than the work of real contributors.',
+    email: 'hello@lab-rb.my.id',
     x: 'https://x.com/',
     github: 'https://github.com/',
     linkedin: 'https://www.linkedin.com/',

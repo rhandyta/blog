@@ -1,9 +1,9 @@
 {
-  "name": "commonplace",
+  "name": "rhandytaverse",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Commonplace — an editorial publishing platform",
+  "description": "RhandytaVERSE — an editorial publishing platform",
   "scripts": {
     "dev": "bun scripts/dev.ts",
     "dev:server": "bun --watch src/server/index.ts",

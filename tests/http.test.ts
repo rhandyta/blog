@@ -48,7 +48,7 @@ describe('public pages', () => {
     const response = await app.request('/')
     expect(response.status).toBe(200)
     const html = await response.text()
-    expect(html).toContain('<title>Commonplace</title>')
+    expect(html).toContain('<title>RhandytaVERSE</title>')
     expect(html).toContain('application/ld+json')
     expect(html).toContain('WebSite')
     expect(html).toContain('The Published Test Article')

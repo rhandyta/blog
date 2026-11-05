@@ -1,8 +1,8 @@
-# Commonplace
+# RhandytaVERSE
 
 A self-contained editorial publishing platform: server-rendered React, a real SQLite-backed CMS, and a print-inspired design system. It is built to be read, not to look like a template.
 
-**Commonplace** is a digital commonplace book — a personal index of essays across technology, design, science, culture, work, and the quieter parts of a working life. The demo content is labelled as demonstration material; the editorial tools behind it are fully functional.
+**RhandytaVERSE** is a digital commonplace book — a personal index of essays across technology, design, science, culture, work, and the quieter parts of a working life. The demo content is labelled as demonstration material; the editorial tools behind it are fully functional.
 
 ---
 
@@ -62,8 +62,8 @@ Open <http://localhost:3000>. The editorial desk is at <http://localhost:3000/ad
 The seed script creates an administrator from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env`. The example values are:
 
 ```
-email:    editor@commonplace.local
-password: commonplace-dev
+email:    editor@rhandytaverse.local
+password: rhandytaverse-dev
 ```
 
 Change these before deploying. The seed also creates three labelled demonstration author profiles.
@@ -244,9 +244,9 @@ Vercel Functions have a read-only filesystem, so the local SQLite file and uploa
 1. Create a Turso database and copy its URL and token:
 
    ```bash
-   turso db create commonplace
-   turso db show commonplace --url
-   turso db tokens create commonplace
+   turso db create rhandytaverse
+   turso db show rhandytaverse --url
+   turso db tokens create rhandytaverse
    ```
 
 2. Create a Blob store in the Vercel dashboard (Storage → Blob) and copy `BLOB_READ_WRITE_TOKEN`.

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "commonplace",
+      "name": "rhandytaverse",
       "dependencies": {
         "@fontsource-variable/fraunces": "^5.1.1",
         "@fontsource-variable/newsreader": "^5.1.1",

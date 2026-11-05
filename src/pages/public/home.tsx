@@ -109,7 +109,7 @@ export function HomePage({
             <div>
               <p>{settings.intro}</p>
               <p className="meta" style={{ marginTop: '1rem' }}>
-                <a className="text-link" href="/about">Read about Commonplace →</a>
+                <a className="text-link" href="/about">Read about RhandytaVERSE →</a>
               </p>
             </div>
           </div>

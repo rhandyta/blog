@@ -41,10 +41,10 @@ export type SiteSettings = {
 }
 
 export const defaultSettings: SiteSettings = {
-  title: 'Commonplace',
+  title: 'RhandytaVERSE',
   tagline: 'A personal index of ideas',
   description:
-    'Commonplace is an independent publication for essays and notes across technology, design, science, culture, and the quieter corners of a working life.',
+    'RhandytaVERSE is an independent publication for essays and notes across technology, design, science, culture, and the quieter corners of a working life.',
   issue: 'No. 01',
   intro:
     'An independent, reader-supported publication. Essays and notes on software, machines, design, work, science, and the things worth returning to.',
@@ -54,7 +54,7 @@ export const defaultSettings: SiteSettings = {
   newsletterBlurb:
     'New essays and useful fragments, delivered when there is something worth sending. No schedule, no noise.',
   about:
-    'Commonplace is a record of what one person is reading, building, and thinking about. It takes its name from the commonplace books kept by readers for centuries: private collections of passages, observations, and ideas, copied out and returned to.',
+    'RhandytaVERSE is a record of what one person is reading, building, and thinking about. It takes its name from the commonplace books kept by readers for centuries: private collections of passages, observations, and ideas, copied out and returned to.',
   email: '',
   x: '',
   github: '',

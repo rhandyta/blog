@@ -18,7 +18,7 @@ export function AboutPage({
         <div className="shell">
           <Kicker plain>About</Kicker>
           <h1 style={{ marginTop: '1rem' }}>
-            A commonplace book, kept in public.
+            A living index of ideas, kept in public.
           </h1>
           <p className="lede" style={{ marginTop: '1.5rem', maxWidth: '46ch' }}>
             {settings.tagline}. An independent publication about the things worth returning to — without a niche, a
@@ -49,7 +49,7 @@ export function AboutPage({
 
             <h2>How it is made</h2>
             <p>
-              Commonplace is a small, self-contained publishing platform. Pages are rendered on the server, the text is
+              RhandytaVERSE is a small, self-contained publishing platform. Pages are rendered on the server, the text is
               stored in a local SQLite database, images are processed into modern formats at upload, and the only
               client-side JavaScript covers a handful of interactions: the theme switch, reading progress, search, and
               saving an article for later.
