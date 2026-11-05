@@ -152,6 +152,33 @@ export const settings = sqliteTable('settings', {
   updatedAt: text('updated_at').notNull(),
 })
 
+export const automationActivity = sqliteTable('automation_activity', {
+  id: text('id').primaryKey(),
+  text: text('text').notNull().default(''),
+  mediaId: text('media_id').references(() => media.id, { onDelete: 'set null' }),
+  createdAt: text('created_at').notNull(),
+  consumedAt: text('consumed_at'),
+}, (table) => ({
+  createdIdx: index('automation_activity_created_idx').on(table.createdAt),
+}))
+
+export const automationRuns = sqliteTable('automation_runs', {
+  id: text('id').primaryKey(),
+  source: text('source', { enum: ['manual', 'cron'] }).notNull(),
+  kind: text('kind', { enum: ['activity', 'initiative'] }).notNull(),
+  activityId: text('activity_id').references(() => automationActivity.id, { onDelete: 'set null' }),
+  articleId: text('article_id').references(() => articles.id, { onDelete: 'set null' }),
+  status: text('status', {
+    enum: ['pending', 'published', 'reviewed', 'skipped', 'deleted', 'error'],
+  }).notNull().default('pending'),
+  error: text('error'),
+  createdAt: text('created_at').notNull(),
+  autoPublishAt: text('auto_publish_at'),
+}, (table) => ({
+  statusIdx: index('automation_runs_status_idx').on(table.status, table.autoPublishAt),
+  createdIdx: index('automation_runs_created_idx').on(table.createdAt),
+}))
+
 export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -174,3 +201,5 @@ export type MediaAsset = typeof media.$inferSelect
 export type Subscriber = typeof subscribers.$inferSelect
 export type ArticleRevision = typeof articleRevisions.$inferSelect
 export type Session = typeof sessions.$inferSelect
+export type AutomationActivity = typeof automationActivity.$inferSelect
+export type AutomationRun = typeof automationRuns.$inferSelect

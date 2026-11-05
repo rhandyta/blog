@@ -13,6 +13,7 @@
     "db:seed": "bun scripts/seed.ts",
     "db:reset": "bun scripts/reset.ts",
     "db:rebuild-search": "bun scripts/rebuild-search.ts",
+    "db:clear-content": "bun scripts/clear-content.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

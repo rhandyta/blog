@@ -65,12 +65,22 @@ import {
   updateMedia,
 } from '../../lib/db/queries/media'
 import { exportSubscribersCsv, listSubscribers, subscriberStats } from '../../lib/db/queries/subscribers'
-import { parseScheduleDate, articlePayloadSchema, authorInputSchema, categoryInputSchema, loginSchema, mediaPatchSchema, settingsInputSchema, tagInputSchema, validHttpUrl } from '../../lib/validation/admin'
+import { automationSettingsSchema, parseScheduleDate, articlePayloadSchema, authorInputSchema, categoryInputSchema, loginSchema, mediaPatchSchema, settingsInputSchema, tagInputSchema, validHttpUrl } from '../../lib/validation/admin'
 import { deleteStoredFiles, MAX_UPLOAD_BYTES, saveUpload, sniffImage } from '../../lib/media/storage'
+import {
+  createActivity,
+  getAutomationSettings,
+  listActivities,
+  listRuns,
+  saveAutomationSettings,
+} from '../../lib/db/queries/automation'
+import { generateAutomationDraft } from '../../lib/automation/generate'
+import { hasGeminiKey } from '../../lib/automation/gemini'
 import { baseHead } from '../head'
 import { renderPageResponse } from '../render-page'
 import type { AppEnv } from '../types'
 import { ArticleEditorPage, MediaLibraryPage, articleToEditorState } from '../../pages/admin/editor-shell'
+import { AutomationPage } from '../../pages/admin/automation'
 import { ArticleListPage, DashboardPage, RevisionsPage } from '../../pages/admin/dashboard'
 import { LoginPage } from '../../pages/admin/login'
 import { SettingsPage, SubscribersPage } from '../../pages/admin/settings'
@@ -104,6 +114,14 @@ const FLASH_MESSAGES: Record<string, Flash> = {
   'error-has-articles': { tone: 'error', message: 'This author still has articles. Reassign or delete them first.' },
   'error-csrf': { tone: 'error', message: 'The form expired. Please try again.' },
   'error-conflict': { tone: 'error', message: 'This article changed elsewhere. Reload before saving again.' },
+  'automation-saved': { tone: 'success', message: 'Automation settings saved.' },
+  'automation-activity-saved': { tone: 'success', message: 'Activity saved.' },
+  'automation-generated': { tone: 'success', message: 'Draft generated. Review it before the auto-publish window closes.' },
+  'automation-disabled': { tone: 'error', message: 'Automation is disabled.' },
+  'automation-no-key': { tone: 'error', message: 'GEMINI_API_KEY is not configured.' },
+  'automation-limit': { tone: 'error', message: 'The daily generation limit has been reached.' },
+  'automation-no-category': { tone: 'error', message: 'Create at least one category before generating.' },
+  'automation-error': { tone: 'error', message: 'The draft could not be generated. Check the automation history.' },
 }
 
 function flashFrom(c: Context<AppEnv>): Flash {
@@ -863,6 +881,118 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     await deleteStoredFiles(asset)
     await deleteMedia(asset.id)
     return c.json({ ok: true })
+  })
+
+  /* ------------------------------------------------------------------ *
+   *  Automation
+   * ------------------------------------------------------------------ */
+
+  app.get('/admin/automation', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const [settings, authors, activities, runs] = await Promise.all([
+      getAutomationSettings(),
+      listAuthors(),
+      listActivities(15),
+      listRuns(15),
+    ])
+    return renderAdminPage(
+      c,
+      <AutomationPage
+        user={user}
+        settings={settings}
+        authors={authors}
+        activities={activities}
+        runs={runs}
+        hasKey={hasGeminiKey()}
+        session={c.get('session')!}
+        flash={flashFrom(c)}
+      />,
+    )
+  })
+
+  app.post('/admin/automation/settings', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/automation?flash=error-csrf', 303)
+
+    const current = await getAutomationSettings()
+    const parsed = automationSettingsSchema.safeParse({
+      enabled: checkbox(body.enabled),
+      language: text(body.language, current.language),
+      model: text(body.model, current.model),
+      authorId: text(body.authorId).trim() || null,
+      autoPublish: checkbox(body.autoPublish),
+      autoPublishDelayHours: text(body.autoPublishDelayHours, String(current.autoPublishDelayHours)),
+      dailyLimit: text(body.dailyLimit, String(current.dailyLimit)),
+      initiativeBrief: text(body.initiativeBrief).trim() || current.initiativeBrief,
+    })
+    if (!parsed.success) return c.redirect('/admin/automation?flash=error-fields', 303)
+    if (parsed.data.authorId) {
+      const author = await getAuthorById(parsed.data.authorId)
+      if (!author) return c.redirect('/admin/automation?flash=error-fields', 303)
+    }
+    await saveAutomationSettings(parsed.data)
+    return c.redirect('/admin/automation?flash=automation-saved', 303)
+  })
+
+  app.post('/admin/automation/activity', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/automation?flash=error-csrf', 303)
+
+    const context = text(body.context).trim().slice(0, 2000)
+    const file = body.image
+    let mediaId: string | null = null
+
+    if (file instanceof File && file.size > 0) {
+      if (file.size > MAX_UPLOAD_BYTES) return c.redirect('/admin/automation?flash=error-fields', 303)
+      const buffer = Buffer.from(await file.arrayBuffer())
+      if (!sniffImage(buffer)) return c.redirect('/admin/automation?flash=error-fields', 303)
+      try {
+        const media = await saveUpload(buffer, {
+          originalName: file.name.slice(0, 200),
+          alt: context.slice(0, 200) || 'Activity image',
+          caption: null,
+          uploadedBy: user.id,
+          allowSvg: false,
+        })
+        mediaId = media?.id ?? null
+      } catch (error) {
+        console.error('[automation] activity image failed', error)
+        return c.redirect('/admin/automation?flash=error', 303)
+      }
+    }
+
+    if (!context && !mediaId) return c.redirect('/admin/automation?flash=error-fields', 303)
+    await createActivity({ text: context, mediaId })
+    return c.redirect('/admin/automation?flash=automation-activity-saved', 303)
+  })
+
+  app.post('/admin/automation/generate', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/automation?flash=error-csrf', 303)
+
+    const result = await generateAutomationDraft('manual')
+    const code = result.ok
+      ? 'automation-generated'
+      : result.reason === 'disabled'
+        ? 'automation-disabled'
+        : result.reason === 'missing-key'
+          ? 'automation-no-key'
+          : result.reason === 'limit'
+            ? 'automation-limit'
+            : result.reason === 'no-category'
+              ? 'automation-no-category'
+              : 'automation-error'
+    return c.redirect(`/admin/automation?flash=${code}`, 303)
   })
 
   /* ------------------------------------------------------------------ *

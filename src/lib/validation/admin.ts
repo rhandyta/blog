@@ -85,6 +85,17 @@ export const scheduleSchema = z.object({
   scheduledFor: z.string().min(1),
 })
 
+export const automationSettingsSchema = z.object({
+  enabled: z.boolean(),
+  language: z.string().trim().min(2).max(40),
+  model: z.string().trim().min(1).max(80),
+  authorId: z.string().trim().max(80).nullable(),
+  autoPublish: z.boolean(),
+  autoPublishDelayHours: z.coerce.number().int().min(1).max(168),
+  dailyLimit: z.coerce.number().int().min(1).max(10),
+  initiativeBrief: z.string().trim().max(2000),
+})
+
 export const mediaPatchSchema = z.object({
   alt: z.string().trim().max(300).optional(),
   caption: z.string().trim().max(400).nullable().optional(),

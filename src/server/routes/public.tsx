@@ -34,6 +34,7 @@ import {
 import { subscribeEmail, unsubscribeByToken } from '../../lib/db/queries/subscribers'
 import { searchPublished } from '../../lib/db/queries/search'
 import { rateLimit } from '../../lib/auth/rate-limit'
+import { runAutomationCron } from '../../lib/automation/generate'
 import { verifyPreviewToken } from '../../lib/seo/preview-token'
 import { articleJsonLd, breadcrumbJsonLd, collectionJsonLd, personJsonLd, websiteJsonLd } from '../../lib/seo/meta'
 import { renderRss, renderSitemap } from '../../lib/seo/feeds'
@@ -704,6 +705,21 @@ Sitemap: ${origin}/sitemap.xml
     }
     const published = await publishDueArticles()
     return c.json({ published })
+  })
+
+  app.get('/api/cron/automation', async (c) => {
+    const secret = getConfig().CRON_SECRET
+    if (secret) {
+      if (c.req.header('authorization') !== `Bearer ${secret}`) {
+        return c.json({ error: 'Unauthorized' }, 401)
+      }
+    } else if (isProd()) {
+      return c.json({ error: 'CRON_SECRET is not configured' }, 403)
+    }
+
+    const scheduled = await publishDueArticles()
+    const result = await runAutomationCron()
+    return c.json({ scheduled, ...result })
   })
 
   app.get('/api/search', async (c) => {

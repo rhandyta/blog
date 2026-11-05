@@ -8,8 +8,18 @@
   "regions": ["hnd1"],
   "functions": {
     "server.ts": {
-      "maxDuration": 60,
+      "maxDuration": 120,
       "includeFiles": "dist/client/**"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/automation",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/automation",
+      "schedule": "0 14 * * *"
+    }
+  ]
 }

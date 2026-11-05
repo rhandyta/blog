@@ -171,4 +171,31 @@ CREATE VIRTUAL TABLE IF NOT EXISTS article_fts USING fts5(
 );
 `,
   },
+  {
+    name: '003_automation.sql',
+    sql: `
+CREATE TABLE IF NOT EXISTS automation_activity (
+  id TEXT PRIMARY KEY,
+  text TEXT NOT NULL DEFAULT '',
+  media_id TEXT REFERENCES media(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  consumed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS automation_activity_created_idx ON automation_activity(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS automation_runs (
+  id TEXT PRIMARY KEY,
+  source TEXT NOT NULL CHECK (source IN ('manual', 'cron')),
+  kind TEXT NOT NULL CHECK (kind IN ('activity', 'initiative')),
+  activity_id TEXT REFERENCES automation_activity(id) ON DELETE SET NULL,
+  article_id TEXT REFERENCES articles(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'published', 'reviewed', 'skipped', 'deleted', 'error')),
+  error TEXT,
+  created_at TEXT NOT NULL,
+  auto_publish_at TEXT
+);
+CREATE INDEX IF NOT EXISTS automation_runs_status_idx ON automation_runs(status, auto_publish_at);
+CREATE INDEX IF NOT EXISTS automation_runs_created_idx ON automation_runs(created_at DESC);
+`,
+  },
 ]

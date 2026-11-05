@@ -20,6 +20,8 @@ const envSchema = z.object({
   TURSO_DATABASE_URL: optionalString,
   TURSO_AUTH_TOKEN: optionalString,
   BLOB_READ_WRITE_TOKEN: optionalString,
+  GEMINI_API_KEY: optionalString,
+  GEMINI_MODEL: optionalString,
 })
 
 export type AppConfig = z.infer<typeof envSchema>

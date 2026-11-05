@@ -19,8 +19,9 @@ A self-contained editorial publishing platform: server-rendered React, a real SQ
 | Search | SQLite FTS5 with BM25 ranking (LIKE fallback if unavailable) |
 | Editor | TipTap / ProseMirror (stored as JSON, rendered through a strict server-side serializer) |
 | Images | `sharp` — WebP + AVIF variants, resized masters, 1200×630 social crops; local disk or [Vercel Blob](https://vercel.com/storage/blob) |
+| Automation | Gemini (Google AI Studio) — drafts from daily activity or an editorial initiative, with a review window |
 | Validation | Zod |
-| Tests | `bun test` (42 unit + integration tests) |
+| Tests | `bun test` (51 unit + integration tests) |
 
 ### Rendering architecture
 
@@ -91,6 +92,7 @@ bun run db:seed
 | `bun run db:seed` | Seed categories, authors, tags, 13 articles, and generated covers (idempotent) |
 | `bun run db:reset` | Delete local data (database + uploads) |
 | `bun run db:rebuild-search` | Rebuild the FTS5 index |
+| `bun run db:clear-content -- --yes` | Remove articles, media, authors and subscribers; keep categories, tags, settings and admin users. Writes a local JSON backup first. |
 | `bun test` | Unit + HTTP integration tests against an in-memory database |
 | `bun run typecheck` | `tsc --noEmit` |
 
@@ -114,7 +116,9 @@ Validated at boot by Zod (`src/lib/config.ts`).
 | `TURSO_DATABASE_URL` | Vercel only | `libsql://…` URL. When unset, the app uses the local SQLite file at `DATABASE_PATH`. |
 | `TURSO_AUTH_TOKEN` | Vercel only | Token for the Turso database. |
 | `BLOB_READ_WRITE_TOKEN` | Vercel only | Vercel Blob token. When unset, uploads go to `UPLOAD_DIR` on local disk. |
-| `CRON_SECRET` | Vercel only | Bearer token protecting `GET /api/cron/publish`, used to run scheduled publishing. |
+| `CRON_SECRET` | Vercel only | Bearer token protecting `GET /api/cron/publish` and `GET /api/cron/automation`. |
+| `GEMINI_API_KEY` | Automation only | Google AI Studio key. Without it, automation stays idle and the admin page shows a warning. |
+| `GEMINI_MODEL` | no | Optional fallback model; the model can also be set per automation settings. Default `gemini-2.5-flash`. |
 
 On Vercel, `PUBLIC_ORIGIN` is derived automatically from `VERCEL_PROJECT_PRODUCTION_URL` (or `VERCEL_URL` on preview deployments) when it is not set explicitly.
 
@@ -130,11 +134,11 @@ The server refuses to boot in production with the placeholder session secret.
 
 **Editorial**
 
-`/admin/login` · `/admin` · `/admin/articles` · `/admin/articles/new` · `/admin/articles/:id/edit` · `/admin/articles/:id/revisions` · `/admin/media` · `/admin/categories[/:id]` · `/admin/tags[/:id]` · `/admin/authors[/:id]` · `/admin/subscribers` · `/admin/settings`.
+`/admin/login` · `/admin` · `/admin/articles` · `/admin/articles/new` · `/admin/articles/:id/edit` · `/admin/articles/:id/revisions` · `/admin/media` · `/admin/automation` · `/admin/categories[/:id]` · `/admin/tags[/:id]` · `/admin/authors[/:id]` · `/admin/subscribers` · `/admin/settings`.
 
 **API**
 
-`/api/admin/articles` (create/update/autosave/publish/schedule/unpublish/archive/delete) · `/api/admin/media` (upload, metadata, delete) · `/api/search` · `/api/articles?slugs=` · `/api/subscribe` · `/api/health`.
+`/api/admin/articles` (create/update/autosave/publish/schedule/unpublish/archive/delete) · `/api/admin/media` (upload, metadata, delete) · `/api/search` · `/api/articles?slugs=` · `/api/subscribe` · `/api/health` · `/api/cron/publish` · `/api/cron/automation`.
 
 ---
 
@@ -149,6 +153,7 @@ The server refuses to boot in production with the placeholder session secret.
 - **SEO panel** — slug, SEO title, meta description, canonical URL, social image, no-index, live search and social previews.
 - **Roles** — `admin`, `editor`, `author`. Authors see and edit only their own articles; content settings and taxonomy management are restricted.
 - **Subscribers** — real persistence, deduplication, unsubscribe tokens, CSV export. No transactional email provider is connected (see Limitations).
+- **Automation** — daily activity (text + optional image), a configurable author/language/model, Gemini drafts, a daily generation cap, and auto-publish after a 24-hour review window. See *Content automation* below.
 
 ### Content safety
 
@@ -259,6 +264,7 @@ Vercel Functions have a read-only filesystem, so the local SQLite file and uploa
    TURSO_AUTH_TOKEN=…
    BLOB_READ_WRITE_TOKEN=…
    CRON_SECRET=<long random string>
+   GEMINI_API_KEY=<Google AI Studio key>
    ```
 
    `PUBLIC_ORIGIN` is optional and derived from the deployment URL.
@@ -281,7 +287,18 @@ Vercel Functions have a read-only filesystem, so the local SQLite file and uploa
    bunx vercel deploy
    ```
 
-Scheduled publishing does not run in-process on Vercel. Add a Vercel Cron job that calls `GET /api/cron/publish` with `Authorization: Bearer $CRON_SECRET` at the interval your plan allows (for example `"crons": [{ "path": "/api/cron/publish", "schedule": "0 * * * *" }]` in `vercel.json`).
+Scheduled publishing does not run in-process on Vercel. The project includes a daily Vercel Cron at `0 2 * * *` calling `GET /api/cron/automation`, which publishes due scheduled articles, auto-publishes reviewed-free AI drafts, and generates one new draft. On the Hobby plan the cron can run once per day; for tighter publishing windows, point a free external cron service at the same endpoint with `Authorization: Bearer $CRON_SECRET`.
+
+### Content automation
+
+`/admin/automation` is the editorial control room for AI-assisted drafts:
+
+- Add a daily **activity** (text and optional image). The image is processed through the normal media pipeline and can become the article cover.
+- Choose the **author**, **language** (default Indonesian), Gemini model, daily generation limit (default 1), and the initiative brief used when there is no activity.
+- Press **Generate draft** to create a draft immediately, or let the daily cron do it.
+- Generated drafts are marked for **auto-publish after 24 hours**. If you edit, schedule, or publish the draft before then, auto-publish is skipped; otherwise the next cron publishes it automatically. This keeps a human review window without blocking the pipeline.
+
+The Gemini integration is provider-side optional: without `GEMINI_API_KEY` the page loads and the cron stays idle. The free tier is enough for a small publication; the daily limit is a hard guard in the application, not just a provider quota.
 
 SQLite FTS5 may not be available on every Turso database; the search layer detects it and falls back to `LIKE` queries automatically.
 
@@ -304,8 +321,9 @@ Health check: `GET /api/health` returns `{ "ok": true }`.
 - **Single instance** — in-memory rate limiting assumes one server. On Vercel that limit is per function instance; move it to Redis or another shared store if you need a global limit. Filesystem storage is replaced by Turso + Vercel Blob there.
 - **Popularity** — “Most read” appears only after real views have been recorded; no seeded fake numbers.
 - **Slug changes** — editing a slug changes the public URL. A redirect-history table would be the next step for long-lived archives.
-- **Scheduled publishing** runs in-process; for multiple instances, move it to a shared cron job.
-- **Demo content** — the authors, articles, and cover art are generated for this prototype. No statistics, testimonials, or credentials are invented.
+- **Scheduled publishing** runs in-process; on Vercel it is handled by `/api/cron/automation` and the daily cron jobs.
+- **Automation timing** — the Hobby plan cron runs twice a day, so an auto-publish scheduled for a specific hour can land up to roughly 12 hours after its 24-hour window. Use an hourly external cron (with `CRON_SECRET`) if exact timing matters.
+- **AI review** — Gemini drafts are intended to be reviewed. Auto-publish is a safety net, not a substitute for editorial judgement.
 
 ---
 
@@ -325,15 +343,16 @@ src/
     content/         TipTap renderer, markdown parser, text utilities
     db/              schema, client, migrations, seed data, queries
     media/           upload pipeline, generated cover art
+    automation/      Gemini client, draft generation, auto-publish queue
     seo/             meta/JSON-LD, feeds, signed preview tokens
     validation/      Zod schemas
   styles/            tokens, editorial CSS, admin CSS
 tests/               unit + HTTP integration suites
-scripts/             dev, build helpers, migrate, seed, reset, rebuild search
+scripts/             dev, build helpers, migrate, seed, reset, clear content, rebuild search
 ```
 
 ---
 
 ## Content note
 
-The publication, its three authors, and all seeded articles are demonstration material written for this project. Author profiles say so on the public site, and seeded articles carry a discreet prototype notice. The CMS, authentication, persistence, search, feeds, and media pipeline are real and operate on that content.
+The production dataset can be cleared with `bun run db:clear-content -- --yes`, which keeps categories, tags, settings and admin users, and writes a local JSON backup first. New content can be written in the CMS or generated from `/admin/automation`; AI drafts are reviewed before publication and still require editorial judgement for accuracy and tone.

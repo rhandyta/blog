@@ -333,6 +333,7 @@ export function AdminLayout({
           {adminLink(path, '/admin', 'Overview')}
           {adminLink(path, '/admin/articles', 'Articles', stats?.drafts)}
           {adminLink(path, '/admin/media', 'Media')}
+          {adminLink(path, '/admin/automation', 'Automation')}
           {user.role !== 'author' ? (
             <>
               <div className="admin-nav__group">Organise</div>

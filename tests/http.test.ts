@@ -41,6 +41,17 @@ async function login(): Promise<{ cookie: string; csrfToken: string }> {
   return { cookie, csrfToken: sessionJson.csrfToken }
 }
 
+describe('automation', () => {
+  test('automation page renders for editors', async () => {
+    const { cookie } = await login()
+    const response = await app.request('/admin/automation', { headers: { cookie } })
+    expect(response.status).toBe(200)
+    const html = await response.text()
+    expect(html).toContain('Automation')
+    expect(html).toContain('Generate draft sekarang')
+  })
+})
+
 describe('public pages', () => {
   beforeAll(() => resetRateLimits())
 
