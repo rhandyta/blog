@@ -47,7 +47,7 @@ export const defaultSettings: SiteSettings = {
     'RhandytaVERSE is an independent publication for essays and notes across technology, design, science, culture, and the quieter corners of a working life.',
   issue: 'No. 01',
   intro:
-    'An independent, reader-supported publication. Essays and notes on software, machines, design, work, science, and the things worth returning to.',
+    'An independent publication. Essays and notes on software, machines, design, work, science, and the things worth returning to.',
   manifesto: 'A place to keep the things worth keeping — and to think them through in public.',
   manifestoBy: 'The editor',
   newsletterTitle: 'A letter, occasionally.',
