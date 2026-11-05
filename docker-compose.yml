@@ -1,0 +1,17 @@
+services:
+  commonplace:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /app/data/commonplace.db
+      UPLOAD_DIR: /app/data/uploads
+    volumes:
+      - commonplace-data:/app/data
+
+volumes:
+  commonplace-data:
