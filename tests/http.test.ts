@@ -114,6 +114,8 @@ describe('public pages', () => {
       '/search?q=notebook',
       '/saved',
       '/about',
+      '/privacy',
+      '/terms',
       '/subscribe',
     ]) {
       const response = await app.request(path)
@@ -133,6 +135,8 @@ describe('public pages', () => {
     expect(response.status).toBe(200)
     const xml = await response.text()
     expect(xml).toContain('/articles/test-published')
+    expect(xml).toContain('/privacy')
+    expect(xml).toContain('/terms')
     expect(xml).not.toContain('/articles/test-draft')
     expect(xml).not.toContain('/articles/test-scheduled')
     expect(xml).not.toContain('/articles/test-noindex')
@@ -222,6 +226,17 @@ describe('newsletter', () => {
       body: JSON.stringify({ email: 'not-an-email' }),
     })
     expect(invalid.status).toBe(400)
+
+    const oneClick = await app.request(
+      `/unsubscribe?token=${encodeURIComponent(pending.items[0]?.unsubscribeToken ?? '')}`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: 'List-Unsubscribe=One-Click',
+      },
+    )
+    expect(oneClick.status).toBe(200)
+    expect((await listSubscribers({ q: 'reader@example.com' })).items[0]?.status).toBe('unsubscribed')
   })
 
   test('cross-origin form submissions are rejected', async () => {

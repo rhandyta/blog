@@ -1,4 +1,4 @@
-import type { NewsletterBroadcast, NewsletterSchedule, User } from '../../lib/db/schema'
+import type { NewsletterBroadcast, NewsletterEvent, NewsletterSchedule, User } from '../../lib/db/schema'
 import { formatDate } from '../../lib/content/html'
 import { cadenceLabel } from '../../lib/newsletter/schedule'
 import { AdminLayout } from '../../components/layout'
@@ -14,6 +14,8 @@ export function NewsletterPage({
   emailReady,
   broadcasts,
   schedule,
+  events,
+  webhookReady,
   flash,
 }: {
   user: User
@@ -23,6 +25,8 @@ export function NewsletterPage({
   emailReady: boolean
   broadcasts: NewsletterBroadcast[]
   schedule: NewsletterSchedule
+  events: NewsletterEvent[]
+  webhookReady: boolean
   flash: Flash
 }) {
   return (
@@ -47,7 +51,6 @@ export function NewsletterPage({
         action="/admin/newsletter/send"
         className="admin-form"
         style={{ maxWidth: '52rem' }}
-        data-confirm={`Send this newsletter to ${confirmedCount} confirmed subscriber${confirmedCount === 1 ? '' : 's'}?`}
       >
         <CsrfField token={csrfToken} />
         <section className="admin-card">
@@ -79,11 +82,33 @@ export function NewsletterPage({
               The free Resend tier supports up to 100 messages per day.
             </p>
           </div>
+          <div className="field">
+            <label htmlFor="testEmail">Test recipient</label>
+            <input
+              className="input"
+              id="testEmail"
+              name="testEmail"
+              type="email"
+              defaultValue={user.email}
+            />
+            <p className="hint" style={{ marginTop: '0.35rem' }}>
+              Send a single preview to this address. Test sends are not recorded as broadcasts.
+            </p>
+          </div>
           <div className="form-actions">
+            <button
+              className="btn btn--ghost"
+              type="submit"
+              formAction="/admin/newsletter/test"
+              disabled={!emailReady}
+            >
+              Send test
+            </button>
             <button
               className="btn btn--solid"
               type="submit"
               disabled={!emailReady || confirmedCount === 0}
+              data-confirm={`Send this newsletter to ${confirmedCount} confirmed subscriber${confirmedCount === 1 ? '' : 's'}?`}
             >
               Send to {confirmedCount} subscriber{confirmedCount === 1 ? '' : 's'}
             </button>
@@ -199,6 +224,45 @@ export function NewsletterPage({
           </div>
         ) : (
           <p className="hint">No newsletter has been sent yet.</p>
+        )}
+      </section>
+
+      <section className="admin-card" style={{ marginTop: '1.25rem' }}>
+        <div className="admin-card__head">
+          <h2>Delivery events</h2>
+          {webhookReady ? <span className="meta">Resend webhook</span> : <span className="meta">Webhook secret missing</span>}
+        </div>
+        {!webhookReady ? (
+          <p className="hint" style={{ marginBottom: '1rem' }}>
+            Add a Resend webhook for <code>/api/webhooks/resend</code> and set <code>RESEND_WEBHOOK_SECRET</code> to
+            record delivered, opened, clicked, bounced, and complained events.
+          </p>
+        ) : null}
+        {events.length ? (
+          <div className="admin-table-wrap" style={{ border: 0 }}>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>Email</th>
+                  <th>Subject</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((event) => (
+                  <tr key={event.id}>
+                    <td className="muted-cell">{event.type.replace(/^email\./, '')}</td>
+                    <td className="muted-cell">{event.email ?? '—'}</td>
+                    <td className="title-cell">{event.subject ?? '—'}</td>
+                    <td className="muted-cell">{formatDate(event.createdAt, 'short')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="hint">No delivery events yet.</p>
         )}
       </section>
     </AdminLayout>

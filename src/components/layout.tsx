@@ -200,6 +200,8 @@ export function SiteFooter({
               <li><a href="/search">Search</a></li>
               <li><a href="/saved">Saved</a></li>
               <li><a href="/about">About</a></li>
+              <li><a href="/privacy">Privacy</a></li>
+              <li><a href="/terms">Terms</a></li>
             </ul>
           </div>
           <div className="footer-col">

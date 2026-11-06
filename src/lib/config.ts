@@ -27,6 +27,7 @@ const envSchema = z.object({
   RESEND_API_KEY: optionalString,
   NEWSLETTER_FROM: optionalString,
   NEWSLETTER_REPLY_TO: optionalString,
+  RESEND_WEBHOOK_SECRET: optionalString,
 })
 
 export type AppConfig = z.infer<typeof envSchema>

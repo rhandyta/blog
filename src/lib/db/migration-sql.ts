@@ -281,4 +281,23 @@ INSERT OR IGNORE INTO newsletter_schedule (id, enabled, cadence, weekday, hour_u
 VALUES ('digest', 1, 'weekly', 1, 2, 'readers', 5, CURRENT_TIMESTAMP);
 `,
   },
+  {
+    name: '008_newsletter_events.sql',
+    sql: `
+ALTER TABLE subscribers ADD COLUMN suppression_reason TEXT;
+
+CREATE TABLE IF NOT EXISTS newsletter_events (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  email TEXT,
+  email_id TEXT,
+  subject TEXT,
+  payload TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  processed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS newsletter_events_type_idx ON newsletter_events(type, created_at DESC);
+CREATE INDEX IF NOT EXISTS newsletter_events_created_idx ON newsletter_events(created_at DESC);
+`,
+  },
 ]

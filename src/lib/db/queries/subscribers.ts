@@ -112,6 +112,38 @@ export async function subscribeEmail(
     : { result: 'subscribed', email: normalized }
 }
 
+export async function getSubscriberById(id: string) {
+  const rows = await getDb().select().from(subscribers).where(eq(subscribers.id, id)).limit(1)
+  return rows[0]
+}
+
+export async function getSubscriberByEmail(email: string) {
+  const rows = await getDb()
+    .select()
+    .from(subscribers)
+    .where(eq(subscribers.email, normalizeEmail(email)))
+    .limit(1)
+  return rows[0]
+}
+
+export async function deleteSubscriberById(id: string): Promise<boolean> {
+  const row = await getSubscriberById(id)
+  if (!row) return false
+  await getDb().delete(subscribers).where(eq(subscribers.id, id))
+  return true
+}
+
+export async function issueConfirmation(id: string): Promise<{ email: string; token: string } | null> {
+  const row = await getSubscriberById(id)
+  if (!row || row.status !== 'subscribed' || row.confirmedAt) return null
+  const token = confirmationToken()
+  await getDb()
+    .update(subscribers)
+    .set({ confirmationToken: token, confirmationSentAt: new Date().toISOString() })
+    .where(eq(subscribers.id, id))
+  return { email: row.email, token }
+}
+
 export async function clearConfirmationTimestamp(email: string): Promise<void> {
   await getDb()
     .update(subscribers)

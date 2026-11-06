@@ -170,7 +170,7 @@ export function SubscribersPage({
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
-            <tr><th>Email</th><th>Status</th><th>Source</th><th>Signed up</th></tr>
+            <tr><th>Email</th><th>Status</th><th>Source</th><th>Signed up</th><th /></tr>
           </thead>
           <tbody>
             {subscribers.map((subscriber) => (
@@ -188,7 +188,7 @@ export function SubscribersPage({
                     }
                   >
                     {subscriber.status === 'unsubscribed'
-                      ? 'unsubscribed'
+                      ? (subscriber.suppressionReason ?? 'unsubscribed')
                       : subscriber.confirmedAt
                         ? 'confirmed'
                         : 'pending'}
@@ -196,10 +196,28 @@ export function SubscribersPage({
                 </td>
                 <td className="muted-cell">{subscriber.source}</td>
                 <td className="muted-cell">{formatDate(subscriber.createdAt, 'long')}</td>
+                <td>
+                  <div className="actions">
+                    {subscriber.status === 'subscribed' && !subscriber.confirmedAt ? (
+                      <form method="post" action={`/admin/subscribers/${subscriber.id}/resend`}>
+                        <CsrfField token={csrfToken} />
+                        <button className="btn btn--ghost btn--small" type="submit">Resend</button>
+                      </form>
+                    ) : null}
+                    <form
+                      method="post"
+                      action={`/admin/subscribers/${subscriber.id}/delete`}
+                      data-confirm="Remove this subscriber permanently?"
+                    >
+                      <CsrfField token={csrfToken} />
+                      <button className="btn btn--danger btn--small" type="submit">Remove</button>
+                    </form>
+                  </div>
+                </td>
               </tr>
             ))}
             {!subscribers.length ? (
-              <tr><td colSpan={4} className="hint" style={{ padding: '1.5rem' }}>No subscribers yet. The newsletter form writes here.</td></tr>
+              <tr><td colSpan={5} className="hint" style={{ padding: '1.5rem' }}>No subscribers yet. The newsletter form writes here.</td></tr>
             ) : null}
           </tbody>
         </table>

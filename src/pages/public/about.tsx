@@ -102,6 +102,8 @@ export function AboutPage({
             <ul>
               <li><a href="/rss.xml">RSS feed</a></li>
               <li><a href="/subscribe">Newsletter</a></li>
+              <li><a href="/privacy">Privacy</a></li>
+              <li><a href="/terms">Terms</a></li>
               {settings.email ? <li><a href={`mailto:${settings.email}`}>{settings.email}</a></li> : null}
               {settings.github ? (
                 <li><a href={settings.github} rel="noopener noreferrer" target="_blank">GitHub ↗</a></li>

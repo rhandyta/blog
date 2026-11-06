@@ -1,6 +1,6 @@
 import { getConfig } from '../config'
 import { digestEmail } from '../email/templates'
-import { emailConfigured, sendEmail } from '../email/mailer'
+import { emailConfigured, sendEmailBatch } from '../email/mailer'
 import { getSiteSettings } from '../db/queries/taxonomy'
 import { getDigestArticles } from '../db/queries/analytics'
 import { getNewsletterSchedule, hasDigestForPeriod } from '../db/queries/newsletter'
@@ -44,33 +44,32 @@ export async function runScheduledNewsletter(options: {
 
   const recipients = await listConfirmedSubscribers()
   if (!recipients.length) return { status: 'skipped', reason: 'no-subscribers' }
-  if (recipients.length > 100) return { status: 'error', reason: 'too-many' }
 
   const settings = await getSiteSettings()
   const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
   const subject = digestSubject(schedule.cadence)
   const intro = digestIntro(schedule.cadence)
-  let sent = 0
-  let failed = 0
-
-  for (const subscriber of recipients) {
+  const messages = recipients.map((subscriber) => {
     const unsubscribeUrl = `${origin}/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribeToken)}`
-    const mail = digestEmail({
-      siteTitle: settings.title,
-      origin,
-      subject,
-      intro,
-      articles,
-      unsubscribeUrl,
-    })
-    const result = await sendEmail({
+    return {
       to: subscriber.email,
-      ...mail,
-      headers: { 'List-Unsubscribe': `<${unsubscribeUrl}>` },
-    })
-    if (result.ok) sent += 1
-    else failed += 1
-  }
+      ...digestEmail({
+        siteTitle: settings.title,
+        origin,
+        subject,
+        intro,
+        articles,
+        unsubscribeUrl,
+      }),
+      headers: {
+        'List-Unsubscribe': `<${unsubscribeUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
+    }
+  })
+  const results = await sendEmailBatch(messages)
+  const sent = results.filter((result) => result.ok).length
+  const failed = results.length - sent
 
   await recordNewsletterBroadcast({
     subject,

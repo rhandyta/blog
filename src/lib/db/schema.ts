@@ -137,6 +137,7 @@ export const subscribers = sqliteTable('subscribers', {
   confirmedAt: text('confirmed_at'),
   confirmationToken: text('confirmation_token'),
   confirmationSentAt: text('confirmation_sent_at'),
+  suppressionReason: text('suppression_reason'),
 }, (table) => ({
   emailIdx: uniqueIndex('subscribers_email_idx').on(table.email),
   confirmationIdx: uniqueIndex('subscribers_confirmation_token_idx').on(table.confirmationToken),
@@ -207,6 +208,20 @@ export const newsletterSchedule = sqliteTable('newsletter_schedule', {
   updatedAt: text('updated_at').notNull(),
 })
 
+export const newsletterEvents = sqliteTable('newsletter_events', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(),
+  email: text('email'),
+  emailId: text('email_id'),
+  subject: text('subject'),
+  payload: text('payload').notNull(),
+  createdAt: text('created_at').notNull(),
+  processedAt: text('processed_at'),
+}, (table) => ({
+  typeIdx: index('newsletter_events_type_idx').on(table.type, table.createdAt),
+  createdIdx: index('newsletter_events_created_idx').on(table.createdAt),
+}))
+
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
@@ -264,6 +279,7 @@ export type MediaAsset = typeof media.$inferSelect
 export type Subscriber = typeof subscribers.$inferSelect
 export type NewsletterBroadcast = typeof newsletterBroadcasts.$inferSelect
 export type NewsletterSchedule = typeof newsletterSchedule.$inferSelect
+export type NewsletterEvent = typeof newsletterEvents.$inferSelect
 export type ArticleRevision = typeof articleRevisions.$inferSelect
 export type ArticleVisit = typeof articleVisits.$inferSelect
 export type ArticleReader = typeof articleReaders.$inferSelect

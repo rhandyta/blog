@@ -1,8 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { run } from '../src/lib/db/client'
+import { recordNewsletterEvent } from '../src/lib/db/queries/newsletter-events'
 import {
   confirmSubscriber,
   csvCell,
+  deleteSubscriberById,
+  getSubscriberByEmail,
+  issueConfirmation,
   listSubscribers,
   subscribeEmail,
   unsubscribeByToken,
@@ -51,6 +55,48 @@ describe('double opt-in', () => {
       const unsubscribed = (await listSubscribers({ q: email })).items[0]
       expect(unsubscribed?.status).toBe('unsubscribed')
     } finally {
+      await run('DELETE FROM subscribers WHERE email = ?', [email])
+    }
+  })
+
+  test('can resend a confirmation and delete the subscriber', async () => {
+    const email = 'resend-delete@example.com'
+    try {
+      const outcome = await subscribeEmail(email, { requireConfirmation: true })
+      if (outcome.result !== 'pending') throw new Error('expected pending')
+      const subscriber = await getSubscriberByEmail(email)
+      expect(subscriber).toBeTruthy()
+      const issued = await issueConfirmation(subscriber!.id)
+      expect(issued?.token).toBeTruthy()
+      expect(issued?.token).not.toBe(subscriber?.confirmationToken)
+      expect(await deleteSubscriberById(subscriber!.id)).toBe(true)
+      expect(await getSubscriberByEmail(email)).toBeUndefined()
+    } finally {
+      await run('DELETE FROM subscribers WHERE email = ?', [email])
+    }
+  })
+
+  test('suppresses a subscriber after a Resend bounce', async () => {
+    const email = 'bounce-test@example.com'
+    const eventId = 'evt_bounce_test'
+    try {
+      await subscribeEmail(email, { requireConfirmation: true })
+      const pending = await getSubscriberByEmail(email)
+      await confirmSubscriber(pending?.confirmationToken ?? '')
+      const inserted = await recordNewsletterEvent({
+        id: eventId,
+        payload: JSON.stringify({ type: 'email.bounced' }),
+        event: {
+          type: 'email.bounced',
+          data: { to: [email], email_id: 'email_test', subject: 'Test' },
+        },
+      })
+      expect(inserted).toBe(true)
+      const suppressed = await getSubscriberByEmail(email)
+      expect(suppressed?.status).toBe('unsubscribed')
+      expect(suppressed?.suppressionReason).toBe('bounced')
+    } finally {
+      await run('DELETE FROM newsletter_events WHERE id = ?', [eventId])
       await run('DELETE FROM subscribers WHERE email = ?', [email])
     }
   })

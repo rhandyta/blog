@@ -40,6 +40,8 @@ import {
 } from '../../lib/db/queries/subscribers'
 import { sendEmail } from '../../lib/email/mailer'
 import { confirmationEmail } from '../../lib/email/templates'
+import { verifyResendWebhook } from '../../lib/email/webhook'
+import { recordNewsletterEvent } from '../../lib/db/queries/newsletter-events'
 import { pruneAnalytics } from '../../lib/db/queries/analytics'
 import { buildVisitContext } from '../../lib/analytics/visitor'
 import { searchPublished } from '../../lib/db/queries/search'
@@ -52,6 +54,7 @@ import { renderRss, renderSitemap } from '../../lib/seo/feeds'
 import { ArticlePage } from '../../pages/public/article'
 import { ArticlesPage } from '../../pages/public/articles'
 import { AboutPage } from '../../pages/public/about'
+import { PrivacyPage, TermsPage } from '../../pages/public/legal'
 import { ArchivePage } from '../../pages/public/archive'
 import { AuthorPage } from '../../pages/public/author'
 import { HomeEmptyPage, HomePage } from '../../pages/public/home'
@@ -602,6 +605,36 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
     })
   })
 
+  app.get('/privacy', async (c) => {
+    const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
+    const { settings, categories } = await layout()
+    return renderPageResponse(c, {
+      element: <PrivacyPage settings={settings} categories={categories} />,
+      head: baseHead({
+        settings,
+        origin,
+        title: 'Privacy policy',
+        description: 'How RhandytaVERSE handles newsletter and readership data.',
+        path: '/privacy',
+      }),
+    })
+  })
+
+  app.get('/terms', async (c) => {
+    const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
+    const { settings, categories } = await layout()
+    return renderPageResponse(c, {
+      element: <TermsPage settings={settings} categories={categories} />,
+      head: baseHead({
+        settings,
+        origin,
+        title: 'Terms of use',
+        description: 'Terms for reading and subscribing to RhandytaVERSE.',
+        path: '/terms',
+      }),
+    })
+  })
+
   app.get('/subscribe', async (c) => {
     const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
     const { settings, categories } = await layout()
@@ -648,6 +681,20 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
     })
   })
 
+  app.post('/unsubscribe', async (c) => {
+    let token = c.req.query('token')?.trim() ?? ''
+    if (!token) {
+      try {
+        const body = await c.req.parseBody()
+        token = typeof body.token === 'string' ? body.token.trim() : ''
+      } catch {
+        token = ''
+      }
+    }
+    const email = token ? await unsubscribeByToken(token) : null
+    return c.json({ ok: Boolean(email) }, email ? 200 : 404)
+  })
+
   app.get('/confirm', async (c) => {
     const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
     const { settings, categories } = await layout()
@@ -666,6 +713,35 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         robots: 'noindex, nofollow',
       }),
     })
+  })
+
+  app.post('/api/webhooks/resend', async (c) => {
+    const secret = getConfig().RESEND_WEBHOOK_SECRET
+    if (!secret) return c.json({ error: 'Webhook is not configured.' }, 503)
+    const payload = await c.req.text()
+    const valid = verifyResendWebhook({
+      id: c.req.header('svix-id') ?? null,
+      timestamp: c.req.header('svix-timestamp') ?? null,
+      signature: c.req.header('svix-signature') ?? null,
+      payload,
+      secret,
+    })
+    if (!valid) return c.json({ error: 'Invalid signature.' }, 401)
+    let event: unknown
+    try {
+      event = JSON.parse(payload)
+    } catch {
+      return c.json({ error: 'Invalid payload.' }, 400)
+    }
+    const id = c.req.header('svix-id') ?? crypto.randomUUID()
+    await recordNewsletterEvent({
+      id,
+      event: event as Parameters<typeof recordNewsletterEvent>[0]['event'],
+      payload,
+    }).catch((error) => {
+      console.error('[newsletter] webhook processing failed', error)
+    })
+    return c.json({ ok: true })
   })
 
   app.get('/rss.xml', async (c) => {
@@ -720,6 +796,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       { loc: `${origin}/topics`, lastmod: today, changefreq: 'weekly', priority: 0.7 },
       { loc: `${origin}/archive`, lastmod: today, changefreq: 'weekly', priority: 0.7 },
       { loc: `${origin}/about`, lastmod: today, changefreq: 'monthly', priority: 0.4 },
+      { loc: `${origin}/privacy`, lastmod: today, changefreq: 'yearly', priority: 0.2 },
+      { loc: `${origin}/terms`, lastmod: today, changefreq: 'yearly', priority: 0.2 },
       { loc: `${origin}/subscribe`, lastmod: today, changefreq: 'monthly', priority: 0.4 },
       ...cards.filter((card) => !card.noIndex).map((card) => ({
         loc: `${origin}/articles/${card.slug}`,

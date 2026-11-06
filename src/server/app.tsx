@@ -71,6 +71,10 @@ export function createApp(): Hono<AppEnv> {
   })
 
   app.use('*', async (c, next) => {
+    if (c.req.path === '/api/webhooks/resend' || c.req.path === '/unsubscribe') {
+      await next()
+      return
+    }
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(c.req.method)) {
       const origin = c.req.header('origin')
       if (origin) {

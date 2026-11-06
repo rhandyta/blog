@@ -65,16 +65,21 @@ import {
   updateMedia,
 } from '../../lib/db/queries/media'
 import {
+  clearConfirmationTimestamp,
+  deleteSubscriberById,
   exportSubscribersCsv,
+  getSubscriberByEmail,
+  issueConfirmation,
   listConfirmedSubscribers,
   listNewsletterBroadcasts,
   listSubscribers,
   recordNewsletterBroadcast,
   subscriberStats,
 } from '../../lib/db/queries/subscribers'
-import { emailConfigured, sendEmail } from '../../lib/email/mailer'
-import { newsletterEmail } from '../../lib/email/templates'
+import { emailConfigured, sendEmail, sendEmailBatch } from '../../lib/email/mailer'
+import { confirmationEmail, newsletterEmail } from '../../lib/email/templates'
 import { getNewsletterSchedule, saveNewsletterSchedule } from '../../lib/db/queries/newsletter'
+import { listNewsletterEvents } from '../../lib/db/queries/newsletter-events'
 import { runScheduledNewsletter } from '../../lib/newsletter/digest'
 import {
   getAnalyticsOverview,
@@ -155,6 +160,11 @@ const FLASH_MESSAGES: Record<string, Flash> = {
   'digest-already': { tone: 'error', message: 'The digest for this period has already been sent.' },
   'digest-no-subscribers': { tone: 'error', message: 'There are no confirmed subscribers.' },
   'digest-error': { tone: 'error', message: 'The digest could not be sent.' },
+  'subscriber-deleted': { tone: 'success', message: 'Subscriber removed.' },
+  'confirmation-resent': { tone: 'success', message: 'Confirmation email sent again.' },
+  'confirmation-error': { tone: 'error', message: 'The confirmation email could not be sent.' },
+  'newsletter-test-sent': { tone: 'success', message: 'Test email sent.' },
+  'newsletter-test-error': { tone: 'error', message: 'The test email could not be sent.' },
   'automation-no-key': { tone: 'error', message: 'GEMINI_API_KEY is not configured.' },
   'automation-limit': { tone: 'error', message: 'The daily generation limit has been reached.' },
   'automation-no-category': { tone: 'error', message: 'Create at least one category before generating.' },
@@ -1332,10 +1342,11 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   app.get('/admin/newsletter', async (c) => {
     const user = c.get('user')!
     if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
-    const [stats, broadcasts, schedule] = await Promise.all([
+    const [stats, broadcasts, schedule, events] = await Promise.all([
       subscriberStats(),
       listNewsletterBroadcasts(8),
       getNewsletterSchedule(),
+      listNewsletterEvents(10),
     ])
     return renderAdminPage(
       c,
@@ -1347,8 +1358,42 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         emailReady={emailConfigured()}
         broadcasts={broadcasts}
         schedule={schedule}
+        events={events}
+        webhookReady={Boolean(getConfig().RESEND_WEBHOOK_SECRET)}
         flash={flashFrom(c)}
       />,
+    )
+  })
+
+  app.post('/admin/newsletter/test', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const body = await parseBody(c)
+    if (!formCsrfOk(c.get('session')!, body)) return c.redirect('/admin/newsletter?flash=error-csrf', 303)
+    if (!emailConfigured()) return c.redirect('/admin/newsletter?flash=newsletter-not-configured', 303)
+    const testEmail = text(body.testEmail).trim().toLowerCase()
+    const subject = text(body.subject).trim().slice(0, 160)
+    const message = text(body.body).trim().slice(0, 20000)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(testEmail) || !subject || !message) {
+      return c.redirect('/admin/newsletter?flash=error-fields', 303)
+    }
+    const settings = await getSiteSettings()
+    const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
+    const subscriber = await getSubscriberByEmail(testEmail)
+    const unsubscribeUrl = subscriber
+      ? `${origin}/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribeToken)}`
+      : `${origin}/unsubscribe`
+    const mail = newsletterEmail({
+      siteTitle: settings.title,
+      origin,
+      subject,
+      body: message,
+      unsubscribeUrl,
+    })
+    const result = await sendEmail({ to: testEmail, ...mail })
+    return c.redirect(
+      `/admin/newsletter?flash=${result.ok ? 'newsletter-test-sent' : 'newsletter-test-error'}`,
+      303,
     )
   })
 
@@ -1431,35 +1476,34 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
 
     const recipients = await listConfirmedSubscribers()
     if (!recipients.length) return c.redirect('/admin/newsletter?flash=newsletter-empty', 303)
-    if (recipients.length > 100) return c.redirect('/admin/newsletter?flash=newsletter-too-many', 303)
 
     const settings = await getSiteSettings()
     const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
-    const batch = recipients
-    let sent = 0
-    let failed = 0
-    for (const subscriber of batch) {
+    const messages = recipients.map((subscriber) => {
       const unsubscribeUrl = `${origin}/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribeToken)}`
-      const mail = newsletterEmail({
-        siteTitle: settings.title,
-        origin,
-        subject,
-        body: message,
-        unsubscribeUrl,
-      })
-      const result = await sendEmail({
+      return {
         to: subscriber.email,
-        ...mail,
-        headers: { 'List-Unsubscribe': `<${unsubscribeUrl}>` },
-      })
-      if (result.ok) sent += 1
-      else failed += 1
-    }
+        ...newsletterEmail({
+          siteTitle: settings.title,
+          origin,
+          subject,
+          body: message,
+          unsubscribeUrl,
+        }),
+        headers: {
+          'List-Unsubscribe': `<${unsubscribeUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+      }
+    })
+    const results = await sendEmailBatch(messages)
+    const sent = results.filter((result) => result.ok).length
+    const failed = results.length - sent
 
     await recordNewsletterBroadcast({
       subject,
       body: message,
-      recipientCount: batch.length,
+      recipientCount: recipients.length,
       sentCount: sent,
       failedCount: failed,
       createdBy: user.id,
@@ -1512,6 +1556,38 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     c.header('Content-Type', 'text/csv; charset=utf-8')
     c.header('Content-Disposition', 'attachment; filename="rhandytaverse-subscribers.csv"')
     return c.body(csv)
+  })
+
+  app.post('/admin/subscribers/:id/delete', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const body = await parseBody(c)
+    if (!formCsrfOk(c.get('session')!, body)) return c.redirect('/admin/subscribers?flash=error-csrf', 303)
+    await deleteSubscriberById(c.req.param('id'))
+    return c.redirect('/admin/subscribers?flash=subscriber-deleted', 303)
+  })
+
+  app.post('/admin/subscribers/:id/resend', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const body = await parseBody(c)
+    if (!formCsrfOk(c.get('session')!, body)) return c.redirect('/admin/subscribers?flash=error-csrf', 303)
+    if (!emailConfigured()) return c.redirect('/admin/subscribers?flash=newsletter-not-configured', 303)
+    const issued = await issueConfirmation(c.req.param('id'))
+    if (!issued) return c.redirect('/admin/subscribers?flash=confirmation-error', 303)
+    const settings = await getSiteSettings()
+    const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
+    const mail = confirmationEmail({
+      siteTitle: settings.title,
+      origin,
+      token: issued.token,
+    })
+    const result = await sendEmail({ to: issued.email, ...mail })
+    if (!result.ok) {
+      await clearConfirmationTimestamp(issued.email).catch(() => undefined)
+      return c.redirect('/admin/subscribers?flash=confirmation-error', 303)
+    }
+    return c.redirect('/admin/subscribers?flash=confirmation-resent', 303)
   })
 
   app.get('/admin/settings', async (c) => {

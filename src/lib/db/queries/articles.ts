@@ -308,6 +308,18 @@ export async function getRelatedArticles(
     ids = [...ids, ...rows.map((row) => row.id)]
   }
 
+  if (ids.length < limit) {
+    const remaining = limit - ids.length
+    const exclude = ids.length ? `AND id NOT IN (${ids.map(() => '?').join(', ')})` : ''
+    const rows = await all<{ id: string }>(
+      `SELECT id FROM articles
+       WHERE status = 'published' AND id != ? ${exclude}
+       ORDER BY published_at DESC LIMIT ?`,
+      [article.id, ...ids, remaining],
+    )
+    ids = [...ids, ...rows.map((row) => row.id)]
+  }
+
   if (!ids.length) return []
   const rows = await cardFrom()
     .where(and(publishedCondition(), inArray(articles.id, ids)))
