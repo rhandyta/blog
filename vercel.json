@@ -8,7 +8,7 @@
   "regions": ["hnd1"],
   "functions": {
     "server.ts": {
-      "maxDuration": 120,
+      "maxDuration": 300,
       "includeFiles": "dist/client/**"
     }
   },

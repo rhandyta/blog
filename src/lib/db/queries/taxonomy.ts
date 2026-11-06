@@ -42,19 +42,19 @@ export type SiteSettings = {
 
 export const defaultSettings: SiteSettings = {
   title: 'RhandytaVERSE',
-  tagline: 'A personal index of ideas',
+  tagline: 'The personal publication of Rhandyta Briantama',
   description:
-    'RhandytaVERSE is an independent publication for essays and notes across technology, design, science, culture, and the quieter corners of a working life.',
+    'RhandytaVERSE is the personal publication of Rhandyta Briantama: essays and notes on technology, design, science, culture, work, and the quieter parts of a working life.',
   issue: 'No. 01',
   intro:
-    'An independent publication. Essays and notes on software, machines, design, work, science, and the things worth returning to.',
+    'RhandytaVERSE is the personal publication of Rhandyta Briantama: one reader, one desk, and an ongoing record of the things worth returning to.',
   manifesto: 'A place to keep the things worth keeping — and to think them through in public.',
-  manifestoBy: 'The editor',
+  manifestoBy: 'Rhandyta Briantama',
   newsletterTitle: 'A letter, occasionally.',
   newsletterBlurb:
     'New essays and useful fragments, delivered when there is something worth sending. No schedule, no noise.',
   about:
-    'RhandytaVERSE is a record of what one person is reading, building, and thinking about. It takes its name from the commonplace books kept by readers for centuries: private collections of passages, observations, and ideas, copied out and returned to.',
+    'RhandytaVERSE is the personal publication of Rhandyta Briantama. I write about technology, design, science, culture, work, and ordinary life — the things I am reading, building, and thinking about.\n\nThe name comes from the commonplace books kept by readers for centuries: private collections of passages, observations, and ideas, copied out and returned to. The publication and the person are the same project: one reader, one desk, one ongoing record.\n\nEssays are published when there is something worth saying. The archive is kept in full, with no fixed schedule to keep up with.',
   email: '',
   x: '',
   github: '',

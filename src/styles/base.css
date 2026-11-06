@@ -64,7 +64,7 @@
   --accent-ink: #fff7ef;
   --mark: rgba(200, 69, 43, 0.16);
   --focus: #c8452b;
-  --overlay: rgba(23, 20, 15, 0.92);
+  --overlay: rgba(23, 20, 15, 0.98);
 
   --cat: var(--accent);
   --cat-soft: color-mix(in srgb, var(--cat) 12%, transparent);
@@ -105,7 +105,7 @@
   --accent-ink: #1a120e;
   --mark: rgba(226, 101, 74, 0.2);
   --focus: #e2654a;
-  --overlay: rgba(10, 9, 7, 0.95);
+  --overlay: rgba(10, 9, 7, 0.98);
 }
 
 /* Category accents */
@@ -429,20 +429,23 @@ hr { border: 0; border-top: var(--rule-width) solid var(--rule); margin: 0; }
   inset: 0;
   z-index: 120;
   background: var(--overlay);
-  color: var(--paper);
+  color: #f6f2e9;
   padding: 1.5rem var(--gutter) 3rem;
   display: none;
   flex-direction: column;
   overflow-y: auto;
 }
 .mobile-menu[open] { display: flex; }
-.mobile-menu a {
+.mobile-menu:focus { outline: none; }
+.mobile-menu nav a {
+  display: block;
   font-family: var(--font-display);
   font-size: clamp(2rem, 9vw, 3rem);
   line-height: 1.15;
   padding: 0.55rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
+.mobile-menu .meta a:hover { color: #f6f2e9; }
 .mobile-menu__top {
   display: flex;
   justify-content: space-between;

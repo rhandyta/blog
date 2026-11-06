@@ -1,4 +1,4 @@
-import type { AdminFilters, CardRow } from '../../lib/db/queries/articles'
+import type { AdminFilters, ArticleAudience, CardRow } from '../../lib/db/queries/articles'
 import type { CategoryWithCount, SiteSettings } from '../../lib/db/queries/taxonomy'
 import type { Article, Author, Category, User } from '../../lib/db/schema'
 import { formatDate } from '../../lib/content/html'
@@ -19,7 +19,7 @@ export function DashboardPage({
   user: User
   settings: SiteSettings
   csrfToken: string
-  stats: { total: number; published: number; drafts: number; scheduled: number; subscribers: number; media: number; weekViews: number }
+  stats: { total: number; published: number; drafts: number; scheduled: number; subscribers: number; media: number; weekViews: number; weekReaders: number }
   recent: CardRow[]
   scheduled: CardRow[]
   drafts: CardRow[]
@@ -32,7 +32,12 @@ export function DashboardPage({
       path="/admin"
       title="Overview"
       subtitle={`${settings.issue} · Editorial desk`}
-      actions={<a className="btn btn--solid" href="/admin/articles/new">New article</a>}
+      actions={
+        <>
+          {user.role !== 'author' ? <a className="btn btn--ghost" href="/admin/analytics">Audience →</a> : null}
+          <a className="btn btn--solid" href="/admin/articles/new">New article</a>
+        </>
+      }
       stats={{ drafts: stats.drafts, scheduled: stats.scheduled }}
       csrfToken={csrfToken}
     >
@@ -60,9 +65,9 @@ export function DashboardPage({
         </div>
         <div className="admin-card" style={{ gridColumn: 'span 3' }}>
           <div className="stat">
-            <span className="stat__value">{stats.weekViews}</span>
-            <span className="stat__label">Views this week</span>
-            <span className="stat__delta">{stats.media} media assets</span>
+            <span className="stat__value">{stats.weekReaders}</span>
+            <span className="stat__label">Readers this week</span>
+            <span className="stat__delta">{stats.weekViews} views this week</span>
           </div>
         </div>
       </div>
@@ -162,7 +167,7 @@ export function ArticleListPage({
   flash,
 }: {
   user: User
-  articles: Array<{ article: Article; author: Author | null; category: Category | null }>
+  articles: Array<{ article: Article; author: Author | null; category: Category | null; audience: ArticleAudience }>
   total: number
   page: number
   totalPages: number
@@ -232,6 +237,8 @@ export function ArticleListPage({
             <tr>
               <th>Title</th>
               <th>Status</th>
+              <th className="num">Readers</th>
+              <th className="num">Views</th>
               <th>Section</th>
               <th>Author</th>
               <th>Published</th>
@@ -240,7 +247,7 @@ export function ArticleListPage({
             </tr>
           </thead>
           <tbody>
-            {articles.map(({ article, author, category }) => (
+            {articles.map(({ article, author, category, audience }) => (
               <tr key={article.id}>
                 <td className="title-cell">
                   <a href={`/admin/articles/${article.id}/edit`}>{article.title}</a>
@@ -249,6 +256,8 @@ export function ArticleListPage({
                   </div>
                 </td>
                 <td><StatusPill status={article.status} /></td>
+                <td className="num">{audience.readers.toLocaleString('en-US')}</td>
+                <td className="num">{audience.views.toLocaleString('en-US')}</td>
                 <td className="muted-cell">{category?.name ?? '—'}</td>
                 <td className="muted-cell">{author?.displayName ?? '—'}</td>
                 <td className="muted-cell">{article.publishedAt ? formatDate(article.publishedAt, 'short') : '—'}</td>
@@ -267,7 +276,7 @@ export function ArticleListPage({
             ))}
             {!articles.length ? (
               <tr>
-                <td colSpan={7} className="hint" style={{ padding: '1.5rem' }}>
+                <td colSpan={9} className="hint" style={{ padding: '1.5rem' }}>
                   No articles match these filters.
                 </td>
               </tr>
@@ -275,6 +284,10 @@ export function ArticleListPage({
           </tbody>
         </table>
       </div>
+
+      <p className="hint" style={{ marginTop: '0.75rem' }}>
+        Readers are unique visitors; views are deduplicated hourly. Reader counts begin when analytics is enabled.
+      </p>
 
       <PaginationNav page={page} totalPages={totalPages} basePath="/admin/articles" query={query} />
     </AdminLayout>

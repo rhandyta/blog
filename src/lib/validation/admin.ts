@@ -93,6 +93,10 @@ export const automationSettingsSchema = z.object({
   autoPublish: z.boolean(),
   autoPublishDelayHours: z.coerce.number().int().min(1).max(168),
   dailyLimit: z.coerce.number().int().min(1).max(10),
+  coverMode: z.enum(['procedural', 'ai']),
+  aiImageProvider: z.enum(['gemini', 'cloudflare']),
+  aiImageModel: z.string().trim().min(1).max(100),
+  aiImageDailyLimit: z.coerce.number().int().min(0).max(10),
   initiativeBrief: z.string().trim().max(2000),
 })
 

@@ -64,21 +64,46 @@ import {
   mediaUsage,
   updateMedia,
 } from '../../lib/db/queries/media'
-import { exportSubscribersCsv, listSubscribers, subscriberStats } from '../../lib/db/queries/subscribers'
+import {
+  exportSubscribersCsv,
+  listConfirmedSubscribers,
+  listNewsletterBroadcasts,
+  listSubscribers,
+  recordNewsletterBroadcast,
+  subscriberStats,
+} from '../../lib/db/queries/subscribers'
+import { emailConfigured, sendEmail } from '../../lib/email/mailer'
+import { newsletterEmail } from '../../lib/email/templates'
+import { getNewsletterSchedule, saveNewsletterSchedule } from '../../lib/db/queries/newsletter'
+import { runScheduledNewsletter } from '../../lib/newsletter/digest'
+import {
+  getAnalyticsOverview,
+  getBrowserBreakdown,
+  getCountryBreakdown,
+  getDailyAnalytics,
+  getDeviceBreakdown,
+  getReferrerBreakdown,
+  getTopArticles,
+} from '../../lib/db/queries/analytics'
 import { automationSettingsSchema, parseScheduleDate, articlePayloadSchema, authorInputSchema, categoryInputSchema, loginSchema, mediaPatchSchema, settingsInputSchema, tagInputSchema, validHttpUrl } from '../../lib/validation/admin'
 import { deleteStoredFiles, MAX_UPLOAD_BYTES, saveUpload, sniffImage } from '../../lib/media/storage'
 import {
+  countAiCoversSince,
+  countGenerationsSince,
   createActivity,
   getAutomationSettings,
   listActivities,
   listRuns,
   saveAutomationSettings,
 } from '../../lib/db/queries/automation'
-import { generateAutomationDraft } from '../../lib/automation/generate'
+import { generateAutomationDraft, generationWindowStart } from '../../lib/automation/generate'
 import { hasGeminiKey } from '../../lib/automation/gemini'
+import { hasImageGenerationKey } from '../../lib/automation/image'
 import { baseHead } from '../head'
 import { renderPageResponse } from '../render-page'
 import type { AppEnv } from '../types'
+import { AnalyticsPage } from '../../pages/admin/analytics'
+import { NewsletterPage } from '../../pages/admin/newsletter'
 import { ArticleEditorPage, MediaLibraryPage, articleToEditorState } from '../../pages/admin/editor-shell'
 import { AutomationPage } from '../../pages/admin/automation'
 import { ArticleListPage, DashboardPage, RevisionsPage } from '../../pages/admin/dashboard'
@@ -118,6 +143,18 @@ const FLASH_MESSAGES: Record<string, Flash> = {
   'automation-activity-saved': { tone: 'success', message: 'Activity saved.' },
   'automation-generated': { tone: 'success', message: 'Draft generated. Review it before the auto-publish window closes.' },
   'automation-disabled': { tone: 'error', message: 'Automation is disabled.' },
+  'newsletter-sent': { tone: 'success', message: 'Newsletter sent.' },
+  'newsletter-partial': { tone: 'error', message: 'Some recipients failed. Check the recent sends table.' },
+  'newsletter-empty': { tone: 'error', message: 'There are no confirmed subscribers yet.' },
+  'newsletter-not-configured': { tone: 'error', message: 'Email delivery is not configured.' },
+  'newsletter-too-many': { tone: 'error', message: 'The free tier is limited to 100 recipients per send.' },
+  'newsletter-error': { tone: 'error', message: 'The newsletter could not be sent.' },
+  'schedule-saved': { tone: 'success', message: 'Newsletter schedule saved.' },
+  'digest-sent': { tone: 'success', message: 'Digest sent.' },
+  'digest-empty': { tone: 'error', message: 'No articles had activity in this period.' },
+  'digest-already': { tone: 'error', message: 'The digest for this period has already been sent.' },
+  'digest-no-subscribers': { tone: 'error', message: 'There are no confirmed subscribers.' },
+  'digest-error': { tone: 'error', message: 'The digest could not be sent.' },
   'automation-no-key': { tone: 'error', message: 'GEMINI_API_KEY is not configured.' },
   'automation-limit': { tone: 'error', message: 'The daily generation limit has been reached.' },
   'automation-no-category': { tone: 'error', message: 'Create at least one category before generating.' },
@@ -364,6 +401,34 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     )
   })
 
+  app.get('/admin/analytics', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const [overview, daily, topArticles, referrers, countries, devices, browsers] = await Promise.all([
+      getAnalyticsOverview(),
+      getDailyAnalytics(14),
+      getTopArticles(8),
+      getReferrerBreakdown(30, 8),
+      getCountryBreakdown(30, 8),
+      getDeviceBreakdown(30, 6),
+      getBrowserBreakdown(30, 6),
+    ])
+    return renderAdminPage(
+      c,
+      <AnalyticsPage
+        user={user}
+        csrfToken={c.get('session')!.csrfToken}
+        overview={overview}
+        daily={daily}
+        topArticles={topArticles}
+        referrers={referrers}
+        countries={countries}
+        devices={devices}
+        browsers={browsers}
+      />,
+    )
+  })
+
   /* ------------------------------------------------------------------ *
    *  Articles
    * ------------------------------------------------------------------ */
@@ -395,7 +460,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
       c,
       <ArticleListPage
         user={user}
-        articles={result.items.map(({ article, author, category }) => ({ article, author, category }))}
+        articles={result.items.map(({ article, author, category, audience }) => ({ article, author, category, audience }))}
         total={result.total}
         page={page}
         totalPages={totalPages}
@@ -890,11 +955,13 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   app.get('/admin/automation', async (c) => {
     const user = c.get('user')!
     if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
-    const [settings, authors, activities, runs] = await Promise.all([
+    const [settings, authors, activities, runs, generatedToday, aiCoversToday] = await Promise.all([
       getAutomationSettings(),
       listAuthors(),
       listActivities(15),
       listRuns(15),
+      countGenerationsSince(generationWindowStart()),
+      countAiCoversSince(generationWindowStart()),
     ])
     return renderAdminPage(
       c,
@@ -905,6 +972,9 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         activities={activities}
         runs={runs}
         hasKey={hasGeminiKey()}
+        coverReady={hasImageGenerationKey(settings.aiImageProvider)}
+        generatedToday={generatedToday}
+        aiCoversToday={aiCoversToday}
         session={c.get('session')!}
         flash={flashFrom(c)}
       />,
@@ -927,6 +997,10 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
       autoPublish: checkbox(body.autoPublish),
       autoPublishDelayHours: text(body.autoPublishDelayHours, String(current.autoPublishDelayHours)),
       dailyLimit: text(body.dailyLimit, String(current.dailyLimit)),
+      coverMode: text(body.coverMode, current.coverMode),
+      aiImageProvider: text(body.aiImageProvider, current.aiImageProvider),
+      aiImageModel: text(body.aiImageModel, current.aiImageModel),
+      aiImageDailyLimit: text(body.aiImageDailyLimit, String(current.aiImageDailyLimit)),
       initiativeBrief: text(body.initiativeBrief).trim() || current.initiativeBrief,
     })
     if (!parsed.success) return c.redirect('/admin/automation?flash=error-fields', 303)
@@ -1255,12 +1329,155 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
    *  Subscribers & settings
    * ------------------------------------------------------------------ */
 
+  app.get('/admin/newsletter', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const [stats, broadcasts, schedule] = await Promise.all([
+      subscriberStats(),
+      listNewsletterBroadcasts(8),
+      getNewsletterSchedule(),
+    ])
+    return renderAdminPage(
+      c,
+      <NewsletterPage
+        user={user}
+        csrfToken={c.get('session')!.csrfToken}
+        confirmedCount={stats.subscribed}
+        pendingCount={stats.pending}
+        emailReady={emailConfigured()}
+        broadcasts={broadcasts}
+        schedule={schedule}
+        flash={flashFrom(c)}
+      />,
+    )
+  })
+
+  app.post('/admin/newsletter/schedule', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const body = await parseBody(c)
+    if (!formCsrfOk(c.get('session')!, body)) return c.redirect('/admin/newsletter?flash=error-csrf', 303)
+
+    const cadenceRaw = text(body.cadence, 'weekly')
+    const cadence =
+      cadenceRaw === 'daily' || cadenceRaw === 'weekly' || cadenceRaw === 'monthly'
+        ? cadenceRaw
+        : 'weekly'
+    const weekday = Number(text(body.weekday, '1'))
+    const hourUtc = Number(text(body.hourUtc, '2'))
+    const metricRaw = text(body.metric, 'readers')
+    const metric = metricRaw === 'views' ? 'views' : 'readers'
+    const articleLimit = Number(text(body.articleLimit, '5'))
+    if (
+      !Number.isInteger(weekday) ||
+      weekday < 0 ||
+      weekday > 6 ||
+      (hourUtc !== 2 && hourUtc !== 14) ||
+      !Number.isInteger(articleLimit) ||
+      articleLimit < 1 ||
+      articleLimit > 10
+    ) {
+      return c.redirect('/admin/newsletter?flash=error-fields', 303)
+    }
+
+    await saveNewsletterSchedule({
+      enabled: checkbox(body.enabled),
+      cadence,
+      weekday,
+      hourUtc,
+      metric,
+      articleLimit,
+    })
+    return c.redirect('/admin/newsletter?flash=schedule-saved', 303)
+  })
+
+  app.post('/admin/newsletter/digest', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const body = await parseBody(c)
+    if (!formCsrfOk(c.get('session')!, body)) return c.redirect('/admin/newsletter?flash=error-csrf', 303)
+
+    const result = await runScheduledNewsletter({ force: true, actorId: user.id })
+    const flash =
+      result.status === 'sent'
+        ? 'digest-sent'
+        : result.status === 'skipped'
+          ? result.reason === 'no-articles'
+            ? 'digest-empty'
+            : result.reason === 'no-subscribers'
+              ? 'digest-no-subscribers'
+              : result.reason === 'already-sent'
+                ? 'digest-already'
+                : 'digest-error'
+          : result.reason === 'not-configured'
+            ? 'newsletter-not-configured'
+            : result.reason === 'too-many'
+              ? 'newsletter-too-many'
+              : 'digest-error'
+    return c.redirect(`/admin/newsletter?flash=${flash}`, 303)
+  })
+
+  app.post('/admin/newsletter/send', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/newsletter?flash=error-csrf', 303)
+    if (!emailConfigured()) return c.redirect('/admin/newsletter?flash=newsletter-not-configured', 303)
+
+    const subject = text(body.subject).trim().slice(0, 160)
+    const message = text(body.body).trim().slice(0, 20000)
+    if (!subject || !message) return c.redirect('/admin/newsletter?flash=error-fields', 303)
+
+    const recipients = await listConfirmedSubscribers()
+    if (!recipients.length) return c.redirect('/admin/newsletter?flash=newsletter-empty', 303)
+    if (recipients.length > 100) return c.redirect('/admin/newsletter?flash=newsletter-too-many', 303)
+
+    const settings = await getSiteSettings()
+    const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
+    const batch = recipients
+    let sent = 0
+    let failed = 0
+    for (const subscriber of batch) {
+      const unsubscribeUrl = `${origin}/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribeToken)}`
+      const mail = newsletterEmail({
+        siteTitle: settings.title,
+        origin,
+        subject,
+        body: message,
+        unsubscribeUrl,
+      })
+      const result = await sendEmail({
+        to: subscriber.email,
+        ...mail,
+        headers: { 'List-Unsubscribe': `<${unsubscribeUrl}>` },
+      })
+      if (result.ok) sent += 1
+      else failed += 1
+    }
+
+    await recordNewsletterBroadcast({
+      subject,
+      body: message,
+      recipientCount: batch.length,
+      sentCount: sent,
+      failedCount: failed,
+      createdBy: user.id,
+    })
+
+    const flash = failed === 0 ? 'newsletter-sent' : sent === 0 ? 'newsletter-error' : 'newsletter-partial'
+    return c.redirect(`/admin/newsletter?flash=${flash}`, 303)
+  })
+
   app.get('/admin/subscribers', async (c) => {
     const user = c.get('user')!
     if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
     const page = pageParam(c.req.query('page'))
     const statusRaw = c.req.query('status') ?? 'all'
-    const status = statusRaw === 'subscribed' || statusRaw === 'unsubscribed' ? statusRaw : 'all'
+    const status =
+      statusRaw === 'subscribed' || statusRaw === 'pending' || statusRaw === 'unsubscribed'
+        ? statusRaw
+        : 'all'
     const [result, stats] = await Promise.all([
       listSubscribers({
         q: c.req.query('q')?.trim() || undefined,

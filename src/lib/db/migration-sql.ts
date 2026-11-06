@@ -198,4 +198,87 @@ CREATE INDEX IF NOT EXISTS automation_runs_status_idx ON automation_runs(status,
 CREATE INDEX IF NOT EXISTS automation_runs_created_idx ON automation_runs(created_at DESC);
 `,
   },
+  {
+    name: '004_automation_covers.sql',
+    sql: `
+ALTER TABLE automation_runs ADD COLUMN cover_source TEXT;
+ALTER TABLE automation_runs ADD COLUMN cover_error TEXT;
+`,
+  },
+  {
+    name: '005_analytics.sql',
+    sql: `
+CREATE TABLE IF NOT EXISTS article_visits (
+  id TEXT PRIMARY KEY,
+  article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+  visitor_hash TEXT NOT NULL,
+  day TEXT NOT NULL,
+  bucket TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  referrer_host TEXT,
+  country TEXT,
+  device TEXT NOT NULL DEFAULT 'unknown',
+  browser TEXT NOT NULL DEFAULT 'unknown',
+  os TEXT NOT NULL DEFAULT 'unknown'
+);
+CREATE UNIQUE INDEX IF NOT EXISTS article_visits_unique_idx ON article_visits(article_id, visitor_hash, bucket);
+CREATE INDEX IF NOT EXISTS article_visits_article_idx ON article_visits(article_id, day DESC);
+CREATE INDEX IF NOT EXISTS article_visits_day_idx ON article_visits(day);
+CREATE INDEX IF NOT EXISTS article_visits_visitor_idx ON article_visits(visitor_hash);
+CREATE INDEX IF NOT EXISTS article_visits_referrer_idx ON article_visits(referrer_host);
+
+CREATE TABLE IF NOT EXISTS article_readers (
+  article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+  visitor_hash TEXT NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  visits INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (article_id, visitor_hash)
+);
+CREATE INDEX IF NOT EXISTS article_readers_visitor_idx ON article_readers(visitor_hash);
+`,
+  },
+  {
+    name: '006_newsletter.sql',
+    sql: `
+ALTER TABLE subscribers ADD COLUMN confirmed_at TEXT;
+ALTER TABLE subscribers ADD COLUMN confirmation_token TEXT;
+ALTER TABLE subscribers ADD COLUMN confirmation_sent_at TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS subscribers_confirmation_token_idx ON subscribers(confirmation_token);
+UPDATE subscribers SET confirmed_at = created_at WHERE status = 'subscribed' AND confirmed_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS newsletter_broadcasts (
+  id TEXT PRIMARY KEY,
+  subject TEXT NOT NULL,
+  body TEXT NOT NULL,
+  recipient_count INTEGER NOT NULL DEFAULT 0,
+  sent_count INTEGER NOT NULL DEFAULT 0,
+  failed_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  created_by TEXT REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS newsletter_broadcasts_created_idx ON newsletter_broadcasts(created_at DESC);
+`,
+  },
+  {
+    name: '007_newsletter_digest.sql',
+    sql: `
+ALTER TABLE newsletter_broadcasts ADD COLUMN kind TEXT NOT NULL DEFAULT 'manual';
+ALTER TABLE newsletter_broadcasts ADD COLUMN period_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS newsletter_broadcasts_digest_period_idx ON newsletter_broadcasts(kind, period_key);
+
+CREATE TABLE IF NOT EXISTS newsletter_schedule (
+  id TEXT PRIMARY KEY,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  cadence TEXT NOT NULL DEFAULT 'weekly' CHECK (cadence IN ('daily', 'weekly', 'monthly')),
+  weekday INTEGER NOT NULL DEFAULT 1,
+  hour_utc INTEGER NOT NULL DEFAULT 2,
+  metric TEXT NOT NULL DEFAULT 'readers' CHECK (metric IN ('readers', 'views')),
+  article_limit INTEGER NOT NULL DEFAULT 5,
+  updated_at TEXT NOT NULL
+);
+INSERT OR IGNORE INTO newsletter_schedule (id, enabled, cadence, weekday, hour_utc, metric, article_limit, updated_at)
+VALUES ('digest', 1, 'weekly', 1, 2, 'readers', 5, CURRENT_TIMESTAMP);
+`,
+  },
 ]

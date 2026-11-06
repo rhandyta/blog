@@ -9,18 +9,20 @@ export function SubscribePage({
 }: {
   settings: SiteSettings
   categories: CategoryWithCount[]
-  status?: 'ok' | 'exists' | 'invalid' | 'error' | null
+  status?: 'ok' | 'pending' | 'exists' | 'invalid' | 'error' | null
 }) {
   const message =
     status === 'ok'
       ? 'You are on the list. Thank you for subscribing.'
-      : status === 'exists'
-        ? 'That address is already subscribed.'
-        : status === 'invalid'
-          ? 'That email address does not look right. Please check it and try again.'
-          : status === 'error'
-            ? 'Something went wrong while saving your address. Please try again shortly.'
-            : null
+      : status === 'pending'
+        ? 'Check your inbox and click the confirmation link to join the list.'
+        : status === 'exists'
+          ? 'That address is already subscribed.'
+          : status === 'invalid'
+            ? 'That email address does not look right. Please check it and try again.'
+            : status === 'error'
+              ? 'Something went wrong while saving your address. Please try again shortly.'
+              : null
 
   return (
     <SiteLayout settings={settings} categories={categories} path="/subscribe">
@@ -46,7 +48,7 @@ export function SubscribePage({
 
       {message ? (
         <div className="shell" style={{ paddingTop: '1.5rem' }}>
-          <div className="flash" data-tone={status === 'ok' || status === 'exists' ? 'success' : 'error'} role="status">
+          <div className="flash" data-tone={status === 'ok' || status === 'pending' || status === 'exists' ? 'success' : 'error'} role="status">
             {message}
           </div>
         </div>
@@ -59,14 +61,15 @@ export function SubscribePage({
           <div className="about-copy">
             <h2 style={{ marginTop: 0 }}>What happens when you subscribe</h2>
             <p>
-              Your address is checked and stored securely in this site’s own database. It is used only for the
-              newsletter and is never shared or sold. You can remove yourself at any time using the unsubscribe link
-              in any letter, or by contacting the editor.
+              Your address is checked and stored securely in this site’s own database. You will receive a confirmation
+              email; click the link in that message to join the list. The address is used only for the newsletter and
+              is never shared or sold. You can remove yourself at any time using the unsubscribe link in any letter, or
+              by contacting Rhandyta Briantama.
             </p>
             <h2>Privacy</h2>
             <p>
               Your address is used only to send the newsletter. It is never sold or shared. To request removal, use the
-              unsubscribe link in any letter or contact the editor directly.
+              unsubscribe link in any letter or contact Rhandyta Briantama directly.
             </p>
           </div>
           <aside className="about-aside">
@@ -79,6 +82,37 @@ export function SubscribePage({
           </aside>
         </div>
       </div>
+    </SiteLayout>
+  )
+}
+
+export function ConfirmPage({
+  settings,
+  categories,
+  status,
+}: {
+  settings: SiteSettings
+  categories: CategoryWithCount[]
+  status: 'done' | 'invalid'
+}) {
+  return (
+    <SiteLayout settings={settings} categories={categories} path="/confirm">
+      <section className="page-hero">
+        <div className="shell">
+          <Kicker plain>The letter</Kicker>
+          <h1 className="display-lg" style={{ marginTop: '1rem' }}>
+            {status === 'done' ? 'Subscription confirmed.' : 'This link is invalid or expired.'}
+          </h1>
+          <p className="lede" style={{ marginTop: '1.5rem', maxWidth: '46ch' }}>
+            {status === 'done'
+              ? 'You are on the list. You can close this page now.'
+              : 'The confirmation token could not be verified. Subscribe again to receive a fresh link.'}
+          </p>
+          <p style={{ marginTop: '1.75rem' }}>
+            <a className="btn btn--ghost" href="/">Return home</a>
+          </p>
+        </div>
+      </section>
     </SiteLayout>
   )
 }

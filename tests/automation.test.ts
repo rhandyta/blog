@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { eq } from 'drizzle-orm'
 import { extractJson } from '../src/lib/automation/gemini'
-import { processDueAutomation } from '../src/lib/automation/generate'
+import { generateAutomationBatch, processDueAutomation } from '../src/lib/automation/generate'
 import { getDb } from '../src/lib/db/client'
 import { articles } from '../src/lib/db/schema'
 import { createArticle, deleteArticle, getArticleById } from '../src/lib/db/queries/articles'
-import { createRun } from '../src/lib/db/queries/automation'
+import { createRun, getAutomationSettings, saveAutomationSettings } from '../src/lib/db/queries/automation'
 import { deleteAuthor, deleteCategory, upsertAuthor, upsertCategory } from '../src/lib/db/queries/taxonomy'
 
 const body = {
@@ -52,6 +52,42 @@ describe('automation helpers', () => {
   test('extractJson unwraps fenced JSON', () => {
     const parsed = JSON.parse(extractJson('```json\n{"title":"Test"}\n```')) as { title: string }
     expect(parsed.title).toBe('Test')
+  })
+
+  test('extractJson reads a balanced object and ignores braces inside strings', () => {
+    const extracted = extractJson('prefix {"body":"a } inside","title":"Test"} trailing }')
+    expect(JSON.parse(extracted)).toEqual({ body: 'a } inside', title: 'Test' })
+  })
+})
+
+describe('automation batch', () => {
+  test('generates up to the configured articles-per-day count', async () => {
+    const previous = await getAutomationSettings()
+    await saveAutomationSettings({ enabled: true, dailyLimit: 4 })
+    try {
+      let calls = 0
+      const result = await generateAutomationBatch('cron', {
+        generate: async () => {
+          calls += 1
+          return {
+            ok: true,
+            articleId: `fake-${calls}`,
+            slug: `fake-${calls}`,
+            title: `Fake ${calls}`,
+            kind: 'initiative' as const,
+            runId: `run-${calls}`,
+            authorId: 'author_auto_test',
+          }
+        },
+      })
+
+      expect(calls).toBe(4)
+      expect(result.attempts).toBe(4)
+      expect(result.generated).toHaveLength(4)
+      expect(result.reason).toBe('done')
+    } finally {
+      await saveAutomationSettings(previous)
+    }
   })
 })
 

@@ -59,7 +59,7 @@ describe('public pages', () => {
     const response = await app.request('/')
     expect(response.status).toBe(200)
     const html = await response.text()
-    expect(html).toContain('<title>RhandytaVERSE</title>')
+    expect(html).toContain('<title>RhandytaVERSE — Rhandyta Briantama</title>')
     expect(html).toContain('application/ld+json')
     expect(html).toContain('WebSite')
     expect(html).toContain('The Published Test Article')
@@ -196,7 +196,17 @@ describe('newsletter', () => {
       body: JSON.stringify({ email: 'reader@example.com' }),
     })
     expect(valid.status).toBe(201)
-    expect(((await valid.json()) as { status: string }).status).toBe('ok')
+    expect(((await valid.json()) as { status: string }).status).toBe('pending')
+
+    const pending = await listSubscribers({ q: 'reader@example.com' })
+    expect(pending.total).toBe(1)
+    expect(pending.items[0]?.confirmedAt).toBeNull()
+    expect(pending.items[0]?.ipHash).toMatch(/^[a-f0-9]{32}$/)
+    expect(pending.items[0]?.ipHash).not.toBe('127.0.0.1')
+
+    const confirmed = await app.request(`/confirm?token=${encodeURIComponent(pending.items[0]?.confirmationToken ?? '')}`)
+    expect(confirmed.status).toBe(200)
+    expect(await confirmed.text()).toContain('Subscription confirmed.')
 
     const duplicate = await app.request('/api/subscribe', {
       method: 'POST',
@@ -212,9 +222,6 @@ describe('newsletter', () => {
       body: JSON.stringify({ email: 'not-an-email' }),
     })
     expect(invalid.status).toBe(400)
-
-    const subscribers = await listSubscribers({ q: 'reader@example.com' })
-    expect(subscribers.total).toBe(1)
   })
 
   test('cross-origin form submissions are rejected', async () => {
@@ -253,7 +260,7 @@ describe('newsletter', () => {
       body: new URLSearchParams({ email: 'form-reader@example.com', source: 'site' }).toString(),
     })
     expect(response.status).toBe(303)
-    expect(response.headers.get('location')).toBe('/subscribe?status=ok')
+    expect(response.headers.get('location')).toBe('/subscribe?status=pending')
   })
 })
 

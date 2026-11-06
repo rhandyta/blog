@@ -21,6 +21,10 @@ export type AutomationSettings = {
   autoPublish: boolean
   autoPublishDelayHours: number
   dailyLimit: number
+  coverMode: 'procedural' | 'ai'
+  aiImageProvider: 'gemini' | 'cloudflare'
+  aiImageModel: string
+  aiImageDailyLimit: number
   lastRunAt: string | null
   initiativeBrief: string
 }
@@ -33,6 +37,10 @@ export const defaultAutomationSettings: AutomationSettings = {
   autoPublish: true,
   autoPublishDelayHours: 24,
   dailyLimit: 1,
+  coverMode: 'procedural',
+  aiImageProvider: 'cloudflare',
+  aiImageModel: '@cf/black-forest-labs/flux-1-schnell',
+  aiImageDailyLimit: 1,
   lastRunAt: null,
   initiativeBrief:
     'Write a reflective personal essay grounded in ordinary daily life: attention, work, the city, small observations, and the things worth returning to. Do not invent specific facts about real people.',
@@ -133,6 +141,8 @@ export async function createRun(input: {
   articleId: string | null
   status: AutomationRun['status']
   error?: string | null
+  coverSource?: AutomationRun['coverSource']
+  coverError?: string | null
   autoPublishAt: string | null
 }): Promise<AutomationRun> {
   const row: typeof automationRuns.$inferInsert = {
@@ -143,6 +153,8 @@ export async function createRun(input: {
     articleId: input.articleId,
     status: input.status,
     error: input.error ?? null,
+    coverSource: input.coverSource ?? null,
+    coverError: input.coverError ?? null,
     createdAt: new Date().toISOString(),
     autoPublishAt: input.autoPublishAt,
   }
@@ -180,6 +192,14 @@ export async function dueRuns(now: string): Promise<AutomationRun[]> {
     .where(and(eq(automationRuns.status, 'pending'), lte(automationRuns.autoPublishAt, now)))
     .orderBy(desc(automationRuns.createdAt))
     .limit(20)
+}
+
+export async function countAiCoversSince(since: string): Promise<number> {
+  const rows = await getDb()
+    .select({ n: count() })
+    .from(automationRuns)
+    .where(and(gte(automationRuns.createdAt, since), eq(automationRuns.coverSource, 'ai')))
+  return rows[0]?.n ?? 0
 }
 
 export async function countGenerationsSince(since: string): Promise<number> {

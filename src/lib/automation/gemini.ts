@@ -23,6 +23,7 @@ export type GeminiContext = {
   categories: Array<{ name: string; slug: string; description: string }>
   tags: Array<{ name: string; slug: string }>
   initiativeBrief: string
+  recentTitles?: string[]
 }
 
 const draftSchema = z.object({
@@ -46,9 +47,46 @@ export function geminiModel(preferred?: string): string {
 export function extractJson(text: string): string {
   const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
   const start = trimmed.indexOf('{')
-  const end = trimmed.lastIndexOf('}')
-  if (start === -1 || end === -1 || end <= start) return trimmed
-  return trimmed.slice(start, end + 1)
+  if (start === -1) return trimmed
+
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let index = start; index < trimmed.length; index += 1) {
+    const character = trimmed[index]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (character === '\\') escaped = true
+      else if (character === '"') inString = false
+      continue
+    }
+    if (character === '"') {
+      inString = true
+      continue
+    }
+    if (character === '{') depth += 1
+    if (character === '}') {
+      depth -= 1
+      if (depth === 0) return trimmed.slice(start, index + 1)
+    }
+  }
+
+  return trimmed.slice(start)
+}
+
+const responseSchema = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    subtitle: { type: 'string', nullable: true },
+    excerpt: { type: 'string' },
+    body: { type: 'string' },
+    category: { type: 'string' },
+    tags: { type: 'array', items: { type: 'string' } },
+    seoDescription: { type: 'string' },
+  },
+  required: ['title', 'excerpt', 'body', 'category', 'tags', 'seoDescription'],
 }
 
 async function inlineImage(src: string | null): Promise<{ mimeType: string; data: string } | null> {
@@ -93,6 +131,10 @@ function buildPrompt(context: GeminiContext): string {
     ? `Write from the following personal activity. Use only details that are present here or visible in the attached image. Do not invent names, dates, places, or events.\n\nActivity note:\n${context.activityText || '(no written note — use the attached image)'}`
     : `No new personal activity was provided. Write from this editorial initiative brief instead:\n${context.initiativeBrief}`
 
+  const recent = context.recentTitles?.length
+    ? `\nRecent pieces — do not repeat their subjects, arguments, or title patterns. Choose a clearly different angle:\n${context.recentTitles.map((title) => `- ${title}`).join('\n')}\n`
+    : ''
+
   return `You are the editor of RhandytaVERSE, an independent publication of reflective essays about technology, design, science, culture, work, attention, and ordinary life.
 
 Write one complete, publishable essay in ${context.language}.
@@ -100,7 +142,7 @@ Write one complete, publishable essay in ${context.language}.
 Author voice: ${context.authorName}${context.authorRole ? `, ${context.authorRole}` : ''}. ${context.authorBio}
 
 ${source}
-
+${recent}
 Available sections (choose exactly one slug):
 ${categories}
 
@@ -112,7 +154,7 @@ Editorial requirements:
 - 800–1000 words, specific and observant, first person where it feels natural.
 - Begin with a concrete detail or scene, not a definition or a summary.
 - Use Markdown: short paragraphs, several "## " section headings, occasional lists or blockquotes. Do not include a top-level title heading, images, external links, or HTML.
-- No clickbait, no motivational clichés, no bullet-point-only essays, no mention of AI, prompts, automation, or this instruction.
+- No clickbait, no motivational clichés, no bullet-point-only essays, no mention of AI, prompts, automation, or this instruction. Avoid repetitive title formulas and starting every title with the same word.
 - Do not invent personal facts that are not supported by the activity note or image. If the material is thin, stay reflective and general rather than fabricating specifics.
 - The "tags" array must contain only slugs copied exactly from the available tags list above, untranslated. If none fit, return an empty array.
 - The tone is calm, precise, and human. Avoid em dashes used as a tic; vary sentence length.
@@ -138,27 +180,39 @@ export async function generateDraft(context: GeminiContext, model?: string): Pro
   const parts: Array<Record<string, unknown>> = [{ text: prompt }]
   if (image) parts.push({ inlineData: image })
 
+  const modelName = geminiModel(model)
+  const generationConfig: Record<string, unknown> = {
+    temperature: 0.85,
+    maxOutputTokens: 16384,
+    responseMimeType: 'application/json',
+    responseSchema,
+  }
+  if (modelName.includes('2.5') && modelName.includes('flash')) {
+    // Flash uses a thinking budget by default; it can consume the output
+    // allowance and leave the JSON truncated. Structured output does not need it.
+    generationConfig.thinkingConfig = { thinkingBudget: 0 }
+  }
+
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel(model))}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
-        generationConfig: {
-          temperature: 0.85,
-          maxOutputTokens: 4096,
-          responseMimeType: 'application/json',
-        },
+        generationConfig,
       }),
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(60_000),
     },
   )
 
   const payload = (await response.json().catch(() => null)) as
     | {
         error?: { message?: string }
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+        candidates?: Array<{
+          finishReason?: string
+          content?: { parts?: Array<{ text?: string }> }
+        }>
       }
     | null
 
@@ -171,14 +225,21 @@ export async function generateDraft(context: GeminiContext, model?: string): Pro
       ?.flatMap((candidate) => candidate.content?.parts ?? [])
       .map((part) => part.text ?? '')
       .join('') ?? ''
+  const finishReason = payload?.candidates?.[0]?.finishReason
 
   if (!text.trim()) throw new Error('Gemini returned an empty response')
+  if (finishReason === 'MAX_TOKENS') {
+    throw new Error('Gemini response was truncated before the JSON was complete')
+  }
 
   let parsed: unknown
   try {
     parsed = JSON.parse(extractJson(text))
   } catch {
-    throw new Error('Gemini returned a response that was not valid JSON')
+    const snippet = text.slice(0, 240).replace(/\s+/g, ' ')
+    throw new Error(
+      `Gemini returned invalid JSON (${text.length} chars${finishReason ? `, finish ${finishReason}` : ''}): ${snippet}`,
+    )
   }
 
   const result = draftSchema.safeParse(parsed)

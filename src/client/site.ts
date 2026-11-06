@@ -85,15 +85,32 @@ function setupMobileMenu(): void {
     menu.setAttribute('open', '')
     openButton.setAttribute('aria-expanded', 'true')
     document.body.style.overflow = 'hidden'
-    const firstLink = menu.querySelector<HTMLAnchorElement>('a')
-    firstLink?.focus()
+    menu.focus()
   }
 
   openButton.addEventListener('click', open)
   closeButton?.addEventListener('click', close)
   menu.querySelectorAll('a').forEach((link) => link.addEventListener('click', close))
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !menu.hasAttribute('hidden')) close()
+    if (menu.hasAttribute('hidden')) return
+    if (event.key === 'Escape') {
+      close()
+      return
+    }
+    if (event.key !== 'Tab') return
+    const focusable = Array.from(
+      menu.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
+    )
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (!first || !last) return
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === menu)) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
   })
 }
 
@@ -227,7 +244,11 @@ function setupNewsletter(): void {
           }),
         })
         const payload = (await response.json()) as { status?: string }
-        if (response.ok && payload.status === 'ok') {
+        if (response.ok && payload.status === 'pending') {
+          message.dataset.state = 'success'
+          message.textContent = 'Check your inbox and click the confirmation link to join the list.'
+          form.reset()
+        } else if (response.ok && payload.status === 'ok') {
           message.dataset.state = 'success'
           message.textContent = 'You are on the list. Thank you for subscribing.'
           form.reset()

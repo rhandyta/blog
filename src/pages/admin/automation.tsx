@@ -16,6 +16,9 @@ export function AutomationPage({
   activities,
   runs,
   hasKey,
+  coverReady,
+  generatedToday,
+  aiCoversToday,
   session,
   flash,
 }: {
@@ -25,6 +28,9 @@ export function AutomationPage({
   activities: AutomationActivityWithMedia[]
   runs: AutomationRunWithArticle[]
   hasKey: boolean
+  coverReady: boolean
+  generatedToday: number
+  aiCoversToday: number
   session: { csrfToken: string }
   flash: Flash
 }) {
@@ -198,7 +204,7 @@ export function AutomationPage({
                 />
               </div>
               <div className="field">
-                <label htmlFor="dailyLimit">Batas generate / 24 jam</label>
+                <label htmlFor="dailyLimit">Artikel per 24 jam</label>
                 <input
                   className="input"
                   id="dailyLimit"
@@ -211,11 +217,65 @@ export function AutomationPage({
                 />
               </div>
             </div>
+            <p className="hint" style={{ marginTop: '-0.3rem' }}>
+              Terpakai dalam 24 jam terakhir: <strong>{generatedToday} / {settings.dailyLimit}</strong>. Cron akan
+              membuat hingga batas ini, bisa beberapa artikel sekaligus dalam satu slot. Jika durasi fungsi habis, sisa
+              kuota dilanjutkan pada cron berikutnya.
+            </p>
 
             <label className="field" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
               <input type="checkbox" name="autoPublish" defaultChecked={settings.autoPublish} />
               <span>Publish otomatis jika tidak diedit</span>
             </label>
+
+            <div className="field">
+              <label htmlFor="coverMode">Cover image</label>
+              <select className="select" id="coverMode" name="coverMode" defaultValue={settings.coverMode}>
+                <option value="procedural">Prosedural — gratis, tanpa AI image</option>
+                <option value="ai">AI — pakai provider di bawah</option>
+              </select>
+            </div>
+            <div className="form-row">
+              <div className="field">
+                <label htmlFor="aiImageProvider">Provider image</label>
+                <select className="select" id="aiImageProvider" name="aiImageProvider" defaultValue={settings.aiImageProvider}>
+                  <option value="cloudflare">Cloudflare Workers AI</option>
+                  <option value="gemini">Gemini</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="aiImageModel">Model image</label>
+                <input className="input" id="aiImageModel" name="aiImageModel" defaultValue={settings.aiImageModel} />
+              </div>
+            </div>
+            <p className="hint" style={{ marginTop: '-0.3rem' }}>
+              Cloudflare: <code>@cf/black-forest-labs/flux-1-schnell</code> · Gemini:{' '}
+              <code>gemini-2.5-flash-image</code>
+            </p>
+            <div className="field">
+              <label htmlFor="aiImageDailyLimit">Batas AI cover / 24 jam</label>
+              <input
+                className="input"
+                id="aiImageDailyLimit"
+                name="aiImageDailyLimit"
+                type="number"
+                min={0}
+                max={10}
+                defaultValue={settings.aiImageDailyLimit}
+              />
+            </div>
+            {settings.coverMode === 'ai' && !coverReady ? (
+              <div className="flash" data-tone="error" role="alert">
+                Provider AI cover belum dikonfigurasi. Set <code>CLOUDFLARE_ACCOUNT_ID</code> +{' '}
+                <code>CLOUDFLARE_API_TOKEN</code> untuk Cloudflare, atau <code>GEMINI_API_KEY</code> untuk Gemini.
+              </div>
+            ) : null}
+            <p className="hint" style={{ marginTop: '-0.3rem' }}>
+              AI cover hanya dipakai jika aktivitas tidak punya foto. Terpakai:{' '}
+              <strong>{aiCoversToday} / {settings.aiImageDailyLimit}</strong> dalam 24 jam. Jika kuota habis atau
+              generate gagal, otomatis fallback ke cover prosedural. Generate gambar memakai kuota/biaya terpisah dari
+              teks; pada free tier Gemini, kuota image generation sering 0.
+            </p>
 
             <div className="field">
               <label htmlFor="initiativeBrief">Initiative brief (saat tidak ada aktivitas)</label>
@@ -250,9 +310,10 @@ export function AutomationPage({
                     )}
                   </div>
                   <div className="meta">
-                    Status: {run.status}
+                    Status: {run.status} · cover: {run.coverSource ?? '—'}
                     {run.autoPublishAt ? ` · auto-publish ${formatDate(run.autoPublishAt, 'short')}` : ''}
                   </div>
+                  {run.coverError ? <div className="hint">Cover fallback: {run.coverError}</div> : null}
                 </li>
               ))}
             </ul>

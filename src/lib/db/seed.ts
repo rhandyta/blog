@@ -142,11 +142,11 @@ export async function seedDatabase(): Promise<void> {
   await saveSiteSettings({
     ...defaultSettings,
     about:
-      'RhandytaVERSE is a record of what one person is reading, building, and thinking about. It takes its name from the commonplace books kept by readers for centuries: private collections of passages, observations, and ideas, copied out and returned to.\n\nEssays are published when there is something worth saying. The archive is kept in full, with no fixed schedule to keep up with.',
+      'RhandytaVERSE is the personal publication of Rhandyta Briantama. I write about technology, design, science, culture, work, and ordinary life — the things I am reading, building, and thinking about.\n\nThe name comes from the commonplace books kept by readers for centuries: private collections of passages, observations, and ideas, copied out and returned to. The publication and the person are the same project: one reader, one desk, one ongoing record.\n\nEssays are published when there is something worth saying. The archive is kept in full, with no fixed schedule to keep up with.',
     email: 'hello@lab-rb.my.id',
-    x: 'https://x.com/',
-    github: 'https://github.com/',
-    linkedin: 'https://www.linkedin.com/',
+    x: '',
+    github: 'https://github.com/rhandyta',
+    linkedin: '',
   })
 
   console.log(`[seed] done — ${seedArticles.length} articles, ${seedAuthors.length} authors, ${seedCategories.length} categories`)

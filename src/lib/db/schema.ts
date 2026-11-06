@@ -134,8 +134,12 @@ export const subscribers = sqliteTable('subscribers', {
   ipHash: text('ip_hash'),
   createdAt: text('created_at').notNull(),
   unsubscribedAt: text('unsubscribed_at'),
+  confirmedAt: text('confirmed_at'),
+  confirmationToken: text('confirmation_token'),
+  confirmationSentAt: text('confirmation_sent_at'),
 }, (table) => ({
   emailIdx: uniqueIndex('subscribers_email_idx').on(table.email),
+  confirmationIdx: uniqueIndex('subscribers_confirmation_token_idx').on(table.confirmationToken),
 }))
 
 export const articleViews = sqliteTable('article_views', {
@@ -145,6 +149,63 @@ export const articleViews = sqliteTable('article_views', {
 }, (table) => ({
   pk: primaryKey({ columns: [table.articleId, table.day] }),
 }))
+
+export const articleVisits = sqliteTable('article_visits', {
+  id: text('id').primaryKey(),
+  articleId: text('article_id').notNull().references(() => articles.id, { onDelete: 'cascade' }),
+  visitorHash: text('visitor_hash').notNull(),
+  day: text('day').notNull(),
+  bucket: text('bucket').notNull(),
+  createdAt: text('created_at').notNull(),
+  referrerHost: text('referrer_host'),
+  country: text('country'),
+  device: text('device').notNull().default('unknown'),
+  browser: text('browser').notNull().default('unknown'),
+  os: text('os').notNull().default('unknown'),
+}, (table) => ({
+  uniqueIdx: uniqueIndex('article_visits_unique_idx').on(table.articleId, table.visitorHash, table.bucket),
+  articleIdx: index('article_visits_article_idx').on(table.articleId, table.day),
+  dayIdx: index('article_visits_day_idx').on(table.day),
+  visitorIdx: index('article_visits_visitor_idx').on(table.visitorHash),
+  referrerIdx: index('article_visits_referrer_idx').on(table.referrerHost),
+}))
+
+export const articleReaders = sqliteTable('article_readers', {
+  articleId: text('article_id').notNull().references(() => articles.id, { onDelete: 'cascade' }),
+  visitorHash: text('visitor_hash').notNull(),
+  firstSeenAt: text('first_seen_at').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+  visits: integer('visits').notNull().default(1),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.articleId, table.visitorHash] }),
+  visitorIdx: index('article_readers_visitor_idx').on(table.visitorHash),
+}))
+
+export const newsletterBroadcasts = sqliteTable('newsletter_broadcasts', {
+  id: text('id').primaryKey(),
+  subject: text('subject').notNull(),
+  body: text('body').notNull(),
+  recipientCount: integer('recipient_count').notNull().default(0),
+  sentCount: integer('sent_count').notNull().default(0),
+  failedCount: integer('failed_count').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+  createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+  kind: text('kind', { enum: ['manual', 'digest'] }).notNull().default('manual'),
+  periodKey: text('period_key'),
+}, (table) => ({
+  periodIdx: uniqueIndex('newsletter_broadcasts_digest_period_idx').on(table.kind, table.periodKey),
+}))
+
+export const newsletterSchedule = sqliteTable('newsletter_schedule', {
+  id: text('id').primaryKey(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  cadence: text('cadence', { enum: ['daily', 'weekly', 'monthly'] }).notNull().default('weekly'),
+  weekday: integer('weekday').notNull().default(1),
+  hourUtc: integer('hour_utc').notNull().default(2),
+  metric: text('metric', { enum: ['readers', 'views'] }).notNull().default('readers'),
+  articleLimit: integer('article_limit').notNull().default(5),
+  updatedAt: text('updated_at').notNull(),
+})
 
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
@@ -172,6 +233,8 @@ export const automationRuns = sqliteTable('automation_runs', {
     enum: ['pending', 'published', 'reviewed', 'skipped', 'deleted', 'error'],
   }).notNull().default('pending'),
   error: text('error'),
+  coverSource: text('cover_source', { enum: ['activity', 'ai', 'procedural'] }),
+  coverError: text('cover_error'),
   createdAt: text('created_at').notNull(),
   autoPublishAt: text('auto_publish_at'),
 }, (table) => ({
@@ -199,7 +262,11 @@ export type Category = typeof categories.$inferSelect
 export type Tag = typeof tags.$inferSelect
 export type MediaAsset = typeof media.$inferSelect
 export type Subscriber = typeof subscribers.$inferSelect
+export type NewsletterBroadcast = typeof newsletterBroadcasts.$inferSelect
+export type NewsletterSchedule = typeof newsletterSchedule.$inferSelect
 export type ArticleRevision = typeof articleRevisions.$inferSelect
+export type ArticleVisit = typeof articleVisits.$inferSelect
+export type ArticleReader = typeof articleReaders.$inferSelect
 export type Session = typeof sessions.$inferSelect
 export type AutomationActivity = typeof automationActivity.$inferSelect
 export type AutomationRun = typeof automationRuns.$inferSelect

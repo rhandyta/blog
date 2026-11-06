@@ -48,9 +48,12 @@ await run('DELETE FROM automation_runs')
 await run('DELETE FROM automation_activity')
 await run('DELETE FROM article_tags')
 await run('DELETE FROM article_revisions')
+await run('DELETE FROM article_visits')
+await run('DELETE FROM article_readers')
 await run('DELETE FROM article_views')
 await run('DELETE FROM articles')
 await run('DELETE FROM authors')
+await run('DELETE FROM newsletter_broadcasts')
 await run('DELETE FROM subscribers')
 
 const fts = await get<{ name: string }>(

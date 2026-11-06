@@ -1,10 +1,12 @@
-import { and, asc, count, desc, eq, inArray, like, lte, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNotNull, like, lte, notInArray, or, sql } from 'drizzle-orm'
 import type { MediaInfo } from '../../content/doc'
 import { all, exec, get, getDb, hasFts5, run } from '../client'
 import {
+  articleReaders,
   articleRevisions,
   articleTags,
   articleViews,
+  articleVisits,
   articles,
   authors,
   categories,
@@ -373,14 +375,108 @@ export async function getArchiveEntries(): Promise<ArchiveEntry[]> {
  *  Views / popularity
  * ------------------------------------------------------------------ */
 
-export async function recordArticleView(articleId: string): Promise<void> {
-  await getDb()
+export type ArticleViewInput = {
+  articleId: string
+  visitorHash: string
+  day: string
+  bucket: string
+  referrerHost: string | null
+  country: string | null
+  device: string
+  browser: string
+  os: string
+}
+
+export async function recordArticleView(input: ArticleViewInput): Promise<boolean> {
+  const db = getDb()
+  const now = new Date().toISOString()
+  const inserted = await db
+    .insert(articleVisits)
+    .values({
+      id: crypto.randomUUID(),
+      articleId: input.articleId,
+      visitorHash: input.visitorHash,
+      day: input.day,
+      bucket: input.bucket,
+      createdAt: now,
+      referrerHost: input.referrerHost,
+      country: input.country,
+      device: input.device,
+      browser: input.browser,
+      os: input.os,
+    })
+    .onConflictDoNothing({
+      target: [articleVisits.articleId, articleVisits.visitorHash, articleVisits.bucket],
+    })
+    .returning({ id: articleVisits.id })
+  if (!inserted.length) return false
+
+  await db
     .insert(articleViews)
-    .values({ articleId, day: isoDay(), count: 1 })
+    .values({ articleId: input.articleId, day: input.day, count: 1 })
     .onConflictDoUpdate({
       target: [articleViews.articleId, articleViews.day],
       set: { count: sql`${articleViews.count} + 1` },
     })
+
+  await db
+    .insert(articleReaders)
+    .values({
+      articleId: input.articleId,
+      visitorHash: input.visitorHash,
+      firstSeenAt: now,
+      lastSeenAt: now,
+      visits: 1,
+    })
+    .onConflictDoUpdate({
+      target: [articleReaders.articleId, articleReaders.visitorHash],
+      set: {
+        lastSeenAt: now,
+        visits: sql`${articleReaders.visits} + 1`,
+      },
+    })
+
+  return true
+}
+
+export type ArticleAudience = {
+  views: number
+  readers: number
+}
+
+export async function getArticleAudienceMap(
+  articleIds: string[],
+): Promise<Map<string, ArticleAudience>> {
+  const ids = [...new Set(articleIds.filter(Boolean))]
+  const audience = new Map<string, ArticleAudience>()
+  for (const id of ids) audience.set(id, { views: 0, readers: 0 })
+  if (!ids.length) return audience
+
+  const placeholders = ids.map(() => '?').join(', ')
+  const [views, readers] = await Promise.all([
+    all<{ articleId: string; total: number }>(
+      `SELECT article_id AS articleId, COALESCE(SUM(count), 0) AS total
+       FROM article_views WHERE article_id IN (${placeholders})
+       GROUP BY article_id`,
+      ids,
+    ),
+    all<{ articleId: string; total: number }>(
+      `SELECT article_id AS articleId, COUNT(*) AS total
+       FROM article_readers WHERE article_id IN (${placeholders})
+       GROUP BY article_id`,
+      ids,
+    ),
+  ])
+
+  for (const row of views) {
+    const entry = audience.get(row.articleId)
+    if (entry) entry.views = Number(row.total) || 0
+  }
+  for (const row of readers) {
+    const entry = audience.get(row.articleId)
+    if (entry) entry.readers = Number(row.total) || 0
+  }
+  return audience
 }
 
 export async function getMostRead(limit = 4, days = 14): Promise<ArticleCard[]> {
@@ -410,6 +506,15 @@ export async function getCardsByIds(ids: string[]): Promise<ArticleCard[]> {
   return cards.sort((a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99))
 }
 
+export async function listRecentArticleTitles(limit = 12): Promise<string[]> {
+  const rows = await getDb()
+    .select({ title: articles.title })
+    .from(articles)
+    .orderBy(desc(articles.createdAt))
+    .limit(limit)
+  return rows.map((row) => row.title)
+}
+
 export async function getArticleBodyTexts(ids: string[]): Promise<Map<string, string>> {
   if (!ids.length) return new Map()
   const rows = await all<{ id: string; bodyText: string }>(
@@ -433,7 +538,7 @@ export type AdminFilters = {
 }
 
 export async function listAdminArticles(filters: AdminFilters = {}): Promise<{
-  items: Array<CardRow & { tags: Tag[] }>
+  items: Array<CardRow & { tags: Tag[]; audience: ArticleAudience }>
   total: number
 }> {
   const { status = 'all', categoryId, authorId, q, limit = 30, offset = 0 } = filters
@@ -458,7 +563,15 @@ export async function listAdminArticles(filters: AdminFilters = {}): Promise<{
     .select({ n: count() })
     .from(articles)
     .where(where)
-  return { items: rows.map((row) => ({ ...row, tags: [] })), total: totals[0]?.n ?? 0 }
+  const audience = await getArticleAudienceMap(rows.map((row) => row.article.id))
+  return {
+    items: rows.map((row) => ({
+      ...row,
+      tags: [],
+      audience: audience.get(row.article.id) ?? { views: 0, readers: 0 },
+    })),
+    total: totals[0]?.n ?? 0,
+  }
 }
 
 export async function getArticleTags(articleId: string): Promise<Tag[]> {
@@ -751,17 +864,25 @@ export async function rebuildSearchIndex(): Promise<number> {
 
 export async function getDashboardStats() {
   const db = getDb()
-  const [total, published, drafts, scheduled, subscriberRows, mediaRows, weekViews] = await Promise.all([
+  const [total, published, drafts, scheduled, subscriberRows, mediaRows, weekViews, weekReaders] = await Promise.all([
     db.select({ n: count() }).from(articles),
     db.select({ n: count() }).from(articles).where(eq(articles.status, 'published')),
     db.select({ n: count() }).from(articles).where(eq(articles.status, 'draft')),
     db.select({ n: count() }).from(articles).where(eq(articles.status, 'scheduled')),
-    db.select({ n: count() }).from(subscribers).where(eq(subscribers.status, 'subscribed')),
+    db.select({ n: count() }).from(subscribers).where(and(eq(subscribers.status, 'subscribed'), isNotNull(subscribers.confirmedAt))),
     db.select({ n: count() }).from(media),
     (async () => {
       const since = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)
       const row = await get<{ n: number }>(
         'SELECT COALESCE(SUM(count), 0) AS n FROM article_views WHERE day >= ?',
+        [since],
+      )
+      return row ?? { n: 0 }
+    })(),
+    (async () => {
+      const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
+      const row = await get<{ n: number }>(
+        'SELECT COUNT(DISTINCT visitor_hash) AS n FROM article_visits WHERE created_at >= ?',
         [since],
       )
       return row ?? { n: 0 }
@@ -775,5 +896,6 @@ export async function getDashboardStats() {
     subscribers: subscriberRows[0]?.n ?? 0,
     media: mediaRows[0]?.n ?? 0,
     weekViews: weekViews?.n ?? 0,
+    weekReaders: weekReaders?.n ?? 0,
   }
 }

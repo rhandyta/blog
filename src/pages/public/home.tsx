@@ -13,6 +13,15 @@ import {
   accentClass,
 } from '../../components/ui'
 
+function breakableTitle(title: string) {
+  return title.split(/(?<=[a-z])(?=[A-Z])/g).map((part, index) => (
+    <span key={`${part}-${index}`}>
+      {index > 0 ? <wbr /> : null}
+      {part}
+    </span>
+  ))
+}
+
 export function HomeEmptyPage({
   settings,
   categories,
@@ -55,6 +64,12 @@ export function HomePage({
   picks: ArticleCard[]
   mostRead: ArticleCard[]
 }) {
+  let section = 1
+  const latestNumber = latest.length ? String(section++).padStart(2, '0') : null
+  const picksNumber = picks.length ? String(section++).padStart(2, '0') : null
+  const mostReadNumber = mostRead.length ? String(section++).padStart(2, '0') : null
+  const topicsNumber = String(section++).padStart(2, '0')
+
   return (
     <SiteLayout settings={settings} categories={categories} path="/">
       <section className={`hero ${accentClass(hero.category?.accent)}`}>
@@ -68,7 +83,7 @@ export function HomePage({
                 </span>
               </div>
               <h1 className="hero__title display-xl">
-                <a href={`/articles/${hero.slug}`}>{hero.title}</a>
+                <a href={`/articles/${hero.slug}`}>{breakableTitle(hero.title)}</a>
               </h1>
               <p className="hero__deck deck">{hero.subtitle ?? hero.excerpt}</p>
               <div className="hero__footer">
@@ -116,21 +131,23 @@ export function HomePage({
         </div>
       </section>
 
-      <section className="latest">
-        <div className="shell">
-          <SectionHead number="01" label="Latest" moreHref="/articles" moreLabel="All articles" />
-          <div>
-            {latest.map((card) => (
-              <ArticleRow key={card.id} card={card} />
-            ))}
+      {latestNumber ? (
+        <section className="latest">
+          <div className="shell">
+            <SectionHead number={latestNumber} label="Latest" moreHref="/articles" moreLabel="All articles" />
+            <div>
+              {latest.map((card) => (
+                <ArticleRow key={card.id} card={card} />
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      {picks.length ? (
+      {picksNumber ? (
         <section className="picks">
           <div className="shell">
-            <SectionHead number="02" label="Editors’ picks" />
+            <SectionHead number={picksNumber} label="Editors’ picks" />
             <div className="picks__grid">
               {picks[0] ? <PickLead card={picks[0]} /> : null}
               <div className="pick__side">
@@ -143,10 +160,10 @@ export function HomePage({
         </section>
       ) : null}
 
-      {mostRead.length ? (
+      {mostReadNumber ? (
         <section className="most-read">
           <div className="shell">
-            <SectionHead number="03" label="Most read" moreHref="/articles" moreLabel="The index" />
+            <SectionHead number={mostReadNumber} label="Most read" moreHref="/articles" moreLabel="The index" />
             <div className="most-read__grid">
               {mostRead.map((card, index) => (
                 <a key={card.id} className={`most-read__item ${accentClass(card.category?.accent)}`} href={`/articles/${card.slug}`}>
@@ -162,7 +179,7 @@ export function HomePage({
 
       <section className="topics">
         <div className="shell">
-          <SectionHead number={mostRead.length ? '04' : '03'} label="Topics" moreHref="/topics" moreLabel="All topics" />
+          <SectionHead number={topicsNumber} label="Topics" moreHref="/topics" moreLabel="All topics" />
           <div className="topic-list">
             {categories.map((category, index) => (
               <TopicRow key={category.id} category={category} index={index} />
@@ -189,15 +206,22 @@ export function HomePage({
         <div className="shell">
           <div className="about-strip__grid">
             <div>
-              <span className="kicker kicker--plain">The editor</span>
+              <span className="kicker kicker--plain">The person</span>
               <h2 className="display-sm" style={{ marginTop: '1rem' }}>
-                One reader, keeping notes in public.
+                {settings.title} is Rhandyta Briantama.
               </h2>
             </div>
             <div>
-              <p>{settings.about}</p>
+              {settings.about
+                .split(/\n{2,}/)
+                .filter(Boolean)
+                .map((paragraph, index) => (
+                  <p key={index} style={index > 0 ? { marginTop: '1rem' } : undefined}>
+                    {paragraph}
+                  </p>
+                ))}
               <p style={{ marginTop: '1.25rem' }}>
-                <a className="text-link" href="/about">About the publication →</a>
+                <a className="text-link" href="/about">More about Rhandyta Briantama →</a>
               </p>
             </div>
           </div>

@@ -22,6 +22,11 @@ const envSchema = z.object({
   BLOB_READ_WRITE_TOKEN: optionalString,
   GEMINI_API_KEY: optionalString,
   GEMINI_MODEL: optionalString,
+  CLOUDFLARE_ACCOUNT_ID: optionalString,
+  CLOUDFLARE_API_TOKEN: optionalString,
+  RESEND_API_KEY: optionalString,
+  NEWSLETTER_FROM: optionalString,
+  NEWSLETTER_REPLY_TO: optionalString,
 })
 
 export type AppConfig = z.infer<typeof envSchema>

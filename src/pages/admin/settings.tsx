@@ -127,11 +127,11 @@ export function SubscribersPage({
   user: User
   subscribers: Subscriber[]
   total: number
-  stats: { subscribed: number; unsubscribed: number }
+  stats: { subscribed: number; pending: number; unsubscribed: number }
   page: number
   totalPages: number
   q?: string
-  status: 'subscribed' | 'unsubscribed' | 'all'
+  status: 'subscribed' | 'pending' | 'unsubscribed' | 'all'
   flash: Flash
   csrfToken: string
 }) {
@@ -140,8 +140,13 @@ export function SubscribersPage({
       user={user}
       path="/admin/subscribers"
       title="Subscribers"
-      subtitle={`${stats.subscribed} subscribed · ${stats.unsubscribed} unsubscribed`}
-      actions={<a className="btn btn--ghost" href="/admin/subscribers.csv">Export CSV</a>}
+      subtitle={`${stats.subscribed} confirmed · ${stats.pending} pending · ${stats.unsubscribed} unsubscribed`}
+      actions={
+        <>
+          <a className="btn btn--ghost" href="/admin/newsletter">Write newsletter →</a>
+          <a className="btn btn--ghost" href="/admin/subscribers.csv">Export CSV</a>
+        </>
+      }
       flash={flash}
       csrfToken={csrfToken}
     >
@@ -154,7 +159,8 @@ export function SubscribersPage({
           <label htmlFor="status">Status</label>
           <select className="select" id="status" name="status" defaultValue={status}>
             <option value="all">All</option>
-            <option value="subscribed">Subscribed</option>
+            <option value="subscribed">Confirmed</option>
+            <option value="pending">Pending confirmation</option>
             <option value="unsubscribed">Unsubscribed</option>
           </select>
         </div>
@@ -170,7 +176,24 @@ export function SubscribersPage({
             {subscribers.map((subscriber) => (
               <tr key={subscriber.id}>
                 <td>{subscriber.email}</td>
-                <td><span className="status" data-status={subscriber.status === 'subscribed' ? 'published' : 'archived'}>{subscriber.status}</span></td>
+                <td>
+                  <span
+                    className="status"
+                    data-status={
+                      subscriber.status === 'unsubscribed'
+                        ? 'archived'
+                        : subscriber.confirmedAt
+                          ? 'published'
+                          : 'scheduled'
+                    }
+                  >
+                    {subscriber.status === 'unsubscribed'
+                      ? 'unsubscribed'
+                      : subscriber.confirmedAt
+                        ? 'confirmed'
+                        : 'pending'}
+                  </span>
+                </td>
                 <td className="muted-cell">{subscriber.source}</td>
                 <td className="muted-cell">{formatDate(subscriber.createdAt, 'long')}</td>
               </tr>
@@ -188,7 +211,8 @@ export function SubscribersPage({
         query={{ q, status: status === 'all' ? undefined : status }}
       />
       <p className="hint" style={{ marginTop: '1rem' }}>
-        {total} total records. Export the subscriber list as a CSV for your email provider.
+        {total} total records. Only confirmed subscribers receive newsletters. Pending addresses are waiting for
+        double opt-in.
       </p>
     </AdminLayout>
   )

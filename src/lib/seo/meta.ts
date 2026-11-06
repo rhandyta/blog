@@ -32,6 +32,8 @@ export function renderHead(head: PageHead): string {
   const tags: string[] = [
     `<title>${escapeHtml(title)}</title>`,
     `<meta name="description" content="${escapeAttr(head.description)}">`,
+    `<meta name="author" content="Rhandyta Briantama">`,
+    `<link rel="author" href="${escapeAttr(absoluteUrl(origin, '/author/rhandyta-briantama'))}">`,
     `<link rel="canonical" href="${escapeAttr(canonical)}">`,
     `<meta name="robots" content="${escapeAttr(head.robots ?? 'index, follow, max-image-preview:large')}">`,
     `<meta property="og:site_name" content="${escapeAttr(head.siteName)}">`,
@@ -77,12 +79,19 @@ export function renderHead(head: PageHead): string {
 }
 
 export function websiteJsonLd(settings: SiteSettings, origin: string): unknown {
+  const person = {
+    '@type': 'Person',
+    name: 'Rhandyta Briantama',
+    url: `${origin}/author/rhandyta-briantama`,
+  }
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: settings.title,
     description: settings.description,
     url: origin,
+    author: person,
+    creator: person,
     potentialAction: {
       '@type': 'SearchAction',
       target: `${origin}/search?q={search_term_string}`,
@@ -163,6 +172,8 @@ export function personJsonLd(input: {
   description: string
   image: string | null
   origin: string
+  jobTitle?: string
+  sameAs?: string[]
 }): unknown {
   return {
     '@context': 'https://schema.org',
@@ -170,7 +181,9 @@ export function personJsonLd(input: {
     name: input.name,
     url: absoluteUrl(input.origin, input.url),
     description: input.description,
+    ...(input.jobTitle ? { jobTitle: input.jobTitle } : {}),
     ...(input.image ? { image: absoluteUrl(input.origin, input.image) } : {}),
+    ...(input.sameAs?.length ? { sameAs: input.sameAs } : {}),
   }
 }
 

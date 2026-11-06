@@ -50,6 +50,9 @@ export function AuthorPage({
               <Kicker plain>Contributor</Kicker>
               <h1 style={{ marginTop: '0.75rem' }}>{author.displayName}</h1>
               {author.roleTitle ? <p className="meta author-hero__role">{author.roleTitle}</p> : null}
+              {author.slug === 'rhandyta-briantama' ? (
+                <p className="meta" style={{ marginTop: '0.35rem' }}>Writes and edits {settings.title}.</p>
+              ) : null}
               <p className="author-hero__bio">{author.longBio ?? author.bio}</p>
               {expertise.length ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '1.25rem' }}>

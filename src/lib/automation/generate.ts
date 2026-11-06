@@ -1,6 +1,7 @@
 import { ACCENTS, getAuthorById, getAuthorBySlug, listAuthors, listCategories, listTags, upsertAuthor } from '../db/queries/taxonomy'
-import { createArticle, getArticleById, publishArticle, uniqueArticleSlug } from '../db/queries/articles'
+import { createArticle, getArticleById, listRecentArticleTitles, publishArticle, uniqueArticleSlug } from '../db/queries/articles'
 import {
+  countAiCoversSince,
   countGenerationsSince,
   createRun,
   dueRuns,
@@ -15,6 +16,7 @@ import { parseMarkdown } from '../content/markdown'
 import { coverAlt, coverSvg } from '../media/cover'
 import { saveUpload } from '../media/storage'
 import { generateDraft, hasGeminiKey } from './gemini'
+import { generateCoverImage } from './image'
 
 export type GenerateResult =
   | {
@@ -37,6 +39,25 @@ export type DueResult = {
   reviewed: number
   skipped: number
   deleted: number
+}
+
+export type BatchResult = {
+  generated: Array<{
+    articleId: string
+    title: string
+    slug: string
+    kind: 'activity' | 'initiative'
+    runId: string
+  }>
+  attempts: number
+  errors: string[]
+  reason: 'done' | 'limit' | 'time' | 'error' | 'disabled' | 'missing-key' | 'no-category'
+}
+
+// A small grace avoids skipping a run that happened exactly 24 hours ago at the
+// same cron minute.
+export function generationWindowStart(): string {
+  return new Date(Date.now() - 24 * 60 * 60 * 1000 + 5 * 60 * 1000).toISOString()
 }
 
 function hashSeed(value: string): number {
@@ -90,8 +111,7 @@ export async function generateAutomationDraft(source: 'manual' | 'cron'): Promis
   if (!settings.enabled) return { ok: false, reason: 'disabled' }
   if (!hasGeminiKey()) return { ok: false, reason: 'missing-key' }
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  const generatedRecently = await countGenerationsSince(since)
+  const generatedRecently = await countGenerationsSince(generationWindowStart())
   if (generatedRecently >= Math.max(1, settings.dailyLimit)) {
     return { ok: false, reason: 'limit' }
   }
@@ -104,6 +124,7 @@ export async function generateAutomationDraft(source: 'manual' | 'cron'): Promis
     const categories = await listCategories()
     if (!categories.length) return { ok: false, reason: 'no-category' }
     const tags = await listTags({ limit: 500 })
+    const recentTitles = await listRecentArticleTitles(12)
 
     const draft = await generateDraft(
       {
@@ -121,6 +142,7 @@ export async function generateAutomationDraft(source: 'manual' | 'cron'): Promis
         })),
         tags: tags.map((tag) => ({ name: tag.name, slug: tag.slug })),
         initiativeBrief: settings.initiativeBrief,
+        recentTitles,
       },
       settings.model,
     )
@@ -153,9 +175,51 @@ export async function generateAutomationDraft(source: 'manual' | 'cron'): Promis
     const excerpt = draft.excerpt || makeExcerpt(bodyText, 200)
     const slug = await uniqueArticleSlug(slugify(draft.title))
 
-    let featuredMediaId = activity?.media?.id ?? null
+    let featuredMediaId: string | null = activity?.media?.id ?? null
+    let coverSource: 'activity' | 'ai' | 'procedural' = featuredMediaId ? 'activity' : 'procedural'
+    let coverError: string | null = null
+    const accent = ACCENTS.find((item) => item.token === category.accent)?.hex ?? '#c8452b'
+
+    if (!featuredMediaId && settings.coverMode === 'ai' && settings.aiImageDailyLimit > 0) {
+      const aiCovers = await countAiCoversSince(generationWindowStart())
+      if (aiCovers < settings.aiImageDailyLimit) {
+        try {
+          const generated = await generateCoverImage({
+            provider: settings.aiImageProvider,
+            title: draft.title,
+            excerpt,
+            categoryName: category.name,
+            categoryDescription: category.description,
+            accentHex: accent,
+            language: settings.language,
+            model: settings.aiImageModel,
+          })
+          const extension = generated.mimeType.includes('webp')
+            ? 'webp'
+            : generated.mimeType.includes('jpeg') || generated.mimeType.includes('jpg')
+              ? 'jpg'
+              : 'png'
+          const media = await saveUpload(generated.buffer, {
+            originalName: `ai-cover-${slug}.${extension}`,
+            alt: `Editorial cover for ${draft.title}`,
+            caption: null,
+            uploadedBy: null,
+            allowSvg: false,
+          })
+          if (media) {
+            featuredMediaId = media.id
+            coverSource = 'ai'
+          } else {
+            coverError = 'AI image could not be stored'
+          }
+        } catch (error) {
+          coverError = error instanceof Error ? error.message : String(error)
+          console.warn('[automation] AI cover failed, using procedural fallback:', coverError)
+        }
+      }
+    }
+
     if (!featuredMediaId) {
-      const accent = ACCENTS.find((item) => item.token === category.accent)?.hex ?? '#c8452b'
       const seed = hashSeed(draft.title)
       const media = await saveUpload(Buffer.from(coverSvg(seed, accent)), {
         originalName: `automation-cover-${slug}.svg`,
@@ -165,6 +229,7 @@ export async function generateAutomationDraft(source: 'manual' | 'cron'): Promis
         allowSvg: true,
       })
       featuredMediaId = media?.id ?? null
+      coverSource = 'procedural'
     }
 
     const now = new Date().toISOString()
@@ -208,6 +273,8 @@ export async function generateAutomationDraft(source: 'manual' | 'cron'): Promis
       activityId: activity?.id ?? null,
       articleId: article.id,
       status: 'pending',
+      coverSource,
+      coverError,
       autoPublishAt,
     })
 
@@ -236,6 +303,60 @@ export async function generateAutomationDraft(source: 'manual' | 'cron'): Promis
     }).catch(() => undefined)
     return { ok: false, reason: 'error', message }
   }
+}
+
+export async function generateAutomationBatch(
+  source: 'manual' | 'cron',
+  options: { max?: number; budgetMs?: number; generate?: typeof generateAutomationDraft } = {},
+): Promise<BatchResult> {
+  const settings = await getAutomationSettings()
+  const result: BatchResult = { generated: [], attempts: 0, errors: [], reason: 'done' }
+  const generateOne = options.generate ?? generateAutomationDraft
+
+  if (!settings.enabled) {
+    result.reason = 'disabled'
+    return result
+  }
+  if (!options.generate && !hasGeminiKey()) {
+    result.reason = 'missing-key'
+    return result
+  }
+
+  const startedAt = Date.now()
+  const budgetMs = options.budgetMs ?? 210_000
+  const max = Math.min(options.max ?? settings.dailyLimit, settings.dailyLimit)
+
+  while (result.attempts < max) {
+    if (Date.now() - startedAt >= budgetMs) {
+      result.reason = 'time'
+      break
+    }
+
+    const alreadyGenerated = await countGenerationsSince(generationWindowStart())
+    if (alreadyGenerated >= settings.dailyLimit) {
+      result.reason = 'limit'
+      break
+    }
+
+    const single = await generateOne(source)
+    result.attempts += 1
+
+    if (!single.ok) {
+      result.reason = single.reason
+      if (single.message) result.errors.push(single.message)
+      break
+    }
+
+    result.generated.push({
+      articleId: single.articleId,
+      title: single.title,
+      slug: single.slug,
+      kind: single.kind,
+      runId: single.runId,
+    })
+  }
+
+  return result
 }
 
 export async function processDueAutomation(now = new Date().toISOString()): Promise<DueResult> {
@@ -283,8 +404,8 @@ export async function processDueAutomation(now = new Date().toISOString()): Prom
   return result
 }
 
-export async function runAutomationCron(): Promise<DueResult & { generated: GenerateResult }> {
+export async function runAutomationCron(): Promise<DueResult & { generated: BatchResult }> {
   const due = await processDueAutomation()
-  const generated = await generateAutomationDraft('cron')
+  const generated = await generateAutomationBatch('cron')
   return { ...due, generated }
 }

@@ -2,7 +2,7 @@
 
 A self-contained editorial publishing platform: server-rendered React, a real SQLite-backed CMS, and a print-inspired design system. It is built to be read, not to look like a template.
 
-**RhandytaVERSE** is a digital commonplace book — a personal index of essays across technology, design, science, culture, work, and the quieter parts of a working life. The demo content is labelled as demonstration material; the editorial tools behind it are fully functional.
+**RhandytaVERSE** is the personal publication of **Rhandyta Briantama** — a digital commonplace book of essays across technology, design, science, culture, work, and the quieter parts of a working life. It is written and edited by Rhandyta Briantama; the publication and the person are the same project.
 
 ---
 
@@ -20,8 +20,10 @@ A self-contained editorial publishing platform: server-rendered React, a real SQ
 | Editor | TipTap / ProseMirror (stored as JSON, rendered through a strict server-side serializer) |
 | Images | `sharp` — WebP + AVIF variants, resized masters, 1200×630 social crops; local disk or [Vercel Blob](https://vercel.com/storage/blob) |
 | Automation | Gemini (Google AI Studio) — drafts from daily activity or an editorial initiative, with a review window |
+| Analytics | First-party, cookie-less readership and visitor aggregates; salted visitor hashes, no raw IP/UA, admin-only |
+| Newsletter | Resend API; double opt-in, admin composer, per-recipient unsubscribe, delivery log |
 | Validation | Zod |
-| Tests | `bun test` (51 unit + integration tests) |
+| Tests | `bun test` (65 unit + integration tests) |
 
 ### Rendering architecture
 
@@ -294,8 +296,9 @@ Scheduled publishing does not run in-process on Vercel. The project includes a d
 `/admin/automation` is the editorial control room for AI-assisted drafts:
 
 - Add a daily **activity** (text and optional image). The image is processed through the normal media pipeline and can become the article cover.
-- Choose the **author**, **language** (default Indonesian), Gemini model, daily generation limit (default 1), and the initiative brief used when there is no activity.
-- Press **Generate draft** to create a draft immediately, or let the daily cron do it.
+- Choose the **author**, **language** (default Indonesian), Gemini model, articles per 24 hours (default 1), and the initiative brief used when there is no activity.
+- Choose the **cover source**: an activity photo, a procedural geometric cover (free), or an optional AI cover with `gemini-2.5-flash-image`. AI covers have their own daily cap and fall back to procedural on quota/error. Gemini image generation may require a paid tier; a free key can return a 0 image quota.
+- Press **Generate draft** to create one draft immediately, or let the cron batch create up to the remaining daily quota. A batch stops at a 210-second budget so the function stays within its 300-second limit; any remainder continues on the next cron slot.
 - Generated drafts are marked for **auto-publish after 24 hours**. If you edit, schedule, or publish the draft before then, auto-publish is skipped; otherwise the next cron publishes it automatically. This keeps a human review window without blocking the pipeline.
 
 The Gemini integration is provider-side optional: without `GEMINI_API_KEY` the page loads and the cron stays idle. The free tier is enough for a small publication; the daily limit is a hard guard in the application, not just a provider quota.

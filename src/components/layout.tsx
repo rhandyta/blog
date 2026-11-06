@@ -121,7 +121,15 @@ export function SiteHeader({
         </button>
       </div>
 
-      <div className="mobile-menu" id="mobile-menu" hidden>
+      <div
+        className="mobile-menu"
+        id="mobile-menu"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Site menu"
+        tabIndex={-1}
+        hidden
+      >
         <div className="mobile-menu__top">
           <span>{settings.issue} — {settings.tagline}</span>
           <button className="icon-button" type="button" data-menu-close aria-label="Close menu" style={{ color: 'inherit' }}>
@@ -168,7 +176,7 @@ export function SiteFooter({
             </a>
             <p>{settings.description}</p>
             <p className="meta" style={{ marginTop: '1.1rem' }}>
-              {settings.issue} · An independent publication
+              {settings.issue} · Written and edited by Rhandyta Briantama
             </p>
           </div>
           <div className="footer-col">
@@ -208,7 +216,7 @@ export function SiteFooter({
           </div>
         </div>
         <div className="footer-folio">
-          <span>© {new Date().getFullYear()} {settings.title}. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} Rhandyta Briantama. Published as {settings.title}.</span>
           <span>Typeset in Fraunces &amp; Newsreader</span>
         </div>
       </div>
@@ -341,7 +349,10 @@ export function AdminLayout({
               {adminLink(path, '/admin/tags', 'Tags')}
               {adminLink(path, '/admin/authors', 'Authors')}
               <div className="admin-nav__group">Audience</div>
+              {adminLink(path, '/admin/analytics', 'Analytics')}
               {adminLink(path, '/admin/subscribers', 'Subscribers')}
+              {adminLink(path, '/admin/newsletter', 'Newsletter')}
+              <div className="admin-nav__group">Settings</div>
               {adminLink(path, '/admin/settings', 'Settings')}
             </>
           ) : null}

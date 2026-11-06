@@ -30,11 +30,22 @@ import {
   listAuthors,
   listCategories,
   listTags,
+  parseJsonObject,
 } from '../../lib/db/queries/taxonomy'
-import { subscribeEmail, unsubscribeByToken } from '../../lib/db/queries/subscribers'
+import {
+  clearConfirmationTimestamp,
+  confirmSubscriber,
+  subscribeEmail,
+  unsubscribeByToken,
+} from '../../lib/db/queries/subscribers'
+import { sendEmail } from '../../lib/email/mailer'
+import { confirmationEmail } from '../../lib/email/templates'
+import { pruneAnalytics } from '../../lib/db/queries/analytics'
+import { buildVisitContext } from '../../lib/analytics/visitor'
 import { searchPublished } from '../../lib/db/queries/search'
 import { rateLimit } from '../../lib/auth/rate-limit'
 import { runAutomationCron } from '../../lib/automation/generate'
+import { runScheduledNewsletter } from '../../lib/newsletter/digest'
 import { verifyPreviewToken } from '../../lib/seo/preview-token'
 import { articleJsonLd, breadcrumbJsonLd, collectionJsonLd, personJsonLd, websiteJsonLd } from '../../lib/seo/meta'
 import { renderRss, renderSitemap } from '../../lib/seo/feeds'
@@ -45,7 +56,7 @@ import { ArchivePage } from '../../pages/public/archive'
 import { AuthorPage } from '../../pages/public/author'
 import { HomeEmptyPage, HomePage } from '../../pages/public/home'
 import { SearchPage, SavedPage } from '../../pages/public/search'
-import { SubscribePage, UnsubscribePage } from '../../pages/public/subscribe'
+import { ConfirmPage, SubscribePage, UnsubscribePage } from '../../pages/public/subscribe'
 import { CategoryPage, TagPage } from '../../pages/public/taxonomy-pages'
 import { TopicsPage } from '../../pages/public/topics'
 import { baseHead, ogFromMedia } from '../head'
@@ -78,8 +89,10 @@ let viewWindowStartedAt = 0
 let viewWindowCount = 0
 
 function shouldCountView(c: Context<AppEnv>, articleId: string): boolean {
+  if (c.get('user')) return false
+  if (c.req.header('dnt') === '1' || c.req.header('sec-gpc') === '1') return false
   const ua = c.req.header('user-agent') ?? ''
-  if (/bot|spider|crawl|preview|headless|facebookexternalhit|slack|twitterbot|linkedinbot|discord/i.test(ua)) return false
+  if (/bot|spider|crawl|preview|headless|facebookexternalhit|slack|twitterbot|linkedinbot|discord|curl|wget|python-requests|go-http-client|axios/i.test(ua)) return false
   if (c.req.header('sec-purpose') === 'prefetch' || c.req.header('purpose') === 'prefetch') return false
 
   const now = Date.now()
@@ -133,7 +146,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         head: baseHead({
           settings,
           origin,
-          title: settings.title,
+          title: `${settings.title} — Rhandyta Briantama`,
           description: settings.description,
           path: '/',
           jsonLd: [websiteJsonLd(settings, origin)],
@@ -159,7 +172,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: settings.title,
+        title: `${settings.title} — Rhandyta Briantama`,
         description: settings.description,
         path: '/',
         ogImage: ogFromMedia(hero.media),
@@ -243,7 +256,14 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       ),
     ]
     if (shouldCountView(c, detail.article.id)) {
-      await recordArticleView(detail.article.id).catch(() => undefined)
+      const visit = buildVisitContext({
+        ip: clientIp(c),
+        userAgent: c.req.header('user-agent') ?? null,
+        referer: c.req.header('referer') ?? null,
+        country: c.req.header('x-vercel-ip-country') ?? c.req.header('cf-ipcountry') ?? null,
+        origin,
+      })
+      await recordArticleView({ articleId: detail.article.id, ...visit }).catch(() => undefined)
     }
     return renderPageResponse(c, {
       element: (
@@ -429,9 +449,13 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
           personJsonLd({
             name: author.displayName,
             url: `/author/${author.slug}`,
-            description: author.bio,
+            description: author.longBio ?? author.bio,
             image: avatar ? avatar.src : null,
             origin,
+            jobTitle: author.roleTitle ?? undefined,
+            sameAs: Object.values(parseJsonObject(author.socialLinks)).filter(
+              (value): value is string => Boolean(value),
+            ),
           }),
         ],
       }),
@@ -535,15 +559,45 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
   app.get('/about', async (c) => {
     const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
     const { settings, categories } = await layout()
-    const articleCount = await countPublished()
+    const [articleCount, author] = await Promise.all([
+      countPublished(),
+      getAuthorBySlug('rhandyta-briantama'),
+    ])
+    const person = author ?? null
+    const personName = person?.displayName ?? 'Rhandyta Briantama'
+    const personSlug = person?.slug ?? 'rhandyta-briantama'
+    const sameAs = [settings.github, settings.x, settings.linkedin].filter(
+      (value): value is string => Boolean(value),
+    )
     return renderPageResponse(c, {
-      element: <AboutPage settings={settings} categories={categories} articleCount={articleCount} />,
+      element: (
+        <AboutPage
+          settings={settings}
+          categories={categories}
+          articleCount={articleCount}
+          author={person}
+        />
+      ),
       head: baseHead({
         settings,
         origin,
         title: 'About',
         description: settings.about.split(/\n{2,}/)[0] ?? settings.description,
         path: '/about',
+        jsonLd: [
+          personJsonLd({
+            name: personName,
+            url: `/author/${personSlug}`,
+            description:
+              person?.longBio ??
+              person?.bio ??
+              'Rhandyta Briantama is the writer and editor behind RhandytaVERSE.',
+            image: null,
+            origin,
+            jobTitle: person?.roleTitle ?? 'Writer & Editor',
+            sameAs,
+          }),
+        ],
       }),
     })
   })
@@ -558,7 +612,9 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
           settings={settings}
           categories={categories}
           status={
-            status === 'ok' || status === 'exists' || status === 'invalid' || status === 'error' ? status : null
+            status === 'ok' || status === 'pending' || status === 'exists' || status === 'invalid' || status === 'error'
+              ? status
+              : null
           }
         />
       ),
@@ -587,6 +643,26 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         title: 'Unsubscribe',
         description: 'Manage your newsletter subscription.',
         path: '/unsubscribe',
+        robots: 'noindex, nofollow',
+      }),
+    })
+  })
+
+  app.get('/confirm', async (c) => {
+    const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
+    const { settings, categories } = await layout()
+    const token = c.req.query('token')
+    const email = token ? await confirmSubscriber(token) : null
+    return renderPageResponse(c, {
+      element: (
+        <ConfirmPage settings={settings} categories={categories} status={email ? 'done' : 'invalid'} />
+      ),
+      head: baseHead({
+        settings,
+        origin,
+        title: 'Confirm subscription',
+        description: 'Confirm your newsletter subscription.',
+        path: '/confirm',
         robots: 'noindex, nofollow',
       }),
     })
@@ -704,6 +780,7 @@ Sitemap: ${origin}/sitemap.xml
       return c.json({ error: 'CRON_SECRET is not configured' }, 403)
     }
     const published = await publishDueArticles()
+    await pruneAnalytics().catch(() => undefined)
     return c.json({ published })
   })
 
@@ -719,7 +796,12 @@ Sitemap: ${origin}/sitemap.xml
 
     const scheduled = await publishDueArticles()
     const result = await runAutomationCron()
-    return c.json({ scheduled, ...result })
+    const digest = await runScheduledNewsletter().catch((error) => {
+      console.error('[newsletter] scheduled digest failed', error)
+      return { status: 'error' as const, reason: 'failed' as const }
+    })
+    await pruneAnalytics().catch(() => undefined)
+    return c.json({ scheduled, ...result, digest })
   })
 
   app.get('/api/search', async (c) => {
@@ -779,13 +861,25 @@ Sitemap: ${origin}/sitemap.xml
 
   app.post('/api/subscribe', async (c) => {
     const ip = clientIp(c)
+    const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
     const wantsJson =
       (c.req.header('accept') ?? '').includes('application/json') ||
       (c.req.header('content-type') ?? '').includes('application/json')
     const limited = rateLimit(`subscribe:${ip}`, 5, 60 * 60 * 1000)
-    const respond = (status: 'ok' | 'exists' | 'invalid' | 'error', code: number) => {
+    const respond = (status: 'ok' | 'pending' | 'exists' | 'invalid' | 'error', code: number) => {
       if (wantsJson) {
-        return c.json({ status, message: status === 'ok' ? 'Subscribed' : status }, code as 200)
+        return c.json(
+          {
+            status,
+            message:
+              status === 'ok'
+                ? 'Subscribed'
+                : status === 'pending'
+                  ? 'Confirmation sent'
+                  : status,
+          },
+          code as 200,
+        )
       }
       return c.redirect(`/subscribe?status=${status}`, 303)
     }
@@ -820,10 +914,30 @@ Sitemap: ${origin}/sitemap.xml
       return respond('ok', 200)
     }
     try {
-      const result = await subscribeEmail(email, { source, ipHash: ip })
-      if (result === 'subscribed') return respond('ok', 201)
-      if (result === 'already') return respond('exists', 200)
-      return respond('invalid', 400)
+      const outcome = await subscribeEmail(email, {
+        source,
+        ip,
+        requireConfirmation: true,
+      })
+      if (outcome.result === 'invalid') return respond('invalid', 400)
+      if (outcome.result === 'already') return respond('exists', 200)
+      if (outcome.result === 'subscribed') return respond('ok', 201)
+
+      if (outcome.send) {
+        const settings = await getSiteSettings()
+        const mail = confirmationEmail({
+          siteTitle: settings.title,
+          origin,
+          token: outcome.token,
+        })
+        const sent = await sendEmail({ to: outcome.email, ...mail })
+        if (!sent.ok) {
+          await clearConfirmationTimestamp(outcome.email).catch(() => undefined)
+          console.error('[subscribe] confirmation email failed:', sent.error)
+          return respond('error', 500)
+        }
+      }
+      return respond('pending', 201)
     } catch (error) {
       console.error('[subscribe] failed', error)
       return respond('error', 500)
