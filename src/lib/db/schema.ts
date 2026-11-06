@@ -222,6 +222,26 @@ export const newsletterEvents = sqliteTable('newsletter_events', {
   createdIdx: index('newsletter_events_created_idx').on(table.createdAt),
 }))
 
+export const rateLimits = sqliteTable('rate_limits', {
+  key: text('key').primaryKey(),
+  count: integer('count').notNull().default(0),
+  resetAt: integer('reset_at').notNull(),
+}, (table) => ({
+  resetIdx: index('rate_limits_reset_idx').on(table.resetAt),
+}))
+
+export const adminAuditLog = sqliteTable('admin_audit_log', {
+  id: text('id').primaryKey(),
+  actorId: text('actor_id').references(() => users.id, { onDelete: 'set null' }),
+  action: text('action').notNull(),
+  detail: text('detail'),
+  ipHash: text('ip_hash'),
+  createdAt: text('created_at').notNull(),
+}, (table) => ({
+  createdIdx: index('admin_audit_created_idx').on(table.createdAt),
+  actorIdx: index('admin_audit_actor_idx').on(table.actorId, table.createdAt),
+}))
+
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
@@ -280,6 +300,7 @@ export type Subscriber = typeof subscribers.$inferSelect
 export type NewsletterBroadcast = typeof newsletterBroadcasts.$inferSelect
 export type NewsletterSchedule = typeof newsletterSchedule.$inferSelect
 export type NewsletterEvent = typeof newsletterEvents.$inferSelect
+export type AdminAuditEntry = typeof adminAuditLog.$inferSelect
 export type ArticleRevision = typeof articleRevisions.$inferSelect
 export type ArticleVisit = typeof articleVisits.$inferSelect
 export type ArticleReader = typeof articleReaders.$inferSelect

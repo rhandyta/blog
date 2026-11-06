@@ -356,6 +356,7 @@ export function AdminLayout({
               {adminLink(path, '/admin/newsletter', 'Newsletter')}
               <div className="admin-nav__group">Settings</div>
               {adminLink(path, '/admin/settings', 'Settings')}
+              {user.role === 'admin' ? adminLink(path, '/admin/audit', 'Audit log') : null}
             </>
           ) : null}
         </nav>

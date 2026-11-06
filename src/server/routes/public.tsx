@@ -42,10 +42,11 @@ import { sendEmail } from '../../lib/email/mailer'
 import { confirmationEmail } from '../../lib/email/templates'
 import { verifyResendWebhook } from '../../lib/email/webhook'
 import { recordNewsletterEvent } from '../../lib/db/queries/newsletter-events'
+import { pruneAuditLog } from '../../lib/db/queries/audit'
 import { pruneAnalytics } from '../../lib/db/queries/analytics'
 import { buildVisitContext } from '../../lib/analytics/visitor'
 import { searchPublished } from '../../lib/db/queries/search'
-import { rateLimit } from '../../lib/auth/rate-limit'
+import { pruneRateLimits, rateLimit } from '../../lib/auth/rate-limit'
 import { runAutomationCron } from '../../lib/automation/generate'
 import { runScheduledNewsletter } from '../../lib/newsletter/digest'
 import { verifyPreviewToken } from '../../lib/seo/preview-token'
@@ -879,12 +880,14 @@ Sitemap: ${origin}/sitemap.xml
       return { status: 'error' as const, reason: 'failed' as const }
     })
     await pruneAnalytics().catch(() => undefined)
+    await pruneRateLimits()
+    await pruneAuditLog()
     return c.json({ scheduled, ...result, digest })
   })
 
   app.get('/api/search', async (c) => {
     const ip = clientIp(c)
-    const limited = rateLimit(`search:${ip}`, 60, 60_000)
+    const limited = await rateLimit(`search:${ip}`, 60, 60_000)
     if (!limited.allowed) {
       c.header('Retry-After', String(limited.retryAfterSeconds))
       return c.json({ error: 'Too many searches. Please wait a moment.' }, 429)
@@ -907,7 +910,7 @@ Sitemap: ${origin}/sitemap.xml
   })
 
   app.get('/api/articles', async (c) => {
-    const limited = rateLimit(`articles:${clientIp(c)}`, 120, 60_000)
+    const limited = await rateLimit(`articles:${clientIp(c)}`, 120, 60_000)
     if (!limited.allowed) {
       c.header('Retry-After', String(limited.retryAfterSeconds))
       return c.json({ error: 'Too many requests. Please wait a moment.' }, 429)
@@ -943,7 +946,7 @@ Sitemap: ${origin}/sitemap.xml
     const wantsJson =
       (c.req.header('accept') ?? '').includes('application/json') ||
       (c.req.header('content-type') ?? '').includes('application/json')
-    const limited = rateLimit(`subscribe:${ip}`, 5, 60 * 60 * 1000)
+    const limited = await rateLimit(`subscribe:${ip}`, 5, 60 * 60 * 1000)
     const respond = (status: 'ok' | 'pending' | 'exists' | 'invalid' | 'error', code: number) => {
       if (wantsJson) {
         return c.json(

@@ -15,7 +15,7 @@ import {
   touchLogin,
   verifyPassword,
 } from '../../lib/auth/session'
-import { canEditArticle, canManageContent, canManageSettings } from '../../lib/auth/permissions'
+import { canEditArticle, canManageContent, canManageSettings, isAdmin } from '../../lib/auth/permissions'
 import { rateLimit } from '../../lib/auth/rate-limit'
 import {
   archiveArticle,
@@ -80,6 +80,8 @@ import { emailConfigured, sendEmail, sendEmailBatch } from '../../lib/email/mail
 import { confirmationEmail, newsletterEmail } from '../../lib/email/templates'
 import { getNewsletterSchedule, saveNewsletterSchedule } from '../../lib/db/queries/newsletter'
 import { listNewsletterEvents } from '../../lib/db/queries/newsletter-events'
+import { listAuditLog, recordAudit } from '../../lib/db/queries/audit'
+import { hashVisitor } from '../../lib/analytics/visitor'
 import { runScheduledNewsletter } from '../../lib/newsletter/digest'
 import {
   getAnalyticsOverview,
@@ -108,6 +110,7 @@ import { baseHead } from '../head'
 import { renderPageResponse } from '../render-page'
 import type { AppEnv } from '../types'
 import { AnalyticsPage } from '../../pages/admin/analytics'
+import { AuditPage } from '../../pages/admin/audit'
 import { NewsletterPage } from '../../pages/admin/newsletter'
 import { ArticleEditorPage, MediaLibraryPage, articleToEditorState } from '../../pages/admin/editor-shell'
 import { AutomationPage } from '../../pages/admin/automation'
@@ -260,6 +263,25 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     await next()
   })
 
+  const auditMutation = async (c: Context<AppEnv>, next: () => Promise<void>) => {
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(c.req.method)) return next()
+    if (c.req.path.endsWith('/autosave')) return next()
+    await next()
+    const user = c.get('user')
+    if (!user) return
+    await recordAudit({
+      actorId: user.id,
+      action: `${c.req.method} ${c.req.path}`,
+      detail: `HTTP ${c.res.status}`,
+      ipHash: hashVisitor(clientIp(c), 'audit'),
+    }).catch((error) => {
+      console.error('[audit] failed to record action', error)
+    })
+  }
+
+  app.use('/admin/*', auditMutation)
+  app.use('/api/admin/*', auditMutation)
+
   /* ------------------------------------------------------------------ *
    *  Authentication
    * ------------------------------------------------------------------ */
@@ -333,7 +355,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     }
 
     const ip = clientIp(c)
-    const limit = rateLimit(`login:${ip}:${email}`, 5, 15 * 60 * 1000)
+    const limit = await rateLimit(`login:${ip}:${email}`, 5, 15 * 60 * 1000)
     if (!limit.allowed) {
       return renderError('Too many sign-in attempts. Please wait a few minutes and try again.', 429)
     }
@@ -348,6 +370,12 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     // response time does not reveal whether an account exists.
     const validPassword = await verifyPassword(password, user?.passwordHash ?? (await getDummyPasswordHash()))
     if (!user || !validPassword || !user.active) {
+      await recordAudit({
+        actorId: null,
+        action: 'auth.login_failed',
+        detail: 'Invalid credentials',
+        ipHash: hashVisitor(ip, 'audit'),
+      }).catch(() => undefined)
       return renderError('Those credentials do not match an active account.', 401)
     }
 
@@ -364,6 +392,12 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
       secure: isProd(),
     })
     deleteCookie(c, LOGIN_CSRF_COOKIE, { path: '/admin' })
+    await recordAudit({
+      actorId: user.id,
+      action: 'auth.login',
+      detail: 'Signed in',
+      ipHash: hashVisitor(ip, 'audit'),
+    }).catch(() => undefined)
 
     const destination = next.startsWith('/admin') && !next.startsWith('//') ? next : '/admin'
     return c.redirect(destination, 303)
@@ -1588,6 +1622,25 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
       return c.redirect('/admin/subscribers?flash=confirmation-error', 303)
     }
     return c.redirect('/admin/subscribers?flash=confirmation-resent', 303)
+  })
+
+  app.get('/admin/audit', async (c) => {
+    const user = c.get('user')!
+    if (!isAdmin(user)) return c.redirect('/admin?flash=error', 303)
+    const page = pageParam(c.req.query('page'))
+    const result = await listAuditLog({ limit: 50, offset: (page - 1) * 50 })
+    const totalPages = Math.max(1, Math.ceil(result.total / 50))
+    return renderAdminPage(
+      c,
+      <AuditPage
+        user={user}
+        entries={result.items}
+        total={result.total}
+        page={page}
+        totalPages={totalPages}
+        csrfToken={c.get('session')!.csrfToken}
+      />,
+    )
   })
 
   app.get('/admin/settings', async (c) => {

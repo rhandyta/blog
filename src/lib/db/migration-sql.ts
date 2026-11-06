@@ -300,4 +300,26 @@ CREATE INDEX IF NOT EXISTS newsletter_events_type_idx ON newsletter_events(type,
 CREATE INDEX IF NOT EXISTS newsletter_events_created_idx ON newsletter_events(created_at DESC);
 `,
   },
+  {
+    name: '009_audit_rate_limits.sql',
+    sql: `
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL DEFAULT 0,
+  reset_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS rate_limits_reset_idx ON rate_limits(reset_at);
+
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+  id TEXT PRIMARY KEY,
+  actor_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  detail TEXT,
+  ip_hash TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS admin_audit_created_idx ON admin_audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS admin_audit_actor_idx ON admin_audit_log(actor_id, created_at DESC);
+`,
+  },
 ]

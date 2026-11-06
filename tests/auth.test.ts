@@ -40,13 +40,15 @@ describe('permissions', () => {
 })
 
 describe('rate limiting', () => {
-  beforeEach(() => resetRateLimits())
+  beforeEach(async () => {
+    await resetRateLimits()
+  })
 
-  test('allows up to the limit then blocks until the window expires', () => {
+  test('allows up to the limit then blocks until the window expires', async () => {
     const key = `test:${Math.random()}`
-    expect(rateLimit(key, 2, 1000).allowed).toBe(true)
-    expect(rateLimit(key, 2, 1000).allowed).toBe(true)
-    const blocked = rateLimit(key, 2, 1000)
+    expect((await rateLimit(key, 2, 1000)).allowed).toBe(true)
+    expect((await rateLimit(key, 2, 1000)).allowed).toBe(true)
+    const blocked = await rateLimit(key, 2, 1000)
     expect(blocked.allowed).toBe(false)
     expect(blocked.retryAfterSeconds).toBeGreaterThan(0)
   })

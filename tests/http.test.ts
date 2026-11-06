@@ -17,7 +17,7 @@ function cookieFrom(response: Response): string {
 }
 
 async function login(): Promise<{ cookie: string; csrfToken: string }> {
-  resetRateLimits()
+  await resetRateLimits()
   const get = await app.request('/admin/login')
   const html = await get.text()
   const csrf = /name="_csrf" value="([^"]+)"/.exec(html)?.[1] ?? ''
@@ -53,7 +53,9 @@ describe('automation', () => {
 })
 
 describe('public pages', () => {
-  beforeAll(() => resetRateLimits())
+  beforeAll(async () => {
+    await resetRateLimits()
+  })
 
   test('homepage renders server-rendered content and metadata', async () => {
     const response = await app.request('/')
@@ -193,7 +195,7 @@ describe('search API', () => {
 
 describe('newsletter', () => {
   test('subscribes, deduplicates, and rejects invalid addresses', async () => {
-    resetRateLimits()
+    await resetRateLimits()
     const valid = await app.request('/api/subscribe', {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
@@ -252,7 +254,7 @@ describe('newsletter', () => {
   })
 
   test('honeypot submissions are accepted but never stored', async () => {
-    resetRateLimits()
+    await resetRateLimits()
     const response = await app.request('/api/subscribe', {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
@@ -264,7 +266,7 @@ describe('newsletter', () => {
   })
 
   test('form submissions redirect back to the subscribe page', async () => {
-    resetRateLimits()
+    await resetRateLimits()
     const response = await app.request('/api/subscribe', {
       method: 'POST',
       headers: {
@@ -287,7 +289,7 @@ describe('authentication and authorization', () => {
   })
 
   test('wrong credentials do not create a session', async () => {
-    resetRateLimits()
+    await resetRateLimits()
     const get = await app.request('/admin/login')
     const html = await get.text()
     const csrf = /name="_csrf" value="([^"]+)"/.exec(html)?.[1] ?? ''
@@ -497,6 +499,6 @@ describe('preview tokens', () => {
   })
 })
 
-beforeAll(() => {
-  resetRateLimits()
+beforeAll(async () => {
+  await resetRateLimits()
 })

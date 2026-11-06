@@ -21,9 +21,10 @@ A self-contained editorial publishing platform: server-rendered React, a real SQ
 | Images | `sharp` — WebP + AVIF variants, resized masters, 1200×630 social crops; local disk or [Vercel Blob](https://vercel.com/storage/blob) |
 | Automation | Gemini (Google AI Studio) — drafts from daily activity or an editorial initiative, with a review window |
 | Analytics | First-party, cookie-less readership and visitor aggregates; salted visitor hashes, no raw IP/UA, admin-only |
-| Newsletter | Resend API; double opt-in, admin composer, per-recipient unsubscribe, delivery log |
+| Newsletter | Resend API; double opt-in, admin composer, scheduled digest, per-recipient unsubscribe, webhook delivery events |
+| Audit & limits | Admin mutation log with hashed IPs; database-backed rate limits shared across instances |
 | Validation | Zod |
-| Tests | `bun test` (65 unit + integration tests) |
+| Tests | `bun test` (73 unit + integration tests) |
 
 ### Rendering architecture
 

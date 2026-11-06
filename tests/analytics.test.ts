@@ -21,7 +21,7 @@ function cookieFrom(response: Response): string {
 }
 
 async function login(): Promise<string> {
-  resetRateLimits()
+  await resetRateLimits()
   const get = await app.request('/admin/login')
   const html = await get.text()
   const csrf = /name="_csrf" value="([^"]+)"/.exec(html)?.[1] ?? ''
@@ -141,7 +141,9 @@ describe('article analytics', () => {
 })
 
 describe('admin analytics', () => {
-  beforeAll(() => resetRateLimits())
+  beforeAll(async () => {
+    await resetRateLimits()
+  })
 
   test('requires a session', async () => {
     const response = await app.request('/admin/analytics', { redirect: 'manual' })
@@ -177,6 +179,12 @@ describe('admin analytics', () => {
     const subscribers = await app.request('/admin/subscribers', { headers: { cookie } })
     expect(subscribers.status).toBe(200)
     expect(await subscribers.text()).toContain('Pending confirmation')
+
+    const audit = await app.request('/admin/audit', { headers: { cookie } })
+    expect(audit.status).toBe(200)
+    const auditHtml = await audit.text()
+    expect(auditHtml).toContain('Audit log')
+    expect(auditHtml).toContain('auth.login')
   })
 })
 
