@@ -20,6 +20,7 @@ export type PageHead = {
   origin: string
   lang?: string
   locale?: string
+  pagination?: { prev?: string | null; next?: string | null }
 }
 
 const TITLE_LIMIT = 60
@@ -101,6 +102,15 @@ export function renderHead(head: PageHead): string {
   }
 
   tags.push(`<link rel="alternate" type="application/rss+xml" title="${escapeAttr(head.siteName)} — RSS" href="${escapeAttr(absoluteUrl(origin, '/rss.xml'))}">`)
+
+  // Paginated listings get explicit prev/next hints so crawlers can follow the
+  // sequence instead of treating every page as an unrelated URL.
+  if (head.pagination?.prev) {
+    tags.push(`<link rel="prev" href="${escapeAttr(absoluteUrl(origin, head.pagination.prev))}">`)
+  }
+  if (head.pagination?.next) {
+    tags.push(`<link rel="next" href="${escapeAttr(absoluteUrl(origin, head.pagination.next))}">`)
+  }
 
   for (const block of head.jsonLd ?? []) {
     const json = JSON.stringify(block).replace(/</g, '\\u003c')

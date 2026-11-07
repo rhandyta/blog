@@ -133,6 +133,14 @@ async function layout() {
   return { settings, categories }
 }
 
+/** prev/next paths for a paginated listing, so crawlers can follow the sequence. */
+function paginationLinks(basePath: string, page: number, totalPages: number) {
+  return {
+    prev: page > 1 ? (page === 2 ? basePath : `${basePath}?page=${page - 1}`) : null,
+    next: page < totalPages ? `${basePath}?page=${page + 1}` : null,
+  }
+}
+
 function absoluteContent(html: string, origin: string): string {
   // Rewrite uploaded media first so srcset entries become absolute too, then
   // resolve any remaining root-relative links.
@@ -215,6 +223,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         title: page > 1 ? `Articles — page ${page}` : 'All articles and essays — RhandytaVERSE',
         description: 'Every essay and note in RhandytaVERSE, newest first.',
         path: page > 1 ? `/articles?page=${page}` : '/articles',
+        pagination: paginationLinks('/articles', page, totalPages),
         ogImage: items[0]?.media ? ogFromMedia(items[0].media) : null,
       }),
     })
@@ -415,16 +424,22 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         title: category.name,
         description: category.description,
         path: page > 1 ? `/category/${category.slug}?page=${page}` : `/category/${category.slug}`,
+        pagination: total === 0 ? undefined : paginationLinks(`/category/${category.slug}`, page, totalPages),
+        // An empty section and deep pagination are thin pages; keep them
+        // crawlable but out of the index.
+        robots: total === 0 || page > 1 ? 'noindex, follow' : undefined,
         ogImage: ogFromMedia(featured?.media ?? null),
-        jsonLd: [
-          collectionJsonLd({
-            name: category.name,
-            description: category.description,
-            url: `/category/${category.slug}`,
-            origin,
-            items: items.map((card) => ({ title: card.title, path: `/articles/${card.slug}` })),
-          }),
-        ],
+        jsonLd: total === 0
+          ? []
+          : [
+              collectionJsonLd({
+                name: category.name,
+                description: category.description,
+                url: `/category/${category.slug}`,
+                origin,
+                items: items.map((card) => ({ title: card.title, path: `/articles/${card.slug}` })),
+              }),
+            ],
       }),
     })
   })
@@ -484,6 +499,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         title: author.displayName,
         description: author.bio,
         path: page > 1 ? `/author/${author.slug}?page=${page}` : `/author/${author.slug}`,
+        pagination: paginationLinks(`/author/${author.slug}`, page, totalPages),
         ogImage: avatar ? ogFromMedia(avatar) : null,
         jsonLd: [
           personJsonLd({
@@ -531,6 +547,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         title: `Tagged “${tag.name}”`,
         description: tag.description || `Every piece filed under ${tag.name}.`,
         path: page > 1 ? `/tags/${tag.slug}?page=${page}` : `/tags/${tag.slug}`,
+        pagination: paginationLinks(`/tags/${tag.slug}`, page, totalPages),
         ogImage: items[0]?.media ? ogFromMedia(items[0].media) : null,
       }),
     })
@@ -844,7 +861,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         changefreq: 'monthly',
         priority: 0.8,
       })),
-      ...categories.map((category) => ({
+      // Empty sections are noindexed, so they must not be advertised here either.
+      ...categories.filter((category) => category.articleCount > 0).map((category) => ({
         loc: `${origin}/category/${category.slug}`,
         lastmod: today,
         changefreq: 'weekly',
@@ -856,7 +874,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         changefreq: 'monthly',
         priority: 0.5,
       })),
-      ...tags.map((tag) => ({
+      ...tags.filter((tag) => tag.articleCount > 0).map((tag) => ({
         loc: `${origin}/tags/${tag.slug}`,
         lastmod: today,
         changefreq: 'weekly',

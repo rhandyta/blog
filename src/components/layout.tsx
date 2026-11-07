@@ -147,7 +147,7 @@ export function SiteHeader({
           <a href="/search">Search</a>
         </nav>
         <p className="meta" style={{ marginTop: '2rem', color: 'rgba(255,255,255,.5)' }}>
-          {categories.slice(0, 6).map((category) => (
+          {categories.map((category) => (
             <a key={category.id} href={`/category/${category.slug}`} style={{ marginRight: '0.9rem', display: 'inline-block', padding: '0.2rem 0' }}>
               {category.name}
             </a>
@@ -182,13 +182,14 @@ export function SiteFooter({
           <div className="footer-col">
             <h2>Sections</h2>
             <ul>
-              {categories.slice(0, 6).map((category) => (
+              {categories.map((category) => (
                 <li key={category.id}>
                   <a className={accentClass(category.accent)} href={`/category/${category.slug}`}>
                     {category.name}
                   </a>
                 </li>
               ))}
+              <li><a href="/topics">All topics →</a></li>
             </ul>
           </div>
           <div className="footer-col">

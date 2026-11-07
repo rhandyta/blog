@@ -3,7 +3,7 @@ import { createApp } from '../src/server/app'
 import { createPreviewToken } from '../src/lib/seo/preview-token'
 import { resetRateLimits } from '../src/lib/auth/rate-limit'
 import { getDb } from '../src/lib/db/client'
-import { articles, articleRevisions } from '../src/lib/db/schema'
+import { articles, articleRevisions, categories } from '../src/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { listSubscribers } from '../src/lib/db/queries/subscribers'
 import { getArticleById, publishDueArticles, scheduleArticle } from '../src/lib/db/queries/articles'
@@ -132,6 +132,41 @@ describe('public pages', () => {
     expect(html).toContain('aria-label="Share this article"')
   })
 
+  test('category state matches the number of pieces it holds', async () => {
+    const { upsertCategory } = await import('../src/lib/db/queries/taxonomy')
+    await upsertCategory({
+      id: 'cat_empty',
+      slug: 'empty-section',
+      name: 'Empty Section',
+      description: 'A section with no articles.',
+      intro: 'Nothing here yet.',
+      accent: 'moss',
+      sortOrder: 99,
+    })
+
+    // 1 piece: the hero promotes it, so the list below is empty — that must not
+    // render "No pieces in this section yet", and Latest must show its date.
+    const one = await (await app.request('/category/test-section')).text()
+    expect(one).toContain('Featured in')
+    expect(one).not.toContain('No pieces in this section yet')
+    expect(one).not.toContain('<div>Latest<strong>—</strong></div>')
+
+    // 0 pieces: an honest empty state plus noindex, since the page is thin.
+    const empty = await app.request('/category/empty-section')
+    expect(empty.status).toBe(200)
+    const emptyHtml = await empty.text()
+    expect(emptyHtml).toContain('No pieces in this section yet')
+    expect(emptyHtml).toContain('noindex')
+    expect(emptyHtml).not.toContain('Pieces<strong>1</strong>')
+
+    // The empty section is excluded from the sitemap as well.
+    const sitemap = await (await app.request('/sitemap.xml')).text()
+    expect(sitemap).toContain('/category/test-section')
+    expect(sitemap).not.toContain('/category/empty-section')
+
+    await getDb().delete(categories).where(eq(categories.id, 'cat_empty'))
+  })
+
   test('draft and scheduled articles are not publicly visible', async () => {
     expect((await app.request('/articles/test-draft')).status).toBe(404)
     expect((await app.request('/articles/test-scheduled')).status).toBe(404)
@@ -203,6 +238,28 @@ describe('public pages', () => {
     expect(text).toContain('/articles/test-published')
     // No-indexed articles must not be advertised to crawlers.
     expect(text).not.toContain('/articles/test-noindex')
+  })
+
+  test('renderHead emits rel=prev/next for paginated pages', async () => {
+    const { renderHead } = await import('../src/lib/seo/meta')
+    const base = {
+      title: 'Articles',
+      description: 'Every essay.',
+      canonicalPath: '/articles',
+      siteName: 'RhandytaVERSE',
+      origin: 'http://localhost:3000',
+    }
+    const first = renderHead({ ...base, pagination: { prev: null, next: '/articles?page=2' } })
+    expect(first).toContain('<link rel="next" href="http://localhost:3000/articles?page=2">')
+    expect(first).not.toContain('rel="prev"')
+
+    const middle = renderHead({ ...base, canonicalPath: '/articles?page=2', pagination: { prev: '/articles', next: '/articles?page=3' } })
+    expect(middle).toContain('<link rel="prev" href="http://localhost:3000/articles">')
+    expect(middle).toContain('<link rel="next" href="http://localhost:3000/articles?page=3">')
+
+    const unpaginated = renderHead(base)
+    expect(unpaginated).not.toContain('rel="prev"')
+    expect(unpaginated).not.toContain('rel="next"')
   })
 
   test('unknown routes return the styled 404 page', async () => {

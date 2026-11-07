@@ -24,7 +24,11 @@ export function CategoryPage({
   page: number
   totalPages: number
 }) {
-  const latest = items[0]?.publishedAt
+  // When the first page promotes one card into the featured slot it is removed
+  // from `items`, so emptiness must be judged against the section total, not
+  // against the remaining list.
+  const latest = featured?.publishedAt ?? items[0]?.publishedAt ?? null
+  const hasAnyPieces = total > 0
   return (
     <SiteLayout settings={settings} categories={categories} path={`/category/${category.slug}`}>
       <section className={`category-hero ${accentClass(category.accent)}`}>
@@ -83,22 +87,29 @@ export function CategoryPage({
 
       <section className="latest" aria-labelledby="category-list-title">
         <div className="shell">
-          <h2 id="category-list-title" className="sr-only">More in {category.name}</h2>
           {items.length ? (
-            items.map((card) => <ArticleRow key={card.id} card={card} />)
+            <>
+              <h2 id="category-list-title" className="sr-only">More in {category.name}</h2>
+              {items.map((card) => <ArticleRow key={card.id} card={card} />)}
+            </>
+          ) : hasAnyPieces ? (
+            // The section has pieces, they are simply all shown above.
+            null
           ) : (
             <div className="empty-state">
-              <h2>No pieces in this section yet</h2>
+              <h2 id="category-list-title">No pieces in this section yet</h2>
               <p>It is waiting for the right idea.</p>
             </div>
           )}
-          <div style={{ marginTop: '1.5rem' }}>
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              basePath={`/category/${category.slug}`}
-            />
-          </div>
+          {totalPages > 1 ? (
+            <div style={{ marginTop: '1.5rem' }}>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                basePath={`/category/${category.slug}`}
+              />
+            </div>
+          ) : null}
         </div>
       </section>
     </SiteLayout>

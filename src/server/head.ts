@@ -51,6 +51,7 @@ export function baseHead(input: {
   jsonLd?: unknown[]
   lang?: string
   locale?: string
+  pagination?: { prev?: string | null; next?: string | null }
 }): PageHead {
   const noIndex = (input.robots ?? '').includes('noindex')
   const ogImage =
@@ -81,6 +82,7 @@ export function baseHead(input: {
     origin: input.origin,
     lang: input.lang ?? input.settings.siteLanguage ?? 'en',
     locale: input.locale ?? (input.settings.siteLanguage === 'id' ? 'id_ID' : 'en_US'),
+    pagination: input.pagination,
   }
 }
 
