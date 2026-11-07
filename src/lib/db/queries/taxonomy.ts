@@ -60,7 +60,7 @@ export const defaultSettings: SiteSettings = {
   x: '',
   github: '',
   linkedin: '',
-  siteLanguage: 'en',
+  siteLanguage: 'id',
 }
 
 let cachedSettings: SiteSettings | null = null

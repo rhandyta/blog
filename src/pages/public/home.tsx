@@ -1,6 +1,7 @@
 import type { ArticleCard } from '../../lib/db/queries/articles'
 import type { CategoryWithCount, SiteSettings } from '../../lib/db/queries/taxonomy'
 import { formatDate, splitParagraphs } from '../../lib/content/html'
+import { ui } from '../../lib/content/ui-copy'
 import { NewsletterBand, SiteLayout } from '../../components/layout'
 import {
   ArticleRow,
@@ -33,14 +34,14 @@ export function HomeEmptyPage({
     <SiteLayout settings={settings} categories={categories} path="/">
       <section className="about-hero">
         <div className="shell">
-          <Kicker plain>{settings.issue} — A new publication</Kicker>
-          <h1 style={{ marginTop: '1.25rem', maxWidth: '16ch' }}>A place for things worth keeping.</h1>
+          <Kicker plain>{settings.issue} — Publikasi baru</Kicker>
+          <h1 style={{ marginTop: '1.25rem', maxWidth: '16ch' }}>Tempat untuk hal-hal yang layak disimpan.</h1>
           <p className="lede" style={{ marginTop: '1.5rem', maxWidth: '46ch' }}>
             {settings.description}
           </p>
           <div className="error-page__actions">
-            <a className="btn btn--solid" href="/admin/login">Editorial sign in</a>
-            <a className="btn btn--ghost" href="/about">About the publication</a>
+            <a className="btn btn--solid" href="/admin/login">Masuk meja editorial</a>
+            <a className="btn btn--ghost" href="/about">Tentang publikasi</a>
           </div>
         </div>
       </section>
@@ -77,9 +78,9 @@ export function HomePage({
           <div className="hero__grid">
             <div className="hero__text">
               <div>
-                <Kicker accent={hero.category?.accent}>{hero.category?.name ?? 'Essay'}</Kicker>
+                <Kicker accent={hero.category?.accent}>{hero.category?.name ?? ui.common.essay}</Kicker>
                 <span className="meta" style={{ marginLeft: '0.9rem' }}>
-                  Featured
+                  {ui.home.featured}
                 </span>
               </div>
               <h1 className="hero__title display-xl">
@@ -92,16 +93,16 @@ export function HomePage({
                     {hero.author ? (
                       <a className="link-underline" href={`/author/${hero.author.slug}`}>{hero.author.displayName}</a>
                     ) : (
-                      'The editors'
+                      'Redaksi'
                     )}
                   </span>
                   <span className="sep" aria-hidden="true">/</span>
                   <span className="meta">{formatDate(hero.publishedAt, 'long')}</span>
                   <span className="sep" aria-hidden="true">/</span>
-                  <span className="meta">{hero.readingMinutes} min read</span>
+                  <span className="meta">{ui.article.minRead(hero.readingMinutes)}</span>
                 </div>
                 <a className="text-link" href={`/articles/${hero.slug}`}>
-                  Read the essay →
+                  {ui.home.readEssay} →
                 </a>
               </div>
             </div>
@@ -115,16 +116,16 @@ export function HomePage({
         </div>
       </section>
 
-      <section className="intro-band" aria-label="About this publication">
+      <section className="intro-band" aria-label={ui.home.thePublication}>
         <div className="shell">
           <div className="intro-band__grid">
             <div>
-              <span className="kicker kicker--plain">The publication</span>
+              <span className="kicker kicker--plain">{ui.home.thePublication}</span>
             </div>
             <div>
               <p>{settings.intro}</p>
               <p className="meta" style={{ marginTop: '1rem' }}>
-                <a className="text-link" href="/about">Read about RhandytaVERSE →</a>
+                <a className="text-link" href="/about">{ui.home.readAbout} →</a>
               </p>
             </div>
           </div>
@@ -134,7 +135,7 @@ export function HomePage({
       {latestNumber ? (
         <section className="latest">
           <div className="shell">
-            <SectionHead number={latestNumber} label="Latest" moreHref="/articles" moreLabel="All articles" />
+            <SectionHead number={latestNumber} label={ui.home.latest} moreHref="/articles" moreLabel={ui.home.allArticles} />
             <div>
               {latest.map((card) => (
                 <ArticleRow key={card.id} card={card} />
@@ -147,7 +148,7 @@ export function HomePage({
       {picksNumber ? (
         <section className="picks">
           <div className="shell">
-            <SectionHead number={picksNumber} label="Editors’ picks" />
+            <SectionHead number={picksNumber} label={ui.common.editorsPick} />
             <div className="picks__grid">
               {picks[0] ? <PickLead card={picks[0]} /> : null}
               <div className="pick__side">
@@ -163,13 +164,13 @@ export function HomePage({
       {mostReadNumber ? (
         <section className="most-read">
           <div className="shell">
-            <SectionHead number={mostReadNumber} label="Most read" moreHref="/articles" moreLabel="The index" />
+            <SectionHead number={mostReadNumber} label={ui.home.mostRead} moreHref="/articles" moreLabel={ui.home.theIndex} />
             <div className="most-read__grid">
               {mostRead.map((card, index) => (
                 <a key={card.id} className={`most-read__item ${accentClass(card.category?.accent)}`} href={`/articles/${card.slug}`}>
                   <span className="most-read__rank">{String(index + 1).padStart(2, '0')}</span>
                   <h3>{card.title}</h3>
-                  <span className="meta">{card.category?.name} · {card.readingMinutes} min</span>
+                  <span className="meta">{card.category?.name} · {ui.common.minuteShort(card.readingMinutes)}</span>
                 </a>
               ))}
             </div>
@@ -179,7 +180,7 @@ export function HomePage({
 
       <section className="topics">
         <div className="shell">
-          <SectionHead number={topicsNumber} label="Topics" moreHref="/topics" moreLabel="All topics" />
+          <SectionHead number={topicsNumber} label={ui.home.topics} moreHref="/topics" moreLabel={ui.home.allTopics} />
           <div className="topic-list">
             {categories.map((category, index) => (
               <TopicRow key={category.id} category={category} index={index} />
@@ -191,7 +192,7 @@ export function HomePage({
       <section className="manifesto">
         <div className="shell">
           <div className="manifesto__inner">
-            <span className="kicker kicker--plain">A note on method</span>
+            <span className="kicker kicker--plain">Catatan tentang metode</span>
             <div>
               <blockquote>{settings.manifesto}</blockquote>
               <p className="manifesto__by">— {settings.manifestoBy}</p>
@@ -206,9 +207,9 @@ export function HomePage({
         <div className="shell">
           <div className="about-strip__grid">
             <div>
-              <span className="kicker kicker--plain">The person</span>
+              <span className="kicker kicker--plain">{ui.home.thePerson}</span>
               <h2 className="display-sm" style={{ marginTop: '1rem' }}>
-                {settings.title} is Rhandyta Briantama.
+                {settings.title} adalah Rhandyta Briantama.
               </h2>
             </div>
             <div>
@@ -218,7 +219,7 @@ export function HomePage({
                 </p>
               ))}
               <p style={{ marginTop: '1.25rem' }}>
-                <a className="text-link" href="/about">More about Rhandyta Briantama →</a>
+                <a className="text-link" href="/about">{ui.home.moreAbout} →</a>
               </p>
             </div>
           </div>

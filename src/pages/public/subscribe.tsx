@@ -13,15 +13,15 @@ export function SubscribePage({
 }) {
   const message =
     status === 'ok'
-      ? 'You are on the list. Thank you for subscribing.'
+      ? 'Kamu sudah masuk daftar. Terima kasih sudah berlangganan.'
       : status === 'pending'
-        ? 'Check your inbox and click the confirmation link to join the list.'
+        ? 'Cek kotak masukmu dan klik tautan konfirmasi untuk bergabung.'
         : status === 'exists'
-          ? 'That address is already subscribed.'
+          ? 'Alamat itu sudah berlangganan.'
           : status === 'invalid'
-            ? 'That email address does not look right. Please check it and try again.'
+            ? 'Alamat surel itu sepertinya tidak tepat. Mohon diperiksa dan coba lagi.'
             : status === 'error'
-              ? 'Something went wrong while saving your address. Please try again shortly.'
+              ? 'Ada yang gagal saat menyimpan alamatmu. Coba lagi sebentar lagi.'
               : null
 
   return (
@@ -30,16 +30,16 @@ export function SubscribePage({
         <div className="shell">
           <div className="page-hero__grid">
             <div>
-              <Kicker plain>The letter</Kicker>
-              <h1 className="display-lg" style={{ marginTop: '1rem' }}>Subscribe</h1>
+              <Kicker plain>Surat kabar</Kicker>
+              <h1 className="display-lg" style={{ marginTop: '1rem' }}>Berlangganan</h1>
             </div>
             <div>
               <p>
-                A note when there is something worth sending. New essays, occasional fragments, and no schedule to
-                keep up with.
+                Sebuah catatan ketika ada sesuatu yang layak dikirim. Esai baru, serpihan sesekali, tanpa jadwal yang
+                harus dikejar.
               </p>
               <div className="page-hero__meta">
-                <a className="text-link" href="/rss.xml">Prefer RSS? →</a>
+                <a className="text-link" href="/rss.xml">Lebih suka RSS? →</a>
               </div>
             </div>
           </div>
@@ -59,25 +59,25 @@ export function SubscribePage({
       <div className="shell">
         <div className="about-layout" style={{ paddingTop: 'clamp(2rem, 4vw, 3rem)' }}>
           <div className="about-copy">
-            <h2 style={{ marginTop: 0 }}>What happens when you subscribe</h2>
+            <h2 style={{ marginTop: 0 }}>Apa yang terjadi saat kamu berlangganan</h2>
             <p>
-              Your address is checked and stored securely in this site’s own database. You will receive a confirmation
-              email; click the link in that message to join the list. The address is used only for the newsletter and
-              is never shared or sold. You can remove yourself at any time using the unsubscribe link in any letter, or
-              by contacting Rhandyta Briantama.
+              Alamatmu diperiksa dan disimpan dengan aman di basis data situs ini sendiri. Kamu akan menerima surel
+              konfirmasi; klik tautan di pesan itu untuk bergabung. Alamat hanya dipakai untuk surat kabar ini dan
+              tidak pernah dibagikan atau dijual. Kamu bisa berhenti kapan saja lewat tautan berhenti berlangganan di
+              setiap surat, atau dengan menghubungi Rhandyta Briantama.
             </p>
-            <h2>Privacy</h2>
+            <h2>Privasi</h2>
             <p>
-              Your address is used only to send the newsletter. It is never sold or shared. To request removal, use the
-              unsubscribe link in any letter or contact Rhandyta Briantama directly.
+              Alamatmu hanya dipakai untuk mengirim surat kabar. Tidak pernah dijual atau dibagikan. Untuk meminta
+              penghapusan, gunakan tautan berhenti berlangganan di setiap surat atau hubungi Rhandyta Briantama.
             </p>
           </div>
           <aside className="about-aside">
-            <h2>Other routes</h2>
+            <h2>Jalur lain</h2>
             <ul>
-              <li><a href="/rss.xml">RSS feed</a></li>
-              <li><a href="/articles">All articles</a></li>
-              <li><a href="/about">About the publication</a></li>
+              <li><a href="/rss.xml">Umpan RSS</a></li>
+              <li><a href="/articles">Semua artikel</a></li>
+              <li><a href="/about">Tentang publikasi</a></li>
             </ul>
           </aside>
         </div>
@@ -99,17 +99,17 @@ export function ConfirmPage({
     <SiteLayout settings={settings} categories={categories} path="/confirm">
       <section className="page-hero">
         <div className="shell">
-          <Kicker plain>The letter</Kicker>
+          <Kicker plain>Surat kabar</Kicker>
           <h1 className="display-lg" style={{ marginTop: '1rem' }}>
-            {status === 'done' ? 'Subscription confirmed.' : 'This link is invalid or expired.'}
+            {status === 'done' ? 'Langganan terkonfirmasi.' : 'Tautan ini tidak valid atau sudah kedaluwarsa.'}
           </h1>
           <p className="lede" style={{ marginTop: '1.5rem', maxWidth: '46ch' }}>
             {status === 'done'
-              ? 'You are on the list. You can close this page now.'
-              : 'The confirmation token could not be verified. Subscribe again to receive a fresh link.'}
+              ? 'Kamu sudah masuk daftar. Halaman ini boleh ditutup.'
+              : 'Token konfirmasi tidak dapat diverifikasi. Berlangganan lagi untuk menerima tautan baru.'}
           </p>
           <p style={{ marginTop: '1.75rem' }}>
-            <a className="btn btn--ghost" href="/">Return home</a>
+            <a className="btn btn--ghost" href="/">Kembali ke beranda</a>
           </p>
         </div>
       </section>
@@ -130,17 +130,17 @@ export function UnsubscribePage({
     <SiteLayout settings={settings} categories={categories} path="/unsubscribe">
       <section className="page-hero">
         <div className="shell">
-          <Kicker plain>The letter</Kicker>
+          <Kicker plain>Surat kabar</Kicker>
           <h1 className="display-lg" style={{ marginTop: '1rem' }}>
-            {status === 'done' ? 'You are unsubscribed.' : 'This link is not valid.'}
+            {status === 'done' ? 'Kamu sudah berhenti berlangganan.' : 'Tautan ini tidak valid.'}
           </h1>
           <p className="lede" style={{ marginTop: '1.5rem', maxWidth: '46ch' }}>
             {status === 'done'
-              ? 'Your address has been removed from the newsletter list. You will not receive any further letters.'
-              : 'The unsubscribe token could not be verified. If you believe this is an error, use the contact address on the about page.'}
+              ? 'Alamatmu sudah dihapus dari daftar surat kabar. Kamu tidak akan menerima surat berikutnya.'
+              : 'Token berhenti berlangganan tidak dapat diverifikasi. Jika menurutmu ini keliru, gunakan alamat kontak di halaman tentang.'}
           </p>
           <p style={{ marginTop: '1.75rem' }}>
-            <a className="btn btn--ghost" href="/">Return home</a>
+            <a className="btn btn--ghost" href="/">Kembali ke beranda</a>
           </p>
         </div>
       </section>

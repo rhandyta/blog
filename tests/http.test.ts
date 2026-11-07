@@ -129,7 +129,7 @@ describe('public pages', () => {
     expect(html).toContain('id="a-section-heading"')
     expect(html).toContain('href="#a-section-heading"')
     expect(html).toContain('og:type" content="article"')
-    expect(html).toContain('aria-label="Share this article"')
+    expect(html).toContain('aria-label="Bagikan"')
   })
 
   test('category state matches the number of pieces it holds', async () => {
@@ -147,15 +147,15 @@ describe('public pages', () => {
     // 1 piece: the hero promotes it, so the list below is empty — that must not
     // render "No pieces in this section yet", and Latest must show its date.
     const one = await (await app.request('/category/test-section')).text()
-    expect(one).toContain('Featured in')
-    expect(one).not.toContain('No pieces in this section yet')
-    expect(one).not.toContain('<div>Latest<strong>—</strong></div>')
+    expect(one).toContain('Pilihan')
+    expect(one).not.toContain('Belum ada tulisan di rubrik ini')
+    expect(one).not.toContain('<div>Terbaru<strong>—</strong></div>')
 
     // 0 pieces: an honest empty state plus noindex, since the page is thin.
     const empty = await app.request('/category/empty-section')
     expect(empty.status).toBe(200)
     const emptyHtml = await empty.text()
-    expect(emptyHtml).toContain('No pieces in this section yet')
+    expect(emptyHtml).toContain('Belum ada tulisan di rubrik ini')
     expect(emptyHtml).toContain('noindex')
     expect(emptyHtml).not.toContain('Pieces<strong>1</strong>')
 
@@ -265,7 +265,7 @@ describe('public pages', () => {
   test('unknown routes return the styled 404 page', async () => {
     const response = await app.request('/nope')
     expect(response.status).toBe(404)
-    expect(await response.text()).toContain('This page is not in the index.')
+    expect(await response.text()).toContain('Halaman ini tidak ada di indeks.')
   })
 })
 
@@ -313,7 +313,7 @@ describe('newsletter', () => {
 
     const confirmed = await app.request(`/confirm?token=${encodeURIComponent(pending.items[0]?.confirmationToken ?? '')}`)
     expect(confirmed.status).toBe(200)
-    expect(await confirmed.text()).toContain('Subscription confirmed.')
+    expect(await confirmed.text()).toContain('Langganan terkonfirmasi.')
 
     const duplicate = await app.request('/api/subscribe', {
       method: 'POST',

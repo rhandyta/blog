@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { SiteSettings, CategoryWithCount } from '../lib/db/queries/taxonomy'
 import type { User } from '../lib/db/schema'
 import { roleLabel } from '../lib/auth/permissions'
+import { ui } from '../lib/content/ui-copy'
 import { Fleuron, accentClass } from './ui'
 
 function isCurrent(path: string, href: string): boolean {
@@ -53,7 +54,7 @@ function MenuIcon() {
 
 export function ThemeToggle() {
   return (
-    <button className="icon-button theme-toggle" type="button" data-theme-toggle aria-label="Switch colour theme">
+    <button className="icon-button theme-toggle" type="button" data-theme-toggle aria-label={ui.header.themeToggle}>
       <SunIcon />
       <MoonIcon />
     </button>
@@ -69,7 +70,7 @@ export function SiteHeader({
   categories: CategoryWithCount[]
   path: string
 }) {
-  const today = new Intl.DateTimeFormat('en-GB', {
+  const today = new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -85,12 +86,12 @@ export function SiteHeader({
           </span>
           <div className="utility-bar__links">
             <span>{today}</span>
-            <a href="/archive">Archive</a>
-            <a href="/saved" className="saved-link" aria-label="Saved articles">
-              Saved <span className="saved-count" data-saved-count></span>
+            <a href="/archive">{ui.nav.archive}</a>
+            <a href="/saved" className="saved-link" aria-label={ui.header.savedLabel}>
+              {ui.nav.saved} <span className="saved-count" data-saved-count></span>
             </a>
             <ThemeToggle />
-            <a href="/search" className="icon-button" aria-label="Search the publication">
+            <a href="/search" className="icon-button" aria-label={ui.header.searchLabel}>
               <SearchIcon />
             </a>
           </div>
@@ -102,21 +103,21 @@ export function SiteHeader({
           <Fleuron size={19} />
           {settings.title}
         </a>
-        <nav className="primary-nav" aria-label="Primary">
+        <nav className="primary-nav" aria-label={ui.nav.primary}>
           <a href="/articles" aria-current={isCurrent(path, '/articles') ? 'page' : undefined}>
-            Articles
+            {ui.nav.articles}
           </a>
           <a href="/topics" aria-current={isCurrent(path, '/topics') ? 'page' : undefined}>
-            Topics
+            {ui.nav.topics}
           </a>
           <a href="/archive" aria-current={isCurrent(path, '/archive') ? 'page' : undefined}>
-            Archive
+            {ui.nav.archive}
           </a>
           <a href="/about" aria-current={isCurrent(path, '/about') ? 'page' : undefined}>
-            About
+            {ui.nav.about}
           </a>
         </nav>
-        <button className="icon-button menu-toggle" type="button" data-menu-open aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
+        <button className="icon-button menu-toggle" type="button" data-menu-open aria-expanded="false" aria-controls="mobile-menu" aria-label={ui.nav.openMenu}>
           <MenuIcon />
         </button>
       </div>
@@ -126,25 +127,25 @@ export function SiteHeader({
         id="mobile-menu"
         role="dialog"
         aria-modal="true"
-        aria-label="Site menu"
+        aria-label={ui.nav.menu}
         tabIndex={-1}
         hidden
       >
         <div className="mobile-menu__top">
           <span>{settings.issue} — {settings.tagline}</span>
-          <button className="icon-button" type="button" data-menu-close aria-label="Close menu" style={{ color: 'inherit' }}>
+          <button className="icon-button" type="button" data-menu-close aria-label={ui.nav.closeMenu} style={{ color: 'inherit' }}>
             <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
               <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
             </svg>
           </button>
         </div>
-        <nav aria-label="Mobile">
-          <a href="/articles">Articles</a>
-          <a href="/topics">Topics</a>
-          <a href="/archive">Archive</a>
-          <a href="/saved">Saved</a>
-          <a href="/about">About</a>
-          <a href="/search">Search</a>
+        <nav aria-label={ui.nav.mobile}>
+          <a href="/articles">{ui.nav.articles}</a>
+          <a href="/topics">{ui.nav.topics}</a>
+          <a href="/archive">{ui.nav.archive}</a>
+          <a href="/saved">{ui.nav.saved}</a>
+          <a href="/about">{ui.nav.about}</a>
+          <a href="/search">{ui.nav.search}</a>
         </nav>
         <p className="meta" style={{ marginTop: '2rem', color: 'rgba(255,255,255,.5)' }}>
           {categories.map((category) => (
@@ -176,11 +177,11 @@ export function SiteFooter({
             </a>
             <p>{settings.description}</p>
             <p className="meta" style={{ marginTop: '1.1rem' }}>
-              {settings.issue} · Written and edited by Rhandyta Briantama
+              {settings.issue} · {ui.footer.writtenBy}
             </p>
           </div>
           <div className="footer-col">
-            <h2>Sections</h2>
+            <h2>{ui.footer.sections}</h2>
             <ul>
               {categories.map((category) => (
                 <li key={category.id}>
@@ -189,38 +190,38 @@ export function SiteFooter({
                   </a>
                 </li>
               ))}
-              <li><a href="/topics">All topics →</a></li>
+              <li><a href="/topics">{ui.footer.allTopics} →</a></li>
             </ul>
           </div>
           <div className="footer-col">
-            <h2>Index</h2>
+            <h2>{ui.footer.index}</h2>
             <ul>
-              <li><a href="/articles">All articles</a></li>
-              <li><a href="/topics">Topics</a></li>
-              <li><a href="/archive">Archive</a></li>
-              <li><a href="/search">Search</a></li>
-              <li><a href="/saved">Saved</a></li>
-              <li><a href="/about">About</a></li>
-              <li><a href="/privacy">Privacy</a></li>
-              <li><a href="/terms">Terms</a></li>
+              <li><a href="/articles">{ui.footer.allArticles}</a></li>
+              <li><a href="/topics">{ui.footer.topics}</a></li>
+              <li><a href="/archive">{ui.footer.archive}</a></li>
+              <li><a href="/search">{ui.footer.search}</a></li>
+              <li><a href="/saved">{ui.footer.saved}</a></li>
+              <li><a href="/about">{ui.footer.about}</a></li>
+              <li><a href="/privacy">{ui.footer.privacy}</a></li>
+              <li><a href="/terms">{ui.footer.terms}</a></li>
             </ul>
           </div>
           <div className="footer-col">
-            <h2>Elsewhere</h2>
+            <h2>{ui.footer.elsewhere}</h2>
             <ul>
-              <li><a href="/rss.xml">RSS feed</a></li>
-              <li><a href="/subscribe">Newsletter</a></li>
-              {settings.email ? <li><a href={`mailto:${settings.email}`}>Email</a></li> : null}
+              <li><a href="/rss.xml">{ui.footer.rss}</a></li>
+              <li><a href="/subscribe">{ui.footer.newsletter}</a></li>
+              {settings.email ? <li><a href={`mailto:${settings.email}`}>{ui.footer.email}</a></li> : null}
               {settings.x ? <li><a href={settings.x} rel="noopener noreferrer" target="_blank">X ↗</a></li> : null}
               {settings.github ? <li><a href={settings.github} rel="noopener noreferrer" target="_blank">GitHub ↗</a></li> : null}
               {settings.linkedin ? <li><a href={settings.linkedin} rel="noopener noreferrer" target="_blank">LinkedIn ↗</a></li> : null}
-              <li><a href="/admin">Editorial desk</a></li>
+              <li><a href="/admin">{ui.footer.editorialDesk}</a></li>
             </ul>
           </div>
         </div>
         <div className="footer-folio">
-          <span>© {new Date().getFullYear()} Rhandyta Briantama. Published as {settings.title}.</span>
-          <span>Typeset in Fraunces &amp; Newsreader</span>
+          <span>© {new Date().getFullYear()} Rhandyta Briantama. {ui.footer.publishedAs} {settings.title}.</span>
+          <span>{ui.footer.typeset}</span>
         </div>
       </div>
     </footer>
@@ -241,7 +242,7 @@ export function SiteLayout({
   return (
     <>
       <a className="skip-link" href="#main">
-        Skip to content
+        {ui.header.skipToContent}
       </a>
       <SiteHeader settings={settings} categories={categories} path={path} />
       <main id="main" tabIndex={-1}>
@@ -259,7 +260,7 @@ export function NewsletterBand({ settings }: { settings: SiteSettings }) {
         <div className="newsletter-band__grid">
           <div>
             <span className="kicker kicker--plain" style={{ color: 'inherit', opacity: 0.6 }}>
-              The letter
+              Surat kabar
             </span>
             <h2 id="newsletter-title">{settings.newsletterTitle}</h2>
             <p>{settings.newsletterBlurb}</p>
@@ -273,22 +274,22 @@ export function NewsletterBand({ settings }: { settings: SiteSettings }) {
               </label>
             </div>
             <label className="sr-only" htmlFor="newsletter-email">
-              Email address
+              {ui.subscribe.emailLabel}
             </label>
             <input
               className="input"
               id="newsletter-email"
               type="email"
               name="email"
-              placeholder="you@example.com"
+              placeholder={ui.subscribe.emailPlaceholder}
               autoComplete="email"
               required
             />
             <button className="btn" type="submit">
-              Subscribe
+              {ui.subscribe.submit}
             </button>
             <p className="newsletter-note">
-              Your address is stored securely and used only for this newsletter. You can unsubscribe at any time.
+              {ui.subscribe.note}
             </p>
             <p className="form-message" data-message role="status" aria-live="polite"></p>
           </form>

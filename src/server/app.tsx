@@ -171,7 +171,7 @@ export function createApp(): Hono<AppEnv> {
         settings,
         origin,
         title: 'Page not found',
-        description: 'The address you requested is not in the index.',
+        description: 'Alamat yang kamu minta tidak ada di indeks.',
         path: c.req.path,
         robots: 'noindex, follow',
       }),

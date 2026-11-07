@@ -3,6 +3,7 @@ import type { MediaInfo } from '../lib/content/doc'
 import { formatDate } from '../lib/content/html'
 import type { ArticleCard } from '../lib/db/queries/articles'
 import type { CategoryWithCount, TagWithCount } from '../lib/db/queries/taxonomy'
+import { ui } from '../lib/content/ui-copy'
 
 export function Fleuron({ size = 18 }: { size?: number }) {
   return (
@@ -107,7 +108,7 @@ export function SectionHead({
       </span>
       {moreHref ? (
         <a className="section-head__more" href={moreHref}>
-          {moreLabel ?? 'View all'} →
+          {moreLabel ?? ui.listing.allArticlesTitle} →
         </a>
       ) : null}
     </h2>
@@ -118,9 +119,9 @@ export function ArticleRow({ card, showExcerpt = true }: { card: ArticleCard; sh
   return (
     <a className={`article-row ${accentClass(card.category?.accent)}`} href={`/articles/${card.slug}`}>
       <div className="article-row__meta">
-        <span className="cat">{card.category?.name ?? 'Essay'}</span>
+        <span className="cat">{card.category?.name ?? ui.common.essay}</span>
         <span className="meta">{formatDate(card.publishedAt, 'short')}</span>
-        <span className="meta">{card.readingMinutes} min</span>
+        <span className="meta">{card.readingMinutes} menit</span>
       </div>
       <div className="article-row__body">
         <h3 className="article-row__title">{card.title}</h3>
@@ -140,12 +141,12 @@ export function PickLead({ card }: { card: ArticleCard }) {
   return (
     <a className={`pick pick--lead ${accentClass(card.category?.accent)}`} href={`/articles/${card.slug}`}>
       <Cover media={card.media} aspect="wide" sizes="(min-width: 960px) 50vw, 100vw" decorative />
-      <span className="pick__index">Editor’s pick</span>
+      <span className="pick__index">{ui.common.editorsPick}</span>
       <div className="pick__body">
         <h3 className="pick__title">{card.title}</h3>
         <p className="pick__excerpt">{card.excerpt}</p>
         <span className="meta">
-          {card.category?.name} · {formatDate(card.publishedAt, 'short')} · {card.readingMinutes} min
+          {card.category?.name} · {formatDate(card.publishedAt, 'short')} · {card.readingMinutes} menit
         </span>
       </div>
     </a>
@@ -160,7 +161,7 @@ export function PickSmall({ card, index }: { card: ArticleCard; index: number })
         <span className="pick__index">0{index}</span>
         <h3 className="pick__title">{card.title}</h3>
         <span className="meta">
-          {card.category?.name} · {card.readingMinutes} min
+          {card.category?.name} · {card.readingMinutes} menit
         </span>
       </div>
     </a>
@@ -193,7 +194,7 @@ export function TopicRow({
       <span className="topic-row__name">{category.name}</span>
       <span className="topic-row__desc">{category.description}</span>
       <span className="topic-row__count">
-        {category.articleCount} {category.articleCount === 1 ? 'piece' : 'pieces'}
+        {category.articleCount === 1 ? ui.home.piece : ui.home.pieces(category.articleCount)}
       </span>
       <span className="topic-row__arrow" aria-hidden="true">
         →
@@ -227,13 +228,13 @@ export function Pagination({
   const visible = [...pages].filter((value) => value >= 1 && value <= totalPages).sort((a, b) => a - b)
 
   return (
-    <nav className="paginator" aria-label="Pagination">
+    <nav className="paginator" aria-label={ui.listing.pagination}>
       {page > 1 ? (
         <a href={href(page - 1)} rel="prev">
-          ← Newer
+          ← {ui.listing.newer}
         </a>
       ) : (
-        <span className="disabled">← Newer</span>
+        <span className="disabled">← {ui.listing.newer}</span>
       )}
       <div className="paginator__pages">
         {visible.map((value, index) => {
@@ -244,7 +245,7 @@ export function Pagination({
               {value === page ? (
                 <span aria-current="page">{value}</span>
               ) : (
-                <a href={href(value)} aria-label={`Page ${value}`}>
+                <a href={href(value)} aria-label={ui.listing.page(value)}>
                   {value}
                 </a>
               )}
@@ -254,10 +255,10 @@ export function Pagination({
       </div>
       {page < totalPages ? (
         <a href={href(page + 1)} rel="next">
-          Older →
+          {ui.listing.older} →
         </a>
       ) : (
-        <span className="disabled">Older →</span>
+        <span className="disabled">{ui.listing.older} →</span>
       )}
     </nav>
   )
@@ -286,7 +287,7 @@ export function ShareLinks({ url, title }: { url: string; title: string }) {
   const encodedUrl = encodeURIComponent(url)
   const encodedTitle = encodeURIComponent(title)
   return (
-    <div className="rail-actions" aria-label="Share this article">
+    <div className="rail-actions" aria-label={ui.article.share}>
       <button
         className="rail-action"
         type="button"
@@ -294,7 +295,7 @@ export function ShareLinks({ url, title }: { url: string; title: string }) {
         data-share-url={url}
         data-share-title={title}
       >
-        <span>Share</span>
+        <span>{ui.article.share}</span>
         <span aria-hidden="true">↗</span>
       </button>
       <a
@@ -303,7 +304,7 @@ export function ShareLinks({ url, title }: { url: string; title: string }) {
         rel="noopener noreferrer"
         target="_blank"
       >
-        <span>Post to X</span>
+        <span>{ui.article.postToX}</span>
         <span aria-hidden="true">↗</span>
       </a>
       <a
@@ -312,11 +313,11 @@ export function ShareLinks({ url, title }: { url: string; title: string }) {
         rel="noopener noreferrer"
         target="_blank"
       >
-        <span>LinkedIn</span>
+        <span>{ui.article.linkedin}</span>
         <span aria-hidden="true">↗</span>
       </a>
       <a className="rail-action" href={`mailto:?subject=${encodedTitle}&body=${encodedUrl}`}>
-        <span>Email</span>
+        <span>{ui.article.email}</span>
         <span aria-hidden="true">→</span>
       </a>
     </div>

@@ -1,4 +1,5 @@
 import type { CategoryWithCount, SiteSettings } from '../../lib/db/queries/taxonomy'
+import { ui } from '../../lib/content/ui-copy'
 import { SiteLayout } from '../../components/layout'
 import { Kicker, TopicRow } from '../../components/ui'
 
@@ -15,17 +16,17 @@ export function TopicsPage({
         <div className="shell">
           <div className="page-hero__grid">
             <div>
-              <Kicker plain>Sections</Kicker>
-              <h1 className="display-lg" style={{ marginTop: '1rem' }}>Topics</h1>
+              <Kicker plain>{ui.footer.sections}</Kicker>
+              <h1 className="display-lg" style={{ marginTop: '1rem' }}>{ui.listing.topicsTitle}</h1>
             </div>
             <div>
               <p>
-                The publication is organised loosely by subject. Each section has its own accent, its own archive, and
-                room to change as the interests do.
+                Publikasi ini disusun secara longgar menurut subjek. Setiap rubrik punya warna aksennya sendiri,
+                arsipnya sendiri, dan ruang untuk berubah ketika minat pun berubah.
               </p>
               <div className="page-hero__meta">
-                <span className="meta">{categories.length} sections</span>
-                <a className="text-link" href="/archive">Chronological archive →</a>
+                <span className="meta">{categories.length} rubrik</span>
+                <a className="text-link" href="/archive">{ui.footer.archive} kronologis →</a>
               </div>
             </div>
           </div>

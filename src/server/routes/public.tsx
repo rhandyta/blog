@@ -220,8 +220,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: page > 1 ? `Articles — page ${page}` : 'All articles and essays — RhandytaVERSE',
-        description: 'Every essay and note in RhandytaVERSE, newest first.',
+        title: page > 1 ? `Artikel — halaman ${page}` : 'Semua artikel dan esai — RhandytaVERSE',
+        description: 'Setiap esai dan catatan di RhandytaVERSE, terbaru lebih dulu.',
         path: page > 1 ? `/articles?page=${page}` : '/articles',
         pagination: paginationLinks('/articles', page, totalPages),
         ogImage: items[0]?.media ? ogFromMedia(items[0].media) : null,
@@ -452,13 +452,13 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Topics and sections — RhandytaVERSE',
-        description: 'Every section of the publication, with its own accent and archive.',
+        title: 'Topik dan rubrik — RhandytaVERSE',
+        description: 'Setiap rubrik publikasi, dengan warna aksen dan arsipnya sendiri.',
         path: '/topics',
         jsonLd: [
           collectionJsonLd({
-            name: 'Topics',
-            description: 'Sections of the publication.',
+            name: 'Topik',
+            description: 'Rubrik publikasi.',
             url: '/topics',
             origin,
             items: categories.map((category) => ({ title: category.name, path: `/category/${category.slug}` })),
@@ -562,13 +562,13 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Complete archive — RhandytaVERSE',
-        description: 'A complete chronological archive of the publication.',
+        title: 'Arsip lengkap — RhandytaVERSE',
+        description: 'Arsip kronologis publikasi secara lengkap.',
         path: '/archive',
         jsonLd: [
           collectionJsonLd({
-            name: 'Archive',
-            description: 'A complete chronological archive.',
+            name: 'Arsip',
+            description: 'Arsip kronologis lengkap.',
             url: '/archive',
             origin,
             items: entries.slice(0, 50).map((entry) => ({ title: entry.title, path: `/articles/${entry.slug}` })),
@@ -590,7 +590,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         settings,
         origin,
         title: query ? `Search — ${query}` : 'Search',
-        description: 'Search the full text of every published essay, note, and tag.',
+        description: 'Cari di seluruh teks setiap esai, catatan, dan tag yang terbit.',
         path: query ? `/search?q=${encodeURIComponent(query)}` : '/search',
         robots: 'noindex, follow',
       }),
@@ -605,8 +605,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Saved articles',
-        description: 'A reading list kept privately in your browser.',
+        title: 'Artikel tersimpan',
+        description: 'Daftar bacaan yang disimpan secara privat di perambanmu.',
         path: '/saved',
         robots: 'noindex, nofollow',
       }),
@@ -638,7 +638,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'About Rhandyta Briantama and RhandytaVERSE',
+        title: 'Tentang Rhandyta Briantama dan RhandytaVERSE',
         description: splitParagraphs(settings.about)[0] ?? settings.description,
         path: '/about',
         jsonLd: [
@@ -667,8 +667,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Privacy policy',
-        description: 'How RhandytaVERSE handles newsletter and readership data.',
+        title: 'Kebijakan privasi',
+        description: 'Bagaimana RhandytaVERSE menangani data surat kabar dan pembaca.',
         path: '/privacy',
       }),
     })
@@ -682,8 +682,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Terms of use',
-        description: 'Terms for reading and subscribing to RhandytaVERSE.',
+        title: 'Ketentuan penggunaan',
+        description: 'Ketentuan membaca dan berlangganan RhandytaVERSE.',
         path: '/terms',
       }),
     })
@@ -708,7 +708,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Subscribe to the letter — RhandytaVERSE',
+        title: 'Berlangganan surat kabar — RhandytaVERSE',
         description: settings.newsletterBlurb,
         path: '/subscribe',
       }),
@@ -727,8 +727,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Unsubscribe',
-        description: 'Manage your newsletter subscription.',
+        title: 'Berhenti berlangganan',
+        description: 'Kelola langganan surat kabarmu.',
         path: '/unsubscribe',
         robots: 'noindex, nofollow',
       }),
@@ -761,8 +761,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Confirm subscription',
-        description: 'Confirm your newsletter subscription.',
+        title: 'Konfirmasi langganan',
+        description: 'Konfirmasi langganan surat kabarmu.',
         path: '/confirm',
         robots: 'noindex, nofollow',
       }),

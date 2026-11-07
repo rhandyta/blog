@@ -34,7 +34,7 @@ function updateSavedIndicators(): void {
     button.dataset.active = isSaved ? 'true' : 'false'
     button.setAttribute('aria-pressed', isSaved ? 'true' : 'false')
     const label = button.querySelector<HTMLElement>('[data-bookmark-label]')
-    if (label) label.textContent = isSaved ? 'Saved for later' : 'Save for later'
+    if (label) label.textContent = isSaved ? 'Tersimpan' : 'Simpan untuk nanti'
   })
 }
 
@@ -197,12 +197,12 @@ function setupShare(): void {
           return
         }
         await navigator.clipboard.writeText(url)
-        if (label) label.textContent = 'Link copied'
+        if (label) label.textContent = 'Tautan disalin'
         window.setTimeout(() => {
           if (label) label.textContent = original
         }, 1800)
       } catch {
-        if (label) label.textContent = 'Copy the address bar'
+        if (label) label.textContent = 'Salin dari bilah alamat'
         window.setTimeout(() => {
           if (label) label.textContent = original
         }, 2200)
@@ -217,17 +217,17 @@ function setupCodeCopy(): void {
       const block = button.closest('.code-block')
       const code = block?.querySelector('code')
       if (!code) return
-      const original = button.textContent ?? 'Copy'
+      const original = button.textContent ?? 'Salin'
       try {
         await navigator.clipboard.writeText(code.textContent ?? '')
-        button.textContent = 'Copied'
+        button.textContent = 'Tersalin'
         button.dataset.copied = 'true'
         window.setTimeout(() => {
           button.textContent = original
           delete button.dataset.copied
         }, 1800)
       } catch {
-        button.textContent = 'Select manually'
+        button.textContent = 'Pilih manual'
         window.setTimeout(() => {
           button.textContent = original
         }, 2200)
@@ -271,25 +271,25 @@ function setupNewsletter(): void {
         const payload = (await response.json()) as { status?: string }
         if (response.ok && payload.status === 'pending') {
           message.dataset.state = 'success'
-          message.textContent = 'Check your inbox and click the confirmation link to join the list.'
+          message.textContent = 'Cek kotak masukmu dan klik tautan konfirmasi untuk bergabung.'
           form.reset()
         } else if (response.ok && payload.status === 'ok') {
           message.dataset.state = 'success'
-          message.textContent = 'You are on the list. Thank you for subscribing.'
+          message.textContent = 'Kamu sudah masuk daftar. Terima kasih sudah berlangganan.'
           form.reset()
         } else if (response.ok && payload.status === 'exists') {
           message.dataset.state = 'success'
-          message.textContent = 'That address is already subscribed.'
+          message.textContent = 'Alamat itu sudah berlangganan.'
         } else if (response.status === 429) {
           message.dataset.state = 'error'
-          message.textContent = 'Too many attempts. Please try again later.'
+          message.textContent = 'Terlalu banyak percobaan. Coba lagi nanti.'
         } else {
           message.dataset.state = 'error'
-          message.textContent = 'Please check the address and try again.'
+          message.textContent = 'Mohon periksa alamatnya dan coba lagi.'
         }
       } catch {
         message.dataset.state = 'error'
-        message.textContent = 'The connection failed. Please try again.'
+        message.textContent = 'Koneksi gagal. Coba lagi.'
       } finally {
         if (submit) {
           submit.disabled = false
@@ -323,7 +323,7 @@ function renderSavedArticle(article: SavedArticle, onRemove: () => void): HTMLEl
   const date = document.createElement('span')
   date.className = 'meta'
   date.textContent = article.publishedAt
-    ? new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(article.publishedAt))
+    ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(article.publishedAt))
     : ''
   meta.append(category, date)
 
@@ -345,11 +345,11 @@ function renderSavedArticle(article: SavedArticle, onRemove: () => void): HTMLEl
   const read = document.createElement('a')
   read.className = 'text-link'
   read.href = `/articles/${article.slug}`
-  read.textContent = 'Read →'
+  read.textContent = 'Baca →'
   const remove = document.createElement('button')
   remove.type = 'button'
   remove.className = 'btn btn--ghost btn--small'
-  remove.textContent = 'Remove'
+  remove.textContent = 'Hapus'
   remove.addEventListener('click', () => {
     toggleBookmark(article.slug)
     onRemove()
@@ -371,7 +371,7 @@ async function setupSavedPage(): Promise<void> {
   const render = async () => {
     const saved = readSaved()
     updateSavedIndicators()
-    if (meta) meta.textContent = saved.length ? `${saved.length} saved ${saved.length === 1 ? 'article' : 'articles'}` : 'No saved articles'
+    if (meta) meta.textContent = saved.length ? `${saved.length} artikel tersimpan` : 'Belum ada artikel tersimpan'
     list.replaceChildren()
     if (!saved.length) {
       empty.hidden = false
@@ -380,7 +380,7 @@ async function setupSavedPage(): Promise<void> {
     empty.hidden = true
     const loading = document.createElement('p')
     loading.className = 'meta'
-    loading.textContent = 'Loading your reading list…'
+    loading.textContent = 'Memuat daftar bacaanmu…'
     list.append(loading)
     try {
       const response = await fetch(`/api/articles?slugs=${encodeURIComponent(saved.join(','))}`)
@@ -395,7 +395,7 @@ async function setupSavedPage(): Promise<void> {
         list.append(renderSavedArticle(article, render))
       }
     } catch {
-      loading.textContent = 'Your saved articles could not be loaded. Please refresh the page.'
+      loading.textContent = 'Artikel tersimpanmu tidak dapat dimuat. Muat ulang halaman ini.'
     }
   }
 

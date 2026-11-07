@@ -2,6 +2,7 @@ import type { ArticleCard, ArticleDetail } from '../../lib/db/queries/articles'
 import type { CategoryWithCount, SiteSettings } from '../../lib/db/queries/taxonomy'
 import type { TocEntry } from '../../lib/content/doc'
 import { formatDate } from '../../lib/content/html'
+import { ui } from '../../lib/content/ui-copy'
 import { SiteLayout } from '../../components/layout'
 import {
   AuthorInitials,
@@ -54,12 +55,12 @@ export function ArticlePage({
         {preview ? (
           <div className="shell" style={{ paddingTop: '1rem' }}>
             <div className="flash" data-tone="success" role="status">
-              Preview — this article is {article.status}. Only people with this link can see it while it remains unpublished.
+              Preview — artikel ini berstatus {article.status}. Hanya orang dengan tautan ini yang dapat melihatnya selama belum diterbitkan.
             </div>
           </div>
         ) : null}
         <div className="shell">
-          <nav className="breadcrumb" aria-label="Breadcrumb">
+          <nav className="breadcrumb" aria-label="Remah roti">
             <a href="/">Home</a>
             <span className="sep" aria-hidden="true">/</span>
             {category ? (
@@ -75,8 +76,8 @@ export function ArticlePage({
         <article>
           <header className="article-head shell">
             <div className="article-head__kicker">
-              <Kicker accent={accent}>{category?.name ?? 'Essay'}</Kicker>
-              <span className="meta">Essay</span>
+              <Kicker accent={accent}>{category?.name ?? ui.common.essay}</Kicker>
+              <span className="meta">{ui.common.essay}</span>
             </div>
             <h1 className="article-title">{article.title}</h1>
             {article.subtitle ? <p className="article-deck">{article.subtitle}</p> : null}
@@ -94,9 +95,9 @@ export function ArticlePage({
                 {article.publishedAt ? (
                   <time className="meta" dateTime={article.publishedAt}>{formatDate(article.publishedAt, 'long')}</time>
                 ) : null}
-                <span className="meta">{article.readingMinutes} min read</span>
+                <span className="meta">{ui.article.minRead(article.readingMinutes)}</span>
                 {article.updatedAt && article.publishedAt && article.updatedAt.slice(0, 10) !== article.publishedAt.slice(0, 10) ? (
-                  <span className="meta">Updated {formatDate(article.updatedAt, 'short')}</span>
+                  <span className="meta">{ui.article.updated} {formatDate(article.updatedAt, 'short')}</span>
                 ) : null}
               </div>
             </div>
@@ -134,11 +135,11 @@ export function ArticlePage({
 
           <div className="shell">
             <div className="article-layout">
-              <aside className="article-rail" aria-label="Article navigation">
+              <aside className="article-rail" aria-label="Navigasi artikel">
                 <div className="rail-inner">
                   {toc.length >= 2 ? (
-                    <nav className="rail-toc toc" aria-label="Table of contents">
-                      <div className="rail-label">Contents</div>
+                    <nav className="rail-toc toc" aria-label={ui.article.contents}>
+                      <div className="rail-label">{ui.article.contents}</div>
                       <ol>
                         {toc.map((entry) => (
                           <li key={entry.id} data-level={entry.level}>
@@ -149,11 +150,11 @@ export function ArticlePage({
                     </nav>
                   ) : null}
                   <div className="rail-share">
-                    <div className="rail-label">Share</div>
+                    <div className="rail-label">{ui.article.share}</div>
                     <ShareLinks url={url} title={article.title} />
                   </div>
                   <div className="rail-save">
-                    <div className="rail-label">Reading list</div>
+                    <div className="rail-label">{ui.article.savedLabel}</div>
                     <button
                       className="rail-action"
                       type="button"
@@ -161,11 +162,11 @@ export function ArticlePage({
                       data-bookmark-title={article.title}
                       aria-pressed="false"
                     >
-                      <span data-bookmark-label>Save for later</span>
+                      <span data-bookmark-label>{ui.article.saveForLater}</span>
                       <span aria-hidden="true" data-bookmark-icon>⌑</span>
                     </button>
                     <div className="article-sidebar-note">
-                      Saved articles are kept in this browser. Plain reading, no account.
+                      {ui.article.savedNote}
                     </div>
                   </div>
                 </div>
@@ -179,12 +180,12 @@ export function ArticlePage({
                 </footer>
 
                 {author ? (
-                  <aside className="author-card" aria-label="About the author">
+                  <aside className="author-card" aria-label="Tentang penulis">
                     {author.avatarMediaId ? null : (
                       <div className="author-card__initials" aria-hidden="true">{initials || '—'}</div>
                     )}
                     <div>
-                      <span className="kicker kicker--plain">Written by</span>
+                      <span className="kicker kicker--plain">{ui.article.writtenBy}</span>
                       <h2 style={{ marginTop: '0.4rem' }}>
                         <a href={`/author/${author.slug}`}>{author.displayName}</a>
                       </h2>
@@ -192,7 +193,7 @@ export function ArticlePage({
                       <p>{author.longBio ?? author.bio}</p>
                       <div className="author-card__links">
                         <a className="text-link" href={`/author/${author.slug}`}>
-                          More from {author.displayName.split(' ')[0]} →
+                          {ui.article.moreFrom(author.displayName.split(' ')[0])} →
                         </a>
                       </div>
                     </div>
@@ -207,17 +208,17 @@ export function ArticlePage({
               <h2 className="section-head" id="related-title">
                 <span className="section-head__label">
                   <span className="section-head__num" aria-hidden="true">↳</span>
-                  <span>Related reading</span>
+                  <span>{ui.article.relatedReading}</span>
                 </span>
                 <a className="section-head__more" href={category ? `/category/${category.slug}` : '/articles'}>
-                  More in {category?.name ?? 'the index'} →
+                  {ui.article.moreIn(category?.name ?? ui.home.theIndex)} →
                 </a>
               </h2>
               <div className="related__grid">
                 {related.map((card) => (
                   <a key={card.id} className={`related-card ${accentClass(card.category?.accent)}`} href={`/articles/${card.slug}`}>
                     <Cover media={card.media} aspect="wide" sizes="(min-width: 900px) 32vw, 100vw" decorative />
-                    <span className="meta">{card.category?.name} · {card.readingMinutes} min</span>
+                    <span className="meta">{card.category?.name} · {ui.common.minuteShort(card.readingMinutes)}</span>
                     <h3>{card.title}</h3>
                   </a>
                 ))}
@@ -225,27 +226,27 @@ export function ArticlePage({
             </aside>
           ) : null}
 
-          <nav className="article-nav shell" aria-label="Adjacent articles">
+          <nav className="article-nav shell" aria-label="Artikel di sekitarnya">
             <div className="article-nav__item">
               {previous ? (
                 <>
-                  <span className="kicker kicker--plain">Earlier</span>
+                  <span className="kicker kicker--plain">{ui.article.earlier}</span>
                   <a className="article-nav__title" href={`/articles/${previous.slug}`}>← {previous.title}</a>
                   <span className="meta">{previous.category?.name} · {formatDate(previous.publishedAt, 'short')}</span>
                 </>
               ) : (
-                <span className="meta">This is the earliest piece.</span>
+                <span className="meta">{ui.article.earliest}</span>
               )}
             </div>
             <div className="article-nav__item">
               {next ? (
                 <>
-                  <span className="kicker kicker--plain">Later</span>
+                  <span className="kicker kicker--plain">{ui.article.later}</span>
                   <a className="article-nav__title" href={`/articles/${next.slug}`}>{next.title} →</a>
                   <span className="meta">{next.category?.name} · {formatDate(next.publishedAt, 'short')}</span>
                 </>
               ) : (
-                <span className="meta">This is the most recent piece.</span>
+                <span className="meta">{ui.article.mostRecent}</span>
               )}
             </div>
           </nav>

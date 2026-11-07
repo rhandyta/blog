@@ -2,6 +2,7 @@ import type { ArticleCard } from '../../lib/db/queries/articles'
 import type { CategoryWithCount, SiteSettings } from '../../lib/db/queries/taxonomy'
 import type { Author, MediaAsset } from '../../lib/db/schema'
 import { formatDate } from '../../lib/content/html'
+import { ui } from '../../lib/content/ui-copy'
 import { SiteLayout } from '../../components/layout'
 import { ArticleRow, Kicker, Pagination } from '../../components/ui'
 import { parseJsonArray, parseJsonObject } from '../../lib/db/queries/taxonomy'
@@ -47,11 +48,11 @@ export function AuthorPage({
               )}
             </div>
             <div>
-              <Kicker plain>Contributor</Kicker>
+              <Kicker plain>Penulis</Kicker>
               <h1 style={{ marginTop: '0.75rem' }}>{author.displayName}</h1>
               {author.roleTitle ? <p className="meta author-hero__role">{author.roleTitle}</p> : null}
               {author.slug === 'rhandyta-briantama' ? (
-                <p className="meta" style={{ marginTop: '0.35rem' }}>Writes and edits {settings.title}.</p>
+                <p className="meta" style={{ marginTop: '0.35rem' }}>Menulis dan menyunting {settings.title}.</p>
               ) : null}
               <p className="author-hero__bio">{author.longBio ?? author.bio}</p>
               {expertise.length ? (
@@ -64,11 +65,11 @@ export function AuthorPage({
             </div>
             <aside className="author-hero__aside">
               <ul className="author-facts">
-                <li>Pieces <strong>{total}</strong></li>
-                <li>Latest <strong>{items[0]?.publishedAt ? formatDate(items[0].publishedAt, 'short') : '—'}</strong></li>
-                <li>Archive <strong>Page {page} / {totalPages}</strong></li>
+                <li>Tulisan <strong>{total}</strong></li>
+                <li>Terbaru <strong>{items[0]?.publishedAt ? formatDate(items[0].publishedAt, 'short') : '—'}</strong></li>
+                <li>Arsip <strong>Halaman {page} / {totalPages}</strong></li>
                 {socials.website ? (
-                  <li>Website <a href={socials.website} rel="noopener noreferrer" target="_blank">Visit ↗</a></li>
+                  <li>Situs <a href={socials.website} rel="noopener noreferrer" target="_blank">Kunjungi ↗</a></li>
                 ) : null}
               </ul>
             </aside>
@@ -81,15 +82,15 @@ export function AuthorPage({
           <h2 className="section-head">
             <span className="section-head__label">
               <span className="section-head__num">01</span>
-              <span>The archive</span>
+              <span>Arsipnya</span>
             </span>
-            <span className="section-head__more">{total} {total === 1 ? 'piece' : 'pieces'}</span>
+            <span className="section-head__more">{ui.home.pieces(total)}</span>
           </h2>
           {items.length ? (
             items.map((card) => <ArticleRow key={card.id} card={card} />)
           ) : (
             <div className="empty-state">
-              <h2>No published pieces yet</h2>
+              <h2>Belum ada tulisan terbit</h2>
             </div>
           )}
           <div style={{ marginTop: '1.5rem' }}>

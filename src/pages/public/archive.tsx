@@ -1,10 +1,11 @@
 import type { ArchiveEntry } from '../../lib/db/queries/articles'
 import type { CategoryWithCount, SiteSettings, TagWithCount } from '../../lib/db/queries/taxonomy'
 import { formatDate } from '../../lib/content/html'
+import { ui } from '../../lib/content/ui-copy'
 import { SiteLayout } from '../../components/layout'
 import { Kicker, accentClass } from '../../components/ui'
 
-const monthFormat = new Intl.DateTimeFormat('en-GB', { month: 'long' })
+const monthFormat = new Intl.DateTimeFormat('id-ID', { month: 'long' })
 
 export function ArchivePage({
   settings,
@@ -34,18 +35,18 @@ export function ArchivePage({
         <div className="shell">
           <div className="page-hero__grid">
             <div>
-              <Kicker plain>Everything, in order</Kicker>
-              <h1 className="display-lg" style={{ marginTop: '1rem' }}>Archive</h1>
+              <Kicker plain>Semuanya, berurutan</Kicker>
+              <h1 className="display-lg" style={{ marginTop: '1rem' }}>{ui.listing.archiveTitle}</h1>
             </div>
             <div>
               <p>
-                A chronological record of the publication. Nothing is buried; the oldest piece is as easy to reach as
-                the newest.
+                Catatan kronologis publikasi ini. Tidak ada yang dikubur; tulisan paling lama sama mudahnya dijangkau
+                dengan yang paling baru.
               </p>
               <div className="page-hero__meta">
-                <span className="meta">{entries.length} pieces</span>
-                <span className="meta">{years.size} {years.size === 1 ? 'year' : 'years'}</span>
-                <a className="text-link" href="/rss.xml">RSS feed →</a>
+                <span className="meta">{ui.home.pieces(entries.length)}</span>
+                <span className="meta">{years.size} tahun</span>
+                <a className="text-link" href="/rss.xml">{ui.footer.rss} →</a>
               </div>
             </div>
           </div>
@@ -54,9 +55,9 @@ export function ArchivePage({
 
       <div className="shell">
         <div className="archive-layout">
-          <aside className="archive-filters" aria-label="Archive filters">
+          <aside className="archive-filters" aria-label="Penyaring arsip">
             <div className="filter-group">
-              <h2>Sections</h2>
+              <h2>{ui.footer.sections}</h2>
               <ul className="filter-list">
                 {categories.map((category) => (
                   <li key={category.id}>
@@ -69,7 +70,7 @@ export function ArchivePage({
               </ul>
             </div>
             <div className="filter-group">
-              <h2>Tags</h2>
+              <h2>Tag</h2>
               <ul className="filter-list">
                 {tags.slice(0, 14).map((tag) => (
                   <li key={tag.id}>
@@ -89,7 +90,7 @@ export function ArchivePage({
                 <section className="archive-year" key={year}>
                   <div className="archive-year__head">
                     <h2 className="archive-year__num">{year}</h2>
-                    <span className="meta">{[...months.values()].flat().length} pieces</span>
+                    <span className="meta">{ui.home.pieces([...months.values()].flat().length)}</span>
                   </div>
                   {[...months.entries()].map(([month, monthEntries]) => (
                     <div className="archive-month" key={`${year}-${month}`}>
@@ -104,7 +105,7 @@ export function ArchivePage({
                             {String(new Date(entry.publishedAt).getUTCDate()).padStart(2, '0')}
                           </span>
                           <span className="archive-item__title">{entry.title}</span>
-                          <span className="archive-item__cat">{entry.categoryName ?? 'Essay'}</span>
+                          <span className="archive-item__cat">{entry.categoryName ?? ui.common.essay}</span>
                         </a>
                       ))}
                     </div>
@@ -113,12 +114,12 @@ export function ArchivePage({
               ))
             ) : (
               <div className="empty-state">
-                <h2>The archive is empty</h2>
-                <p>Published work will appear here in reverse chronological order.</p>
+                <h2>Arsip masih kosong</h2>
+                <p>Tulisan yang terbit akan muncul di sini dalam urutan terbaru lebih dulu.</p>
               </div>
             )}
             <p className="meta" style={{ marginTop: '2rem' }}>
-              Last entry {entries[0] ? formatDate(entries[0].publishedAt, 'long') : '—'}
+              Entri terakhir {entries[0] ? formatDate(entries[0].publishedAt, 'long') : '—'}
             </p>
           </div>
         </div>
