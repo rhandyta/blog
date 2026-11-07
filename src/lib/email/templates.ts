@@ -55,22 +55,22 @@ export function confirmationEmail(input: {
   token: string
 }): { subject: string; html: string; text: string } {
   const confirmUrl = `${input.origin.replace(/\/$/, '')}/confirm?token=${encodeURIComponent(input.token)}`
-  const subject = `Confirm your subscription to ${input.siteTitle}`
+  const subject = `Konfirmasi langganan ${input.siteTitle}`
   const body = `
-    <p style="margin:0 0 1em;">You asked to receive letters from ${escapeHtml(input.siteTitle)}. Confirm your address to join the list.</p>
+    <p style="margin:0 0 1em;">Kamu meminta menerima surat dari ${escapeHtml(input.siteTitle)}. Konfirmasi alamatmu untuk bergabung.</p>
     <p style="margin:0 0 1.4em;">
-      <a href="${escapeHtml(confirmUrl)}" style="display:inline-block;background:#17140f;color:#f6f2e9;text-decoration:none;padding:12px 18px;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;">Confirm subscription</a>
+      <a href="${escapeHtml(confirmUrl)}" style="display:inline-block;background:#17140f;color:#f6f2e9;text-decoration:none;padding:12px 18px;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;">Konfirmasi langganan</a>
     </p>
-    <p style="margin:0;font-size:14px;color:#7c7364;">If you did not request this, you can ignore this email. The link expires in seven days.</p>`
+    <p style="margin:0;font-size:14px;color:#7c7364;">Jika kamu tidak memintanya, abaikan surel ini. Tautan berlaku tujuh hari.</p>`
   return {
     subject,
     html: shell({
       siteTitle: input.siteTitle,
-      title: 'Confirm your subscription',
+      title: 'Konfirmasi langganan',
       body,
-      footer: `If the button does not work, open this address:<br><a href="${escapeHtml(confirmUrl)}" style="color:#7c7364;">${escapeHtml(confirmUrl)}</a>`,
+      footer: `Jika tombolnya tidak berfungsi, buka alamat ini:<br><a href="${escapeHtml(confirmUrl)}" style="color:#7c7364;">${escapeHtml(confirmUrl)}</a>`,
     }),
-    text: `Confirm your subscription to ${input.siteTitle}\n\nYou asked to receive letters from ${input.siteTitle}. Confirm your address:\n${confirmUrl}\n\nIf you did not request this, ignore this email. The link expires in seven days.`,
+    text: `Konfirmasi langganan ${input.siteTitle}\n\nKamu meminta menerima surat dari ${input.siteTitle}. Konfirmasi alamatmu:\n${confirmUrl}\n\nJika kamu tidak memintanya, abaikan surel ini. Tautan berlaku tujuh hari.`,
   }
 }
 
@@ -97,22 +97,22 @@ export function digestEmail(input: {
       return `
         <div style="padding:20px 0;border-top:1px solid #d8cfbf;">
           <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#7c7364;">
-            ${String(index + 1).padStart(2, '0')} · ${escapeHtml(article.categoryName ?? 'Essay')} · ${article.readingMinutes} min read
+            ${String(index + 1).padStart(2, '0')} · ${escapeHtml(article.categoryName ?? 'Esai')} · ${article.readingMinutes} menit baca
           </div>
           <h2 style="margin:8px 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;font-weight:500;">
             <a href="${escapeHtml(url)}" style="color:#17140f;text-decoration:none;">${escapeHtml(article.title)}</a>
           </h2>
           <p style="margin:0 0 8px;font-size:15px;line-height:1.55;color:#4b453b;">${escapeHtml(article.excerpt)}</p>
           <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#7c7364;">
-            ${article.readers} reader${article.readers === 1 ? '' : 's'} · ${article.views} view${article.views === 1 ? '' : 's'}
+            ${article.readers} pembaca · ${article.views} kunjungan
           </div>
           <p style="margin:10px 0 0;">
-            <a href="${escapeHtml(url)}" style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#17140f;">Read the piece →</a>
+            <a href="${escapeHtml(url)}" style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#17140f;">Baca tulisannya →</a>
           </p>
         </div>`
     })
     .join('')
-  const footer = `You are receiving this because you subscribed to ${escapeHtml(input.siteTitle)}.<br><a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#7c7364;">Unsubscribe</a>`
+  const footer = `Kamu menerima ini karena berlangganan ${escapeHtml(input.siteTitle)}.<br><a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#7c7364;">Berhenti berlangganan</a>`
   return {
     subject: input.subject,
     html: shell({
@@ -124,9 +124,9 @@ export function digestEmail(input: {
     text: `${input.subject}\n\n${input.intro}\n\n${input.articles
       .map(
         (article, index) =>
-          `${index + 1}. ${article.title}\n${base}/articles/${article.slug}\n${article.readers} readers · ${article.views} views\n${article.excerpt}`,
+          `${index + 1}. ${article.title}\n${base}/articles/${article.slug}\n${article.readers} pembaca · ${article.views} kunjungan\n${article.excerpt}`,
       )
-      .join('\n\n')}\n\nYou are receiving this because you subscribed to ${input.siteTitle}.\nUnsubscribe: ${input.unsubscribeUrl}`,
+      .join('\n\n')}\n\nKamu menerima ini karena berlangganan ${input.siteTitle}.\nBerhenti berlangganan: ${input.unsubscribeUrl}`,
   }
 }
 
@@ -137,7 +137,7 @@ export function newsletterEmail(input: {
   body: string
   unsubscribeUrl: string
 }): { subject: string; html: string; text: string } {
-  const footer = `You are receiving this because you subscribed to ${escapeHtml(input.siteTitle)}.<br><a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#7c7364;">Unsubscribe</a>`
+  const footer = `Kamu menerima ini karena berlangganan ${escapeHtml(input.siteTitle)}.<br><a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#7c7364;">Berhenti berlangganan</a>`
   return {
     subject: input.subject,
     html: shell({
@@ -146,6 +146,6 @@ export function newsletterEmail(input: {
       body: paragraphs(input.body),
       footer,
     }),
-    text: `${input.subject}\n\n${input.body.trim()}\n\nYou are receiving this because you subscribed to ${input.siteTitle}.\nUnsubscribe: ${input.unsubscribeUrl}`,
+    text: `${input.subject}\n\n${input.body.trim()}\n\nKamu menerima ini karena berlangganan ${input.siteTitle}.\nBerhenti berlangganan: ${input.unsubscribeUrl}`,
   }
 }
