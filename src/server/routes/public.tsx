@@ -589,7 +589,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: query ? `Search — ${query}` : 'Search',
+        title: query ? `Cari — ${query}` : 'Cari',
         description: 'Cari di seluruh teks setiap esai, catatan, dan tag yang terbit.',
         path: query ? `/search?q=${encodeURIComponent(query)}` : '/search',
         robots: 'noindex, follow',
