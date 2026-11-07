@@ -37,6 +37,18 @@ export type BreakdownRow = {
   readers: number
 }
 
+export type ArticleAnalytics = {
+  article: { id: string; slug: string; title: string; publishedAt: string | null }
+  lifetimeReaders: number
+  lifetimeViews: number
+  readers: number
+  views: number
+  daily: DailyAnalytics[]
+  referrers: BreakdownRow[]
+  countries: BreakdownRow[]
+  devices: BreakdownRow[]
+}
+
 function numberValue(value: unknown): number {
   return Number(value) || 0
 }
@@ -251,6 +263,83 @@ export function getBrowserBreakdown(days = 30, limit = 8): Promise<BreakdownRow[
 
 export function getOsBreakdown(days = 30, limit = 8): Promise<BreakdownRow[]> {
   return dimensionBreakdown('os', days, limit, 'Unknown')
+}
+
+export async function getArticleAnalytics(articleId: string, days = 30): Promise<ArticleAnalytics | null> {
+  const article = await get<{ id: string; slug: string; title: string; publishedAt: string | null }>(
+    'SELECT id, slug, title, published_at AS publishedAt FROM articles WHERE id = ?',
+    [articleId],
+  )
+  if (!article) return null
+  const safeDays = Math.min(90, Math.max(7, Math.floor(days)))
+  const since = isoDay(new Date(Date.now() - (safeDays - 1) * 86_400_000))
+
+  const [lifetime, recent, viewRows, readerRows, referrers, countries, devices] = await Promise.all([
+    all<{ readers: number; views: number }>(
+      `SELECT (SELECT COUNT(*) FROM article_readers WHERE article_id = ?) AS readers,
+              COALESCE((SELECT SUM(count) FROM article_views WHERE article_id = ?), 0) AS views`,
+      [articleId, articleId],
+    ),
+    all<{ readers: number; views: number }>(
+      `SELECT (SELECT COUNT(DISTINCT visitor_hash) FROM article_visits WHERE article_id = ? AND day >= ?) AS readers,
+              COALESCE((SELECT SUM(count) FROM article_views WHERE article_id = ? AND day >= ?), 0) AS views`,
+      [articleId, since, articleId, since],
+    ),
+    all<{ day: string; total: number }>(
+      `SELECT day, COALESCE(SUM(count), 0) AS total
+       FROM article_views WHERE article_id = ? AND day >= ? GROUP BY day`,
+      [articleId, since],
+    ),
+    all<{ day: string; total: number }>(
+      `SELECT day, COUNT(DISTINCT visitor_hash) AS total
+       FROM article_visits WHERE article_id = ? AND day >= ? GROUP BY day`,
+      [articleId, since],
+    ),
+    all<{ label: string; visits: number; readers: number }>(
+      `SELECT COALESCE(NULLIF(referrer_host, ''), 'Direct') AS label,
+              COUNT(*) AS visits, COUNT(DISTINCT visitor_hash) AS readers
+       FROM article_visits WHERE article_id = ? AND day >= ?
+       GROUP BY label ORDER BY visits DESC, readers DESC LIMIT 8`,
+      [articleId, since],
+    ),
+    all<{ label: string; visits: number; readers: number }>(
+      `SELECT COALESCE(NULLIF(country, ''), 'Unknown') AS label,
+              COUNT(*) AS visits, COUNT(DISTINCT visitor_hash) AS readers
+       FROM article_visits WHERE article_id = ? AND day >= ?
+       GROUP BY label ORDER BY visits DESC, readers DESC LIMIT 8`,
+      [articleId, since],
+    ),
+    all<{ label: string; visits: number; readers: number }>(
+      `SELECT device AS label, COUNT(*) AS visits, COUNT(DISTINCT visitor_hash) AS readers
+       FROM article_visits WHERE article_id = ? AND day >= ?
+       GROUP BY label ORDER BY visits DESC, readers DESC LIMIT 6`,
+      [articleId, since],
+    ),
+  ])
+
+  const viewMap = new Map(viewRows.map((row) => [row.day, numberValue(row.total)]))
+  const readerMap = new Map(readerRows.map((row) => [row.day, numberValue(row.total)]))
+  const toRows = (rows: Array<{ label: string; visits: number; readers: number }>): BreakdownRow[] =>
+    rows.map((row) => ({
+      label: row.label,
+      visits: numberValue(row.visits),
+      readers: numberValue(row.readers),
+    }))
+
+  return {
+    article,
+    lifetimeReaders: numberValue(lifetime[0]?.readers),
+    lifetimeViews: numberValue(lifetime[0]?.views),
+    readers: numberValue(recent[0]?.readers),
+    views: numberValue(recent[0]?.views),
+    daily: Array.from({ length: safeDays }, (_, index) => {
+      const day = isoDay(new Date(Date.now() - (safeDays - 1 - index) * 86_400_000))
+      return { day, views: viewMap.get(day) ?? 0, readers: readerMap.get(day) ?? 0 }
+    }),
+    referrers: toRows(referrers),
+    countries: toRows(countries),
+    devices: toRows(devices),
+  }
 }
 
 export async function pruneAnalytics(retentionDays = 180): Promise<number> {

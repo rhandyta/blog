@@ -322,4 +322,10 @@ CREATE INDEX IF NOT EXISTS admin_audit_created_idx ON admin_audit_log(created_at
 CREATE INDEX IF NOT EXISTS admin_audit_actor_idx ON admin_audit_log(actor_id, created_at DESC);
 `,
   },
+  {
+    name: '010_article_language.sql',
+    sql: `
+ALTER TABLE articles ADD COLUMN language TEXT;
+`,
+  },
 ]

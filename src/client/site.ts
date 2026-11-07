@@ -211,6 +211,31 @@ function setupShare(): void {
   })
 }
 
+function setupCodeCopy(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-copy-code]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const block = button.closest('.code-block')
+      const code = block?.querySelector('code')
+      if (!code) return
+      const original = button.textContent ?? 'Copy'
+      try {
+        await navigator.clipboard.writeText(code.textContent ?? '')
+        button.textContent = 'Copied'
+        button.dataset.copied = 'true'
+        window.setTimeout(() => {
+          button.textContent = original
+          delete button.dataset.copied
+        }, 1800)
+      } catch {
+        button.textContent = 'Select manually'
+        window.setTimeout(() => {
+          button.textContent = original
+        }, 2200)
+      }
+    })
+  })
+}
+
 function setupNewsletter(): void {
   document.querySelectorAll<HTMLFormElement>('[data-newsletter]').forEach((form) => {
     const message = form.querySelector<HTMLElement>('[data-message]')
@@ -384,6 +409,7 @@ function init(): void {
   setupTocSpy()
   setupBookmarks()
   setupShare()
+  setupCodeCopy()
   setupNewsletter()
   void setupSavedPage()
 }

@@ -9,7 +9,7 @@ import { AdminLayout } from '../../components/layout'
 
 const numberFormat = new Intl.NumberFormat('en-US')
 
-function formatNumber(value: number): string {
+export function formatNumber(value: number): string {
   return numberFormat.format(value)
 }
 
@@ -21,7 +21,7 @@ function formatDay(day: string): string {
   }).format(new Date(`${day}T00:00:00Z`))
 }
 
-function regionName(code: string): string {
+export function regionName(code: string): string {
   if (code === 'Unknown' || code === 'Direct') return code
   try {
     return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) ?? code
@@ -30,11 +30,11 @@ function regionName(code: string): string {
   }
 }
 
-function labelCase(value: string): string {
+export function labelCase(value: string): string {
   return value.replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
-function ReadershipChart({ data }: { data: DailyAnalytics[] }) {
+export function ReadershipChart({ data }: { data: DailyAnalytics[] }) {
   const max = Math.max(1, ...data.map((point) => Math.max(point.views, point.readers)))
   return (
     <div>
@@ -64,7 +64,7 @@ function ReadershipChart({ data }: { data: DailyAnalytics[] }) {
   )
 }
 
-function BreakdownCard({
+export function BreakdownCard({
   title,
   rows,
   formatLabel,
@@ -181,7 +181,9 @@ export function AnalyticsPage({
                   <tr key={article.id}>
                     <td className="title-cell">
                       <a href={`/admin/articles/${article.id}/edit`}>{article.title}</a>
-                      <div className="meta" style={{ marginTop: '0.2rem' }}>/{article.slug}</div>
+                      <div className="meta" style={{ marginTop: '0.2rem' }}>
+                        /{article.slug} · <a href={`/admin/analytics/${article.id}`}>Readership</a>
+                      </div>
                     </td>
                     <td className="num">{formatNumber(article.readers)}</td>
                     <td className="num">{formatNumber(article.views)}</td>

@@ -27,6 +27,7 @@ export type RssItem = {
   author: string
   category: string | null
   guid: string
+  language?: string
 }
 
 function cdata(value: string): string {
@@ -46,6 +47,7 @@ export function renderRss(input: {
   feedPath: string
   items: RssItem[]
   lastBuild?: string
+  language?: string
 }): string {
   const origin = input.origin.replace(/\/$/, '')
   const items = input.items
@@ -54,7 +56,7 @@ export function renderRss(input: {
       return `<item>
   <title>${escapeHtml(item.title)}</title>
   <link>${escapeHtml(item.link)}</link>
-  <guid isPermaLink="true">${escapeHtml(item.guid)}</guid>
+  <guid isPermaLink="true">${escapeHtml(item.guid)}</guid>${item.language ? `\n  <dc:language>${escapeHtml(item.language)}</dc:language>` : ''}
   <pubDate>${rfc822(item.publishedAt)}</pubDate>
   <dc:creator>${escapeHtml(item.author)}</dc:creator>
   ${item.category ? `<category>${escapeHtml(item.category)}</category>` : ''}
@@ -70,7 +72,7 @@ export function renderRss(input: {
   <title>${escapeHtml(input.title)}</title>
   <link>${escapeHtml(origin)}</link>
   <description>${escapeHtml(input.description)}</description>
-  <language>en</language>
+  <language>${escapeHtml(input.language ?? 'en')}</language>
   <lastBuildDate>${rfc822(input.lastBuild ?? new Date().toISOString())}</lastBuildDate>
   <atom:link href="${escapeHtml(`${origin}${input.feedPath}`)}" rel="self" type="application/rss+xml"/>
 ${items}

@@ -641,6 +641,7 @@ export async function createArticle(input: {
   canonicalUrl: string | null
   ogMediaId: string | null
   noIndex: boolean
+  language?: string | null
   isDemo: boolean
   publishedAt: string | null
   scheduledFor: string | null
@@ -703,14 +704,18 @@ export async function deleteArticle(id: string): Promise<void> {
 }
 
 async function pruneRevisions(articleId: string): Promise<void> {
-  const rows = await getDb()
-    .select({ id: articleRevisions.id })
-    .from(articleRevisions)
-    .where(eq(articleRevisions.articleId, articleId))
-    .orderBy(desc(articleRevisions.createdAt))
-    .offset(30)
-  if (!rows.length) return
-  await getDb().delete(articleRevisions).where(inArray(articleRevisions.id, rows.map((row) => row.id)))
+  // Turso rejects a bare `OFFSET ?` without a LIMIT clause, so the unbounded
+  // limit is written literally. Drizzle drops `limit(-1)`, hence raw SQL here.
+  await run(
+    `DELETE FROM article_revisions
+     WHERE id IN (
+       SELECT id FROM article_revisions
+       WHERE article_id = ?
+       ORDER BY created_at DESC
+       LIMIT -1 OFFSET 30
+     )`,
+    [articleId],
+  )
 }
 
 export async function setArticleTags(articleId: string, tagIds: string[]): Promise<void> {

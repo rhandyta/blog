@@ -3,7 +3,7 @@ import { createApp } from '../src/server/app'
 import { createPreviewToken } from '../src/lib/seo/preview-token'
 import { resetRateLimits } from '../src/lib/auth/rate-limit'
 import { getDb } from '../src/lib/db/client'
-import { articles } from '../src/lib/db/schema'
+import { articles, articleRevisions } from '../src/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { listSubscribers } from '../src/lib/db/queries/subscribers'
 import { getArticleById, publishDueArticles, scheduleArticle } from '../src/lib/db/queries/articles'
@@ -430,6 +430,54 @@ describe('CMS pipeline', () => {
 
     const row = await getDb().select().from(articles).where(eq(articles.slug, createdJson.article.slug)).limit(1)
     expect(row.length).toBe(0)
+  })
+
+  test('prunes revisions past 30 without a bare OFFSET query', async () => {
+    // Regression: Turso rejects `OFFSET ?` with no LIMIT, which broke saving.
+    const { cookie, csrfToken } = await login()
+    const payload = {
+      title: 'Revision Pruning Article',
+      slug: 'revision-pruning-article',
+      excerpt: 'Pruning test.',
+      body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Body.' }] }] },
+      categoryId: 'cat_test',
+      authorId: 'author_test',
+      tagIds: [],
+      status: 'draft',
+    }
+
+    const created = await app.request('/api/admin/articles', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json', 'x-csrf-token': csrfToken },
+      body: JSON.stringify(payload),
+    })
+    expect(created.status).toBe(201)
+    const { article } = (await created.json()) as { article: { id: string } }
+
+    for (let index = 0; index < 34; index += 1) {
+      const current = await getArticleById(article.id)
+      const saved = await app.request(`/api/admin/articles/${article.id}`, {
+        method: 'PUT',
+        headers: { cookie, 'content-type': 'application/json', 'x-csrf-token': csrfToken },
+        body: JSON.stringify({
+          ...payload,
+          title: `Revision Pruning Article ${index}`,
+          updatedAt: current?.updatedAt ?? null,
+        }),
+      })
+      expect(saved.status).toBe(200)
+    }
+
+    const revisions = await getDb()
+      .select({ id: articleRevisions.id })
+      .from(articleRevisions)
+      .where(eq(articleRevisions.articleId, article.id))
+    expect(revisions.length).toBe(30)
+
+    await app.request(`/api/admin/articles/${article.id}`, {
+      method: 'DELETE',
+      headers: { cookie, 'x-csrf-token': csrfToken },
+    })
   })
 
   test('promotes scheduled articles once their time has passed', async () => {

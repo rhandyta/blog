@@ -50,6 +50,17 @@ export function SettingsPage({
             <label htmlFor="intro">Homepage introduction</label>
             <textarea className="textarea" id="intro" name="intro" rows={3} defaultValue={settings.intro} maxLength={500} />
           </div>
+          <div className="field" style={{ marginTop: '1rem' }}>
+            <label htmlFor="siteLanguage">Default site language</label>
+            <select className="select" id="siteLanguage" name="siteLanguage" defaultValue={settings.siteLanguage}>
+              <option value="en">English (en)</option>
+              <option value="id">Indonesian (id)</option>
+            </select>
+            <p className="hint">
+              Applies to navigation pages such as the homepage, archive, and About. Each article uses its
+              own language setting, so the site can publish in both languages at once.
+            </p>
+          </div>
         </section>
 
         <section className="admin-card">

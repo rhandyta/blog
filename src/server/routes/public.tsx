@@ -4,6 +4,7 @@ import { getConnInfo } from 'hono/bun'
 import { getConfig, isProd } from '../../lib/config'
 import { absoluteUrl } from '../../lib/content/html'
 import { collectMediaIds, countWords, parseDoc } from '../../lib/content/doc'
+import { articleLanguage, ogLocale } from '../../lib/content/language'
 import { renderDoc } from '../../lib/content/render'
 import { getMediaById, getMediaMap } from '../../lib/db/queries/media'
 import {
@@ -31,6 +32,7 @@ import {
   listCategories,
   listTags,
   parseJsonObject,
+  ACCENTS,
 } from '../../lib/db/queries/taxonomy'
 import {
   clearConfirmationTimestamp,
@@ -41,6 +43,7 @@ import {
 import { sendEmail } from '../../lib/email/mailer'
 import { confirmationEmail } from '../../lib/email/templates'
 import { verifyResendWebhook } from '../../lib/email/webhook'
+import { fallbackOgPath, parseOgParams, renderFallbackOg } from '../../lib/media/og-fallback'
 import { recordNewsletterEvent } from '../../lib/db/queries/newsletter-events'
 import { pruneAuditLog } from '../../lib/db/queries/audit'
 import { pruneAnalytics } from '../../lib/db/queries/analytics'
@@ -232,7 +235,16 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
     const url = absoluteUrl(origin, `/articles/${detail.article.slug}`)
     const canonicalPath = detail.article.canonicalUrl || `/articles/${detail.article.slug}`
     const description = detail.article.seoDescription || detail.article.excerpt
-    const image = ogFromMedia(detail.ogMedia ?? detail.featuredMedia)
+    const accentHex =
+      ACCENTS.find((item) => item.token === (detail.category?.accent ?? 'vermilion'))?.hex ?? '#c8452b'
+    const image =
+      ogFromMedia(detail.ogMedia ?? detail.featuredMedia) ?? {
+        url: fallbackOgPath(detail.article.slug, accentHex),
+        width: 1200,
+        height: 630,
+        alt: `Editorial illustration for ${detail.article.title}`,
+      }
+    const language = articleLanguage(detail.article.language, detail.article.bodyText)
     const jsonLd: unknown[] = [
       articleJsonLd({
         origin,
@@ -249,6 +261,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         wordCount: countWords(detail.article.bodyText),
         canonicalUrl: detail.article.canonicalUrl,
         settings,
+        language,
       }),
       breadcrumbJsonLd(
         [
@@ -297,9 +310,29 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         author: detail.author?.displayName ?? null,
         section: detail.category?.name ?? null,
         tags: detail.tags.map((tag) => tag.name),
+        lang: language,
+        locale: ogLocale(language),
         jsonLd,
       }),
     })
+  })
+
+  app.get('/og/:seed/:accent', async (c) => {
+    const parsed = parseOgParams(c.req.param('seed') ?? '', c.req.param('accent') ?? '')
+    if (!parsed) return c.notFound()
+    try {
+      const jpeg = await renderFallbackOg(parsed.seed, parsed.accent)
+      if (!jpeg) {
+        c.header('Retry-After', '60')
+        return c.body(null, 503)
+      }
+      c.header('Content-Type', 'image/jpeg')
+      c.header('Cache-Control', 'public, max-age=31536000, s-maxage=31536000, immutable')
+      return c.body(new Uint8Array(jpeg))
+    } catch (error) {
+      console.error('[og] fallback render failed', error)
+      return c.notFound()
+    }
   })
 
   app.get('/preview/:id', async (c) => {
@@ -315,6 +348,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
     const media = await getMediaMap(collectMediaIds(doc))
     const { html, toc } = renderDoc(doc, media)
     const previewUrl = `${absoluteUrl(origin, `/preview/${id}`)}?token=${encodeURIComponent(token ?? '')}`
+    const previewLanguage = articleLanguage(detail.article.language, detail.article.bodyText)
     return renderPageResponse(c, {
       element: (
         <ArticlePage
@@ -338,6 +372,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         path: `/preview/${id}`,
         robots: 'noindex, nofollow',
         ogImage: ogFromMedia(detail.featuredMedia),
+        lang: previewLanguage,
+        locale: ogLocale(previewLanguage),
       }),
     })
   })
@@ -765,6 +801,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
         publishedAt: detail.article.publishedAt,
         author: detail.author?.displayName ?? settings.title,
         category: detail.category?.name ?? null,
+        language: articleLanguage(detail.article.language, detail.article.bodyText),
       })
     }
     const xml = renderRss({
@@ -774,6 +811,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       feedPath: '/rss.xml',
       items,
       lastBuild: cards[0]?.publishedAt ?? new Date().toISOString(),
+      language: settings.siteLanguage,
     })
     c.header('Content-Type', 'application/rss+xml; charset=utf-8')
     c.header('Cache-Control', 'public, max-age=300, s-maxage=300')

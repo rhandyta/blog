@@ -6,6 +6,13 @@ process.env.SESSION_SECRET = 'test-session-secret-0123456789abcdef'
 process.env.ADMIN_EMAIL = 'test@example.com'
 process.env.ADMIN_PASSWORD = 'test-password-123'
 process.env.DISABLE_SCHEDULER = '1'
+// The suite must never reach a remote database. `.env.local` may define a Turso
+// URL, and a remote URL takes precedence over DATABASE_PATH, so clear it here.
+delete process.env.TURSO_DATABASE_URL
+delete process.env.TURSO_AUTH_TOKEN
+delete process.env.BLOB_READ_WRITE_TOKEN
+delete process.env.RESEND_API_KEY
+delete process.env.RESEND_WEBHOOK_SECRET
 
 const { ensureDb } = await import('../src/lib/db/migrate')
 const { getDb } = await import('../src/lib/db/client')
@@ -13,6 +20,12 @@ const { articles, tags } = await import('../src/lib/db/schema')
 const { count } = await import('drizzle-orm')
 const { createUser, getUserByEmail } = await import('../src/lib/auth/session')
 const { upsertAuthor, upsertCategory } = await import('../src/lib/db/queries/taxonomy')
+const { isRemoteDatabase } = await import('../src/lib/config')
+
+if (isRemoteDatabase()) {
+  throw new Error('Refusing to run the test suite against a remote database')
+}
+
 const { createArticle } = await import('../src/lib/db/queries/articles')
 
 await ensureDb()

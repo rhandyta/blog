@@ -56,6 +56,7 @@ export const settingsInputSchema = z.object({
   x: z.string().trim().max(300),
   github: z.string().trim().max(300),
   linkedin: z.string().trim().max(300),
+  siteLanguage: z.enum(['id', 'en']),
 })
 
 export const articlePayloadSchema = z.object({
@@ -76,6 +77,7 @@ export const articlePayloadSchema = z.object({
   seoDescription: z.string().max(400).nullable().optional(),
   canonicalUrl: z.string().max(500).nullable().optional(),
   noIndex: z.boolean().optional(),
+  language: z.enum(['id', 'en']).nullable().optional(),
   tagIds: z.array(z.string()).max(30).optional(),
   status: z.enum(['draft', 'published']).optional(),
   updatedAt: z.string().nullable().optional(),

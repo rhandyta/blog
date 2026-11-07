@@ -24,7 +24,7 @@ A self-contained editorial publishing platform: server-rendered React, a real SQ
 | Newsletter | Resend API; double opt-in, admin composer, scheduled digest, per-recipient unsubscribe, webhook delivery events |
 | Audit & limits | Admin mutation log with hashed IPs; database-backed rate limits shared across instances |
 | Validation | Zod |
-| Tests | `bun test` (73 unit + integration tests) |
+| Tests | `bun test` (85 unit + integration tests) |
 
 ### Rendering architecture
 
@@ -133,11 +133,11 @@ The server refuses to boot in production with the placeholder session secret.
 
 **Public**
 
-`/` · `/articles` (+ `?page=`) · `/articles/:slug` · `/category/:slug` · `/topics` · `/author/:slug` · `/archive` · `/tags/:slug` · `/search?q=` · `/saved` · `/about` · `/subscribe` · `/unsubscribe?token=` · `/preview/:id?token=` (signed draft previews) · `/rss.xml` · `/feed.xml` · `/sitemap.xml` · `/robots.txt` · styled 404 / 500.
+`/` · `/articles` (+ `?page=`) · `/articles/:slug` · `/category/:slug` · `/topics` · `/author/:slug` · `/archive` · `/tags/:slug` · `/search?q=` · `/saved` · `/about` · `/subscribe` · `/unsubscribe?token=` · `/preview/:id?token=` (signed draft previews) · `/og/:seed/:accent.jpg` (generated social cards) · `/rss.xml` · `/feed.xml` · `/sitemap.xml` · `/robots.txt` · styled 404 / 500.
 
 **Editorial**
 
-`/admin/login` · `/admin` · `/admin/articles` · `/admin/articles/new` · `/admin/articles/:id/edit` · `/admin/articles/:id/revisions` · `/admin/media` · `/admin/automation` · `/admin/categories[/:id]` · `/admin/tags[/:id]` · `/admin/authors[/:id]` · `/admin/subscribers` · `/admin/settings`.
+`/admin/login` · `/admin` · `/admin/articles` · `/admin/articles/new` · `/admin/articles/:id/edit` · `/admin/articles/:id/revisions` · `/admin/media` · `/admin/analytics` · `/admin/analytics/:id` · `/admin/audit` · `/admin/automation` · `/admin/categories[/:id]` · `/admin/tags[/:id]` · `/admin/authors[/:id]` · `/admin/newsletter` · `/admin/subscribers` · `/admin/settings`.
 
 **API**
 
@@ -155,7 +155,8 @@ The server refuses to boot in production with the placeholder session secret.
 - **Organisation** — categories with accent colours, tags with usage counts, author profiles, featured rank, editors' picks.
 - **SEO panel** — slug, SEO title, meta description, canonical URL, social image, no-index, live search and social previews.
 - **Roles** — `admin`, `editor`, `author`. Authors see and edit only their own articles; content settings and taxonomy management are restricted.
-- **Subscribers** — real persistence, deduplication, unsubscribe tokens, CSV export. No transactional email provider is connected (see Limitations).
+- **Subscribers** — real persistence, deduplication, unsubscribe tokens, CSV export, and confirmed/pending/unsubscribed states.
+- **Analytics** — `/admin/analytics` shows totals, a 14-day chart, top articles, and breakdowns by referrer, country, device, and browser. `/admin/analytics/:id?days=7|30|90` drills into one article: lifetime versus window readers and views, a daily chart, and its own traffic sources, countries, and devices. Aggregate and non-identifying only; never exposed publicly.
 - **Automation** — daily activity (text + optional image), a configurable author/language/model, Gemini drafts, a daily generation cap, and auto-publish after a 24-hour review window. See *Content automation* below.
 
 ### Content safety
@@ -186,6 +187,8 @@ The renderer is covered by unit tests for scripts, event handlers, unsafe URLs, 
 
 - Semantic landmarks, one `h1` per page, `<time datetime>`, breadcrumbs.
 - Unique titles/descriptions, canonical URLs, Open Graph and Twitter cards with image dimensions.
+- **Language** — each article carries its own `id`/`en` language (auto-detected from the body when unset). `<html lang>`, `og:locale`, `og:locale:alternate`, JSON-LD `inLanguage`, and RSS `<dc:language>` follow the content, so Indonesian and English can coexist. Navigation pages use the default site language set in Settings; the editorial desk is always English.
+- **Social images** — an article uses its own OG crop when one exists and otherwise gets a deterministic procedural card at `/og/:seed/:accentHex.jpg` (1200×630, immutable cache), so no page shares without an image.
 - JSON-LD: `WebSite` + `SearchAction`, `BlogPosting`, `BreadcrumbList`, `Person`, `CollectionPage`.
 - `sitemap.xml` (excludes drafts, scheduled, archived, and no-indexed articles), `robots.txt`, and RSS 2.0 with full `content:encoded` and absolute URLs.
 - Clean URLs; internal links between articles, sections, authors, and tags.
@@ -221,7 +224,8 @@ The suite uses an in-memory SQLite database seeded with fixtures. It covers:
 - newsletter subscribe/dedupe/honeypot/form redirects;
 - login, session cookies, role permissions, CSRF rejection, unauthenticated API access;
 - the full CMS pipeline: create → preview → publish → conflict → schedule → delete;
-- image upload validation, metadata patching, and deletion.
+- image upload validation, metadata patching, and deletion;
+- language detection, per-article `<html lang>`/`og:locale`, generated OG cards, code-block copy buttons, and per-article analytics.
 
 Manual QA shapes: 390 / 768 / 1024 / 1440 widths, both themes, keyboard-only navigation, editor and media library.
 
@@ -239,7 +243,7 @@ NODE_ENV=production bun run start
 
 Set a real `SESSION_SECRET` and `PUBLIC_ORIGIN`. Put Nginx/Caddy in front for TLS and compression. Serve `/assets/*` from `dist/client` with long-lived caching (the app already does), keep HTML uncached, and proxy WebSocket upgrades only if you add them.
 
-SQLite and uploads live under `data/`. Back up that directory. Run a single application instance (SQLite is single-writer and rate limits are in-memory).
+SQLite and uploads live under `data/`. Back up that directory. Rate limits and sessions live in the database, so they survive a restart and are shared across instances; SQLite itself is still single-writer.
 
 ### Vercel
 
@@ -321,8 +325,8 @@ Health check: `GET /api/health` returns `{ "ok": true }`.
 
 ## Limitations and next steps
 
-- **Email delivery** — newsletter addresses are stored, deduplicated, exportable, and unsubscribable, but no transactional provider is connected. A mail hook belongs in `subscribeEmail` / the admin subscribers view. The UI does not claim an email was sent.
-- **Single instance** — in-memory rate limiting assumes one server. On Vercel that limit is per function instance; move it to Redis or another shared store if you need a global limit. Filesystem storage is replaced by Turso + Vercel Blob there.
+- **Email delivery** — newsletters are sent through Resend: double opt-in, batch sending, a scheduled digest, one-click unsubscribe, and a signed webhook for delivery events. Without `RESEND_API_KEY` the app logs messages locally and records nothing as sent.
+- **Single instance** — rate limits, sessions, and analytics live in the database, so multiple instances share them. Filesystem storage is replaced by Turso + Vercel Blob on Vercel.
 - **Popularity** — “Most read” appears only after real views have been recorded; no seeded fake numbers.
 - **Slug changes** — editing a slug changes the public URL. A redirect-history table would be the next step for long-lived archives.
 - **Scheduled publishing** runs in-process; on Vercel it is handled by `/api/cron/automation` and the daily cron jobs.

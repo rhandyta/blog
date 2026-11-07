@@ -1,6 +1,8 @@
 import type { MediaInfo } from '../lib/content/doc'
 import type { SiteSettings } from '../lib/db/queries/taxonomy'
+import { ACCENTS } from '../lib/db/queries/taxonomy'
 import type { MediaAsset } from '../lib/db/schema'
+import { fallbackOgPath } from '../lib/media/og-fallback'
 import type { OgImage, PageHead } from '../lib/seo/meta'
 
 export function parseMediaVariants(value: string | null | undefined): {
@@ -47,14 +49,28 @@ export function baseHead(input: {
   section?: string | null
   tags?: string[]
   jsonLd?: unknown[]
+  lang?: string
+  locale?: string
 }): PageHead {
+  const noIndex = (input.robots ?? '').includes('noindex')
+  const ogImage =
+    input.ogImage ??
+    (noIndex
+      ? null
+      : {
+          url: fallbackOgPath(`${input.settings.title}${input.path}`, ACCENTS[0].hex),
+          width: 1200,
+          height: 630,
+          alt: input.settings.title,
+        })
+
   return {
     title: input.title,
     description: input.description,
     canonicalPath: input.path,
     robots: input.robots,
     ogType: input.ogType,
-    ogImage: input.ogImage ?? null,
+    ogImage,
     publishedTime: input.publishedTime ?? null,
     modifiedTime: input.modifiedTime ?? null,
     author: input.author ?? null,
@@ -63,6 +79,8 @@ export function baseHead(input: {
     jsonLd: input.jsonLd ?? [],
     siteName: input.settings.title,
     origin: input.origin,
+    lang: input.lang ?? input.settings.siteLanguage ?? 'en',
+    locale: input.locale ?? (input.settings.siteLanguage === 'id' ? 'id_ID' : 'en_US'),
   }
 }
 

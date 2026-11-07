@@ -92,6 +92,7 @@ export const articles = sqliteTable('articles', {
   canonicalUrl: text('canonical_url'),
   ogMediaId: text('og_media_id').references(() => media.id, { onDelete: 'set null' }),
   noIndex: integer('no_index', { mode: 'boolean' }).notNull().default(false),
+  language: text('language'),
   isDemo: integer('is_demo', { mode: 'boolean' }).notNull().default(false),
   publishedAt: text('published_at'),
   scheduledFor: text('scheduled_for'),

@@ -18,6 +18,8 @@ export type PageHead = {
   jsonLd?: unknown[]
   siteName: string
   origin: string
+  lang?: string
+  locale?: string
 }
 
 export function fullTitle(title: string, siteName: string): string {
@@ -41,6 +43,12 @@ export function renderHead(head: PageHead): string {
     `<meta property="og:description" content="${escapeAttr(head.description)}">`,
     `<meta property="og:type" content="${head.ogType ?? 'website'}">`,
     `<meta property="og:url" content="${escapeAttr(canonical)}">`,
+    ...(head.locale
+      ? [
+          `<meta property="og:locale" content="${escapeAttr(head.locale)}">`,
+          `<meta property="og:locale:alternate" content="${head.locale === 'id_ID' ? 'en_US' : 'id_ID'}">`,
+        ]
+      : []),
     `<meta name="twitter:card" content="${head.ogImage ? 'summary_large_image' : 'summary'}">`,
     `<meta name="twitter:title" content="${escapeAttr(head.title)}">`,
     `<meta name="twitter:description" content="${escapeAttr(head.description)}">`,
@@ -116,6 +124,7 @@ export function articleJsonLd(input: {
   wordCount?: number
   canonicalUrl?: string | null
   settings: SiteSettings
+  language?: string
 }): unknown {
   return {
     '@context': 'https://schema.org',
@@ -147,6 +156,7 @@ export function articleJsonLd(input: {
     ...(input.section ? { articleSection: input.section } : {}),
     ...(input.tags.length ? { keywords: input.tags.join(', ') } : {}),
     ...(input.wordCount ? { wordCount: input.wordCount } : {}),
+    ...(input.language ? { inLanguage: input.language } : {}),
   }
 }
 

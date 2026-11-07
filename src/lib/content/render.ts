@@ -169,7 +169,7 @@ function renderNode(node: PMNode, context: RenderContext): string {
       const language = typeof node.attrs?.language === 'string' ? node.attrs.language : undefined
       const code = node.content?.map((child) => child.text ?? '').join('') ?? ''
       const label = language ? `<span class="code-lang">${escapeHtml(language)}</span>` : ''
-      return `<div class="code-block">${label}<pre><code${language ? ` class="language-${escapeAttr(language)}"` : ''}>${highlightCode(code, language)}</code></pre></div>`
+      return `<div class="code-block">${label}<button class="code-copy" type="button" data-copy-code aria-label="Copy code to clipboard">Copy</button><pre><code${language ? ` class="language-${escapeAttr(language)}"` : ''}>${highlightCode(code, language)}</code></pre></div>`
     }
     case 'horizontalRule':
       return '<hr class="article-rule">'

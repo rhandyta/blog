@@ -27,8 +27,13 @@ export async function runMigrations(): Promise<void> {
     try {
       await exec(migration.sql)
     } catch (error) {
+      const message = String(error).toLowerCase()
       if (migration.name.includes('search')) {
         console.warn(`[db] full-text search unavailable — falling back to LIKE queries (${String(error)})`)
+      } else if (message.includes('duplicate column name')) {
+        // A previous run applied the ALTER TABLE but was interrupted before it
+        // could record the migration. The schema is already correct.
+        console.warn(`[db] ${migration.name} already applied; recording it`)
       } else {
         throw error
       }

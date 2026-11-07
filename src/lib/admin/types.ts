@@ -31,6 +31,7 @@ export type EditorArticleState = {
   seoDescription: string
   canonicalUrl: string
   noIndex: boolean
+  language: string
   publishedAt: string | null
   updatedAt: string | null
   scheduledFor: string | null

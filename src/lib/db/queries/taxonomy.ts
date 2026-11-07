@@ -38,6 +38,7 @@ export type SiteSettings = {
   x: string
   github: string
   linkedin: string
+  siteLanguage: 'id' | 'en'
 }
 
 export const defaultSettings: SiteSettings = {
@@ -59,6 +60,7 @@ export const defaultSettings: SiteSettings = {
   x: '',
   github: '',
   linkedin: '',
+  siteLanguage: 'en',
 }
 
 let cachedSettings: SiteSettings | null = null

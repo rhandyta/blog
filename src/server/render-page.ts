@@ -25,6 +25,7 @@ export function renderPageResponse(
     entry: options.entry ?? 'site',
     extraEntries: options.extraEntries,
     bodyClass: (options.entry ?? 'site').startsWith('admin') ? 'admin-body' : 'site-body',
+    lang: options.head.lang,
     noScripts: options.noScripts,
   })
   c.header('Content-Type', 'text/html; charset=utf-8')

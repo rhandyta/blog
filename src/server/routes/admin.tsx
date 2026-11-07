@@ -88,6 +88,7 @@ import {
   getBrowserBreakdown,
   getCountryBreakdown,
   getDailyAnalytics,
+  getArticleAnalytics,
   getDeviceBreakdown,
   getReferrerBreakdown,
   getTopArticles,
@@ -110,6 +111,7 @@ import { baseHead } from '../head'
 import { renderPageResponse } from '../render-page'
 import type { AppEnv } from '../types'
 import { AnalyticsPage } from '../../pages/admin/analytics'
+import { ArticleAnalyticsPage } from '../../pages/admin/article-analytics'
 import { AuditPage } from '../../pages/admin/audit'
 import { NewsletterPage } from '../../pages/admin/newsletter'
 import { ArticleEditorPage, MediaLibraryPage, articleToEditorState } from '../../pages/admin/editor-shell'
@@ -210,6 +212,8 @@ async function renderAdminPage(
       description: 'Private editorial tools.',
       path: c.req.path,
       robots: 'noindex, nofollow',
+      lang: 'en',
+      locale: 'en_US',
     }),
   })
 }
@@ -469,6 +473,24 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         countries={countries}
         devices={devices}
         browsers={browsers}
+      />,
+    )
+  })
+
+  app.get('/admin/analytics/:id', async (c) => {
+    const user = c.get('user')!
+    if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
+    const rawDays = Number(c.req.query('days') ?? '30')
+    const days = [7, 30, 90].includes(rawDays) ? rawDays : 30
+    const data = await getArticleAnalytics(c.req.param('id'), days)
+    if (!data) return c.notFound()
+    return renderAdminPage(
+      c,
+      <ArticleAnalyticsPage
+        user={user}
+        csrfToken={c.get('session')!.csrfToken}
+        data={data}
+        days={days}
       />,
     )
   })
@@ -737,6 +759,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         canonicalUrl: payload.canonicalUrl?.trim() || null,
         ogMediaId: payload.ogMediaId || null,
         noIndex: payload.noIndex ?? false,
+        language: payload.language ?? null,
         isDemo: false,
         publishedAt,
         scheduledFor,
@@ -1670,6 +1693,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
       x: text(body.x),
       github: text(body.github),
       linkedin: text(body.linkedin),
+      siteLanguage: text(body.siteLanguage) === 'id' ? 'id' : 'en',
     })
     if (!parsed.success) return c.redirect('/admin/settings?flash=error-fields', 303)
     await saveSiteSettings(parsed.data)

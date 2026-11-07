@@ -325,6 +325,24 @@ a:hover > .cover img, a.cover:hover img, .hero__media:hover .cover img, .pick:ho
   padding: 0.55rem 1rem;
   border-bottom: 1px solid #2c2820;
 }
+.code-copy {
+  position: absolute;
+  top: 0.42rem;
+  right: 0.55rem;
+  z-index: 2;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #b7ae9d;
+  background: rgba(27, 24, 19, 0.7);
+  border: 1px solid #3a352b;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  transition: color 160ms var(--ease), border-color 160ms var(--ease), background 160ms var(--ease);
+}
+.code-copy:hover, .code-copy:focus-visible { color: #f6f2e9; border-color: #8b8475; background: #2a251d; }
+.code-copy[data-copied='true'] { color: #a8c78f; border-color: #5f7a4d; }
 .article-body .code-block pre { margin: 0; padding: 1rem 1.15rem 1.25rem; overflow-x: auto; font-size: 0.84rem; line-height: 1.65; }
 .article-body .code-block code { background: none; border: 0; padding: 0; color: #e7e0d2; font-size: inherit; }
 .hljs-comment, .hljs-quote { color: #7d7466; font-style: italic; }

@@ -484,6 +484,7 @@ function ArticleEditor({ props }: { props: EditorProps }) {
   const [seoDescription, setSeoDescription] = useState(initial?.seoDescription ?? '')
   const [canonicalUrl, setCanonicalUrl] = useState(initial?.canonicalUrl ?? '')
   const [noIndex, setNoIndex] = useState(initial?.noIndex ?? false)
+  const [language, setLanguage] = useState(initial?.language ?? '')
   const [updatedAt, setUpdatedAt] = useState<string | null>(initial?.updatedAt ?? null)
   const [media, setMedia] = useState<AdminMediaSummary[]>(props.media)
   const [dirty, setDirty] = useState(false)
@@ -579,6 +580,7 @@ function ArticleEditor({ props }: { props: EditorProps }) {
       seoDescription: seoDescription.trim() || null,
       canonicalUrl: canonicalUrl.trim() || null,
       noIndex,
+      language: language === 'id' || language === 'en' ? language : null,
       tagIds,
       status: status === 'published' ? 'published' : 'draft',
       updatedAt,
@@ -586,7 +588,7 @@ function ArticleEditor({ props }: { props: EditorProps }) {
     [
       title, subtitle, excerpt, currentSlug, editor, categoryId, authorId, featuredMediaId, featuredCaption,
       ogMediaId, isFeatured, featuredRank, isEditorsPick, seoTitle, seoDescription, canonicalUrl, noIndex,
-      tagIds, status, updatedAt,
+      language, tagIds, status, updatedAt,
     ],
   )
 
@@ -1143,6 +1145,20 @@ function ArticleEditor({ props }: { props: EditorProps }) {
                   <button className="btn btn--ghost btn--small" type="button" onClick={() => { setOgMediaId(null); markDirty() }}>Use featured</button>
                 ) : null}
               </div>
+            </div>
+            <div className="field">
+              <label htmlFor="article-language">Language</label>
+              <select
+                className="select"
+                id="article-language"
+                value={language}
+                onChange={(event) => { setLanguage(event.target.value); markDirty() }}
+              >
+                <option value="">Auto-detect (Indonesian / English)</option>
+                <option value="id">Indonesian</option>
+                <option value="en">English</option>
+              </select>
+              <p className="hint">Sets the document language and og:locale for this article.</p>
             </div>
             <label className="checkbox">
               <input type="checkbox" checked={noIndex} onChange={(event) => { setNoIndex(event.target.checked); markDirty() }} />

@@ -96,6 +96,7 @@ export function articleToEditorState(input: {
     seoDescription: string | null
     canonicalUrl: string | null
     noIndex: boolean
+    language: string | null
     publishedAt: string | null
     updatedAt: string | null
     scheduledFor: string | null
@@ -123,6 +124,7 @@ export function articleToEditorState(input: {
     seoDescription: input.article.seoDescription ?? '',
     canonicalUrl: input.article.canonicalUrl ?? '',
     noIndex: input.article.noIndex,
+    language: input.article.language ?? '',
     publishedAt: input.article.publishedAt,
     updatedAt: input.article.updatedAt,
     scheduledFor: input.article.scheduledFor,
