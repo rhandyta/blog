@@ -134,6 +134,29 @@ describe('text utilities', () => {
     expect(makeExcerpt('short', 50)).toBe('short')
   })
 
+  test('keeps marked inline runs joined without stray spaces', () => {
+    // A mark (italic here) splits one sentence into several text nodes.
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'menghafal fungsi setiap ' },
+            { type: 'text', text: 'port', marks: [{ type: 'italic' }] },
+            { type: 'text', text: '. ' },
+            { type: 'text', text: 'Kini', marks: [{ type: 'bold' }] },
+            { type: 'text', text: ', manual fisik hampir hilang.' },
+          ],
+        },
+      ],
+    } as const
+    const text = docToText(doc as never)
+    expect(text).toContain('setiap port.')
+    expect(text).toContain('Kini,')
+    expect(text).not.toMatch(/\s+[.,;:!?]/)
+  })
+
   test('slugifies headings and escapes HTML', () => {
     expect(slugify('Héllo, Wörld!')).toBe('hello-world')
     expect(slugify('')).toBe('untitled')

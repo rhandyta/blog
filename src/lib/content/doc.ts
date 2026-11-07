@@ -43,14 +43,27 @@ export function isDoc(value: unknown): value is PMDoc {
   return maybe.type === 'doc' && (maybe.content === undefined || Array.isArray(maybe.content))
 }
 
+const BLOCK_CONTAINERS = new Set([
+  'doc',
+  'bulletList',
+  'orderedList',
+  'listItem',
+  'blockquote',
+  'table',
+  'tableRow',
+  'tableHeader',
+  'tableCell',
+])
+
 export function nodeText(node: PMNode | undefined): string {
   if (!node) return ''
   if (node.type === 'text') return node.text ?? ''
   if (node.type === 'hardBreak') return ' '
-  const inner = (node.content ?? []).map(nodeText).join(
-    node.type === 'paragraph' || node.type === 'heading' || node.type === 'listItem' ? ' ' : '',
-  )
-  return inner
+  // Inline content inside a paragraph or heading is split into separate nodes by
+  // marks (italic `port` followed by a plain `.`), so joining with a space would
+  // produce "port ." — blocks need a separator, inline runs must not.
+  const separator = BLOCK_CONTAINERS.has(node.type) ? ' ' : ''
+  return (node.content ?? []).map(nodeText).join(separator)
 }
 
 export function docToText(doc: PMDoc): string {
