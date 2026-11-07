@@ -69,6 +69,17 @@ describe('public pages', () => {
     expect(html).toContain('name="description"')
   })
 
+  test('meta descriptions are single-line and bounded', async () => {
+    for (const path of ['/', '/about', '/articles', '/archive', '/topics']) {
+      const html = await (await app.request(path)).text()
+      const description = /<meta name="description" content="([^"]*)">/.exec(html)?.[1]
+      expect({ path, present: Boolean(description) }).toEqual({ path, present: true })
+      // A raw newline inside the attribute breaks length checks and previews.
+      expect({ path, newline: /[\r\n]/.test(description!) }).toEqual({ path, newline: false })
+      expect(description!.length).toBeLessThanOrEqual(160)
+    }
+  })
+
   test('a custom canonical URL overrides the default canonical and og:url', async () => {
     await getDb()
       .update(articles)
@@ -159,6 +170,18 @@ describe('public pages', () => {
     const text = await response.text()
     expect(text).toContain('Sitemap: http://localhost:3000/sitemap.xml')
     expect(text).toContain('Disallow: /admin')
+  })
+
+  test('llms.txt summarises the publication for language models', async () => {
+    const response = await app.request('/llms.txt')
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('text/plain')
+    const text = await response.text()
+    expect(text.startsWith('# RhandytaVERSE')).toBe(true)
+    expect(text).toContain('http://localhost:3000/rss.xml')
+    expect(text).toContain('/articles/test-published')
+    // No-indexed articles must not be advertised to crawlers.
+    expect(text).not.toContain('/articles/test-noindex')
   })
 
   test('unknown routes return the styled 404 page', async () => {

@@ -232,7 +232,8 @@ async function parseBody(c: Context<AppEnv>): Promise<Record<string, unknown>> {
 }
 
 function text(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback
+  // Normalise line endings at the boundary so stored prose is always LF.
+  return typeof value === 'string' ? value.replace(/\r\n?/g, '\n') : fallback
 }
 
 function checkbox(value: unknown): boolean {

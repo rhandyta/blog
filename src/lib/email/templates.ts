@@ -1,4 +1,4 @@
-import { escapeHtml } from '../content/html'
+import { escapeHtml, splitParagraphs } from '../content/html'
 
 function shell(input: {
   siteTitle: string
@@ -44,9 +44,7 @@ function shell(input: {
 }
 
 function paragraphs(text: string): string {
-  return text
-    .trim()
-    .split(/\n{2,}/)
+  return splitParagraphs(text)
     .map((paragraph) => `<p style="margin:0 0 1em;">${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
     .join('')
 }

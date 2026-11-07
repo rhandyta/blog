@@ -39,6 +39,19 @@ export function stripTags(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * Splits prose into paragraphs. Stored text may use CRLF or even bare CR
+ * (Windows textareas post `\r\n`), so line endings are normalised first —
+ * splitting on `/\n{2,}/` alone merges paragraphs saved with CRLF.
+ */
+export function splitParagraphs(text: string): string[] {
+  return text
+    .replace(/\r\n?/g, '\n')
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
 export function absoluteUrl(origin: string, path: string): string {
   if (/^https?:\/\//i.test(path)) return path
   const base = origin.replace(/\/$/, '')

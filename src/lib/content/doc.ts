@@ -93,11 +93,18 @@ export function collectMediaIds(doc: PMDoc): string[] {
 }
 
 export function slugify(input: string): string {
-  return input
+  const maxLength = 90
+  const slug = input
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 90) || 'untitled'
+  if (slug.length <= maxLength) return slug || 'untitled'
+  // Truncate on a word boundary so slugs never end mid-word, then drop any
+  // dash left dangling by the cut.
+  const clipped = slug.slice(0, maxLength)
+  const boundary = clipped.lastIndexOf('-')
+  const trimmed = (boundary > 0 ? clipped.slice(0, boundary) : clipped).replace(/-+$/, '')
+  return trimmed || 'untitled'
 }

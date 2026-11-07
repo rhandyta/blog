@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { renderDoc } from '../src/lib/content/render'
 import { docToText, countWords, readingMinutes, makeExcerpt, slugify, parseDoc } from '../src/lib/content/doc'
 import { parseMarkdown } from '../src/lib/content/markdown'
-import { escapeHtml, safeUrl } from '../src/lib/content/html'
+import { escapeHtml, safeUrl, splitParagraphs } from '../src/lib/content/html'
 import { highlightParts, splitTerms, buildSnippet } from '../src/lib/db/queries/search'
 import type { MediaInfo } from '../src/lib/content/doc'
 
@@ -141,6 +141,29 @@ describe('text utilities', () => {
     expect(safeUrl('javascript:alert(1)')).toBeNull()
     expect(safeUrl('/articles/x')).toBe('/articles/x')
     expect(safeUrl('https://example.com')).toBe('https://example.com/')
+  })
+
+  test('truncates long slugs on a word boundary', () => {
+    const longTitle =
+      'Ruang Antara Tombol dan Pikiran: Mengapa Desain Antarmuka adalah Dialog yang Tak Pernah Usai'
+    const slug = slugify(longTitle)
+    expect(slug.length).toBeLessThanOrEqual(90)
+    expect(slug.endsWith('-')).toBe(false)
+    expect(slug.endsWith('usa')).toBe(false)
+    expect(slug.endsWith('pernah')).toBe(true)
+
+    const manyWords = slugify(Array.from({ length: 40 }, (_, index) => `w${index}`).join(' '))
+    expect(manyWords.length).toBeLessThanOrEqual(90)
+    expect(manyWords.endsWith('-')).toBe(false)
+  })
+
+  test('splits paragraphs regardless of line endings', () => {
+    expect(splitParagraphs('One.\n\nTwo.')).toEqual(['One.', 'Two.'])
+    // Windows textareas post CRLF, which `split(/\n{2,}/)` alone would merge.
+    expect(splitParagraphs('One.\r\n\r\nTwo.')).toEqual(['One.', 'Two.'])
+    expect(splitParagraphs('One.\r\rTwo.')).toEqual(['One.', 'Two.'])
+    expect(splitParagraphs('  \n\n One. \n\n ')).toEqual(['One.'])
+    expect(splitParagraphs('')).toEqual([])
   })
 
   test('parses the seed markdown dialect', () => {

@@ -1,5 +1,6 @@
 import type { CategoryWithCount, SiteSettings } from '../../lib/db/queries/taxonomy'
 import type { Author } from '../../lib/db/schema'
+import { splitParagraphs } from '../../lib/content/html'
 import { SiteLayout } from '../../components/layout'
 import { Kicker } from '../../components/ui'
 
@@ -14,7 +15,7 @@ export function AboutPage({
   articleCount: number
   author: Author | null
 }) {
-  const paragraphs = settings.about.split(/\n{2,}/).filter(Boolean)
+  const paragraphs = splitParagraphs(settings.about)
   const personName = author?.displayName ?? 'Rhandyta Briantama'
   const personSlug = author?.slug ?? 'rhandyta-briantama'
   return (

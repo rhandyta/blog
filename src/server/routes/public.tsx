@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Hono } from 'hono'
 import { getConnInfo } from 'hono/bun'
 import { getConfig, isProd } from '../../lib/config'
-import { absoluteUrl } from '../../lib/content/html'
+import { absoluteUrl, splitParagraphs } from '../../lib/content/html'
 import { collectMediaIds, countWords, parseDoc } from '../../lib/content/doc'
 import { articleLanguage, ogLocale } from '../../lib/content/language'
 import { renderDoc } from '../../lib/content/render'
@@ -212,7 +212,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: page > 1 ? `Articles — page ${page}` : 'Articles',
+        title: page > 1 ? `Articles — page ${page}` : 'All articles and essays — RhandytaVERSE',
         description: 'Every essay and note in RhandytaVERSE, newest first.',
         path: page > 1 ? `/articles?page=${page}` : '/articles',
         ogImage: items[0]?.media ? ogFromMedia(items[0].media) : null,
@@ -437,7 +437,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Topics',
+        title: 'Topics and sections — RhandytaVERSE',
         description: 'Every section of the publication, with its own accent and archive.',
         path: '/topics',
         jsonLd: [
@@ -545,7 +545,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Archive',
+        title: 'Complete archive — RhandytaVERSE',
         description: 'A complete chronological archive of the publication.',
         path: '/archive',
         jsonLd: [
@@ -621,8 +621,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'About',
-        description: settings.about.split(/\n{2,}/)[0] ?? settings.description,
+        title: 'About Rhandyta Briantama and RhandytaVERSE',
+        description: splitParagraphs(settings.about)[0] ?? settings.description,
         path: '/about',
         jsonLd: [
           personJsonLd({
@@ -691,7 +691,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: 'Subscribe',
+        title: 'Subscribe to the letter — RhandytaVERSE',
         description: settings.newsletterBlurb,
         path: '/subscribe',
       }),
@@ -866,6 +866,51 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
     c.header('Content-Type', 'application/xml; charset=utf-8')
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
     return c.body(renderSitemap(entries))
+  })
+
+  app.get('/llms.txt', async (c) => {
+    const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
+    const settings = await getSiteSettings()
+    const [cards, authors] = await Promise.all([listPublished({ limit: 200 }), listAuthors({ withCounts: true })])
+    const author = authors[0]
+    const lines = [
+      `# ${settings.title}`,
+      '',
+      `> ${settings.description}`,
+      '',
+      `${settings.title} is the personal publication of ${author?.displayName ?? 'Rhandyta Briantama'}.`,
+      'Essays are written in Indonesian and English; each article states its own language.',
+      'All pages are server-rendered and readable without JavaScript.',
+      '',
+      '## Contact',
+      '',
+      `- Author: ${author?.displayName ?? 'Rhandyta Briantama'} (${origin}/author/${author?.slug ?? 'rhandyta-briantama'})`,
+      settings.email ? `- Email: ${settings.email}` : null,
+      '',
+      '## Main pages',
+      '',
+      `- Home: ${origin}/`,
+      `- All articles: ${origin}/articles`,
+      `- Topics: ${origin}/topics`,
+      `- Archive: ${origin}/archive`,
+      `- About: ${origin}/about`,
+      `- RSS: ${origin}/rss.xml`,
+      `- Sitemap: ${origin}/sitemap.xml`,
+      '',
+      '## Articles',
+      '',
+      ...cards
+        .filter((card) => !card.noIndex)
+        .map((card) => `- [${card.title}](${origin}/articles/${card.slug}): ${card.excerpt}`),
+      '',
+      '## Usage',
+      '',
+      'Quoting and summarising these articles is welcome with attribution and a link to the source.',
+      'Prices, dates, and third-party facts should be verified against the linked primary sources.',
+    ].filter((line): line is string => line !== null)
+    c.header('Content-Type', 'text/plain; charset=utf-8')
+    c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+    return c.body(`${lines.join('\n')}\n`)
   })
 
   app.get('/robots.txt', (c) => {

@@ -1,6 +1,6 @@
 import type { ArticleCard } from '../../lib/db/queries/articles'
 import type { CategoryWithCount, SiteSettings } from '../../lib/db/queries/taxonomy'
-import { formatDate } from '../../lib/content/html'
+import { formatDate, splitParagraphs } from '../../lib/content/html'
 import { NewsletterBand, SiteLayout } from '../../components/layout'
 import {
   ArticleRow,
@@ -212,14 +212,11 @@ export function HomePage({
               </h2>
             </div>
             <div>
-              {settings.about
-                .split(/\n{2,}/)
-                .filter(Boolean)
-                .map((paragraph, index) => (
-                  <p key={index} style={index > 0 ? { marginTop: '1rem' } : undefined}>
-                    {paragraph}
-                  </p>
-                ))}
+              {splitParagraphs(settings.about).map((paragraph, index) => (
+                <p key={index} style={index > 0 ? { marginTop: '1rem' } : undefined}>
+                  {paragraph}
+                </p>
+              ))}
               <p style={{ marginTop: '1.25rem' }}>
                 <a className="text-link" href="/about">More about Rhandyta Briantama →</a>
               </p>

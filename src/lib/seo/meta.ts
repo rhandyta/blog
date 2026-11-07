@@ -27,20 +27,37 @@ export function fullTitle(title: string, siteName: string): string {
   return title.includes(siteName) ? title : `${title} — ${siteName}`
 }
 
+const DESCRIPTION_LIMIT = 158
+
+/**
+ * Meta descriptions live inside an attribute, so raw newlines and runs of
+ * whitespace must be collapsed before escaping. Long text is clipped on a word
+ * boundary to stay within what search engines display.
+ */
+export function metaDescription(input: string): string {
+  const flat = input.replace(/\s+/g, ' ').trim()
+  if (flat.length <= DESCRIPTION_LIMIT) return flat
+  const clipped = flat.slice(0, DESCRIPTION_LIMIT)
+  const boundary = clipped.lastIndexOf(' ')
+  const base = (boundary > 0 ? clipped.slice(0, boundary) : clipped).replace(/[,;:\-–—]+$/, '')
+  return `${base}…`
+}
+
 export function renderHead(head: PageHead): string {
   const origin = head.origin.replace(/\/$/, '')
   const title = fullTitle(head.title, head.siteName)
   const canonical = absoluteUrl(origin, head.canonicalPath)
+  const description = metaDescription(head.description)
   const tags: string[] = [
     `<title>${escapeHtml(title)}</title>`,
-    `<meta name="description" content="${escapeAttr(head.description)}">`,
+    `<meta name="description" content="${escapeAttr(description)}">`,
     `<meta name="author" content="Rhandyta Briantama">`,
     `<link rel="author" href="${escapeAttr(absoluteUrl(origin, '/author/rhandyta-briantama'))}">`,
     `<link rel="canonical" href="${escapeAttr(canonical)}">`,
     `<meta name="robots" content="${escapeAttr(head.robots ?? 'index, follow, max-image-preview:large')}">`,
     `<meta property="og:site_name" content="${escapeAttr(head.siteName)}">`,
     `<meta property="og:title" content="${escapeAttr(head.title)}">`,
-    `<meta property="og:description" content="${escapeAttr(head.description)}">`,
+    `<meta property="og:description" content="${escapeAttr(description)}">`,
     `<meta property="og:type" content="${head.ogType ?? 'website'}">`,
     `<meta property="og:url" content="${escapeAttr(canonical)}">`,
     ...(head.locale
@@ -51,7 +68,7 @@ export function renderHead(head: PageHead): string {
       : []),
     `<meta name="twitter:card" content="${head.ogImage ? 'summary_large_image' : 'summary'}">`,
     `<meta name="twitter:title" content="${escapeAttr(head.title)}">`,
-    `<meta name="twitter:description" content="${escapeAttr(head.description)}">`,
+    `<meta name="twitter:description" content="${escapeAttr(description)}">`,
   ]
 
   if (head.ogImage) {
