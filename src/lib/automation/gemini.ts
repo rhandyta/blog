@@ -154,6 +154,7 @@ Editorial requirements:
 - 800–1000 words, specific and observant, first person where it feels natural.
 - Begin with a concrete detail or scene, not a definition or a summary.
 - Use Markdown: short paragraphs, several "## " section headings, occasional lists or blockquotes. Do not include a top-level title heading, images, external links, or HTML.
+- The title must be 45–60 characters so it fits search results without being truncated. Prefer a concrete, specific phrase over a colon-stacked subtitle. Never exceed 60 characters.
 - No clickbait, no motivational clichés, no bullet-point-only essays, no mention of AI, prompts, automation, or this instruction. Avoid repetitive title formulas and starting every title with the same word.
 - Do not invent personal facts that are not supported by the activity note or image. If the material is thin, stay reflective and general rather than fabricating specifics.
 - The "tags" array must contain only slugs copied exactly from the available tags list above, untranslated. If none fit, return an empty array.
@@ -161,13 +162,13 @@ Editorial requirements:
 
 Return ONLY a JSON object with these keys:
 {
-  "title": "headline, max 120 characters",
+  "title": "headline, 45-60 characters, never longer than 60",
   "subtitle": "one sentence or null",
   "excerpt": "one or two sentences for listings, max 300 characters",
   "body": "Markdown essay body",
   "category": "one section slug from the list",
   "tags": ["tag-slug"],
-  "seoDescription": "search description, max 160 characters"
+  "seoDescription": "search description, 120-155 characters, no line breaks"
 }`
 }
 

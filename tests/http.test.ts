@@ -69,6 +69,27 @@ describe('public pages', () => {
     expect(html).toContain('name="description"')
   })
 
+  test('long article headlines drop the site suffix instead of overflowing', async () => {
+    const short = await (await app.request('/articles/test-published')).text()
+    expect(short).toContain('<title>The Published Test Article — RhandytaVERSE</title>')
+
+    await getDb()
+      .update(articles)
+      .set({ title: 'A Very Long Headline That Already Fills The Space Available In Search Results' })
+      .where(eq(articles.id, 'art_test_published'))
+    try {
+      const long = await (await app.request('/articles/test-published')).text()
+      const title = /<title>(.*?)<\/title>/.exec(long)?.[1] ?? ''
+      expect(title.endsWith('— RhandytaVERSE')).toBe(false)
+      expect(title).toBe('A Very Long Headline That Already Fills The Space Available In Search Results')
+    } finally {
+      await getDb()
+        .update(articles)
+        .set({ title: 'The Published Test Article' })
+        .where(eq(articles.id, 'art_test_published'))
+    }
+  })
+
   test('meta descriptions are single-line and bounded', async () => {
     for (const path of ['/', '/about', '/articles', '/archive', '/topics']) {
       const html = await (await app.request(path)).text()

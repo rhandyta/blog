@@ -22,9 +22,16 @@ export type PageHead = {
   locale?: string
 }
 
+const TITLE_LIMIT = 60
+
 export function fullTitle(title: string, siteName: string): string {
   if (!title) return siteName
-  return title.includes(siteName) ? title : `${title} — ${siteName}`
+  if (title.includes(siteName)) return title
+  const combined = `${title} — ${siteName}`
+  // Search results truncate around 60 characters. Appending the publication name
+  // to an already-long headline pushes it past that, so the suffix is dropped
+  // when it would crowd the headline out.
+  return combined.length <= TITLE_LIMIT ? combined : title
 }
 
 const DESCRIPTION_LIMIT = 158
