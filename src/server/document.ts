@@ -48,6 +48,7 @@ export function renderDocument(options: DocumentOptions): string {
     <link rel="preload" href="/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
     <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-NSRP398Z"></script>
+    <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-TW77C5JM"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
