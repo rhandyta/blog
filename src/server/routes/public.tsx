@@ -48,6 +48,7 @@ import { fallbackOgPath, parseOgParams, renderFallbackOg } from '../../lib/media
 import { recordNewsletterEvent } from '../../lib/db/queries/newsletter-events'
 import { pruneAuditLog } from '../../lib/db/queries/audit'
 import { pruneAnalytics } from '../../lib/db/queries/analytics'
+import { checkDatabaseHealth, pruneOpsEvents, recordOpsEvent } from '../../lib/ops/monitor'
 import { buildVisitContext } from '../../lib/analytics/visitor'
 import { searchPublished } from '../../lib/db/queries/search'
 import { pruneRateLimits, rateLimit } from '../../lib/auth/rate-limit'
@@ -817,10 +818,19 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       secret,
     })
     if (!valid) return c.json({ error: 'Invalid signature.' }, 401)
-    let event: unknown
+    let event: { type?: string }
     try {
-      event = JSON.parse(payload)
+      event = JSON.parse(payload) as { type?: string }
     } catch {
+      await recordOpsEvent({
+        level: 'warn',
+        source: 'webhook.resend',
+        code: 'invalid_payload',
+        message: 'Verified Resend webhook contained invalid JSON',
+        requestId: c.get('requestId'),
+        path: c.req.path,
+        notify: false,
+      })
       return c.json({ error: 'Invalid payload.' }, 400)
     }
     const id = c.req.header('svix-id') ?? crypto.randomUUID()
@@ -828,9 +838,29 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       id,
       event: event as Parameters<typeof recordNewsletterEvent>[0]['event'],
       payload,
-    }).catch((error) => {
-      console.error('[newsletter] webhook processing failed', error)
+    }).catch(async (error) => {
+      await recordOpsEvent({
+        level: 'error',
+        source: 'webhook.resend',
+        code: 'webhook_persist_failed',
+        message: error instanceof Error ? error.message : String(error),
+        detail: { eventId: id, type: event.type ?? null },
+        requestId: c.get('requestId'),
+        path: c.req.path,
+      })
     })
+    if (event.type === 'email.bounced' || event.type === 'email.complained') {
+      await recordOpsEvent({
+        level: 'warn',
+        source: 'webhook.resend',
+        code: event.type,
+        message: `Resend reported ${event.type}`,
+        detail: { eventId: id },
+        requestId: c.get('requestId'),
+        path: c.req.path,
+        notify: false,
+      })
+    }
     return c.json({ ok: true })
   })
 
@@ -984,7 +1014,23 @@ Sitemap: ${origin}/sitemap.xml
 
   /* ---------------------------- public API ---------------------------- */
 
-  app.get('/api/health', (c) => c.json({ ok: true, at: new Date().toISOString() }))
+  app.get('/api/health', async (c) => {
+    const db = await checkDatabaseHealth()
+    c.header('Cache-Control', 'no-store')
+    if (!db.ok) {
+      await recordOpsEvent({
+        level: 'error',
+        source: 'health',
+        code: 'db_unhealthy',
+        message: 'Health check database ping failed',
+        detail: { mode: db.mode, latencyMs: db.latencyMs },
+        requestId: c.get('requestId'),
+        path: c.req.path,
+      })
+      return c.json({ ok: false, db: 'error', mode: db.mode, at: new Date().toISOString() }, 503)
+    }
+    return c.json({ ok: true, db: 'ok', mode: db.mode, latencyMs: db.latencyMs, at: new Date().toISOString() })
+  })
 
   app.get('/api/cron/publish', async (c) => {
     const secret = getConfig().CRON_SECRET
@@ -995,9 +1041,33 @@ Sitemap: ${origin}/sitemap.xml
     } else if (isProd()) {
       return c.json({ error: 'CRON_SECRET is not configured' }, 403)
     }
-    const published = await publishDueArticles()
-    await pruneAnalytics().catch(() => undefined)
-    return c.json({ published })
+    try {
+      const published = await publishDueArticles()
+      await pruneAnalytics().catch(() => undefined)
+      await pruneOpsEvents().catch(() => undefined)
+      await recordOpsEvent({
+        level: 'info',
+        source: 'cron.publish',
+        code: 'cron_completed',
+        message: `Scheduled publish completed (${published} published)`,
+        detail: { published },
+        requestId: c.get('requestId'),
+        path: c.req.path,
+        notify: false,
+      })
+      return c.json({ published })
+    } catch (error) {
+      await recordOpsEvent({
+        level: 'error',
+        source: 'cron.publish',
+        code: 'cron_crashed',
+        message: error instanceof Error ? error.message : String(error),
+        detail: error instanceof Error ? (error.stack ?? error.message) : String(error),
+        requestId: c.get('requestId'),
+        path: c.req.path,
+      })
+      return c.json({ ok: false, error: 'Publish cron failed' }, 500)
+    }
   })
 
   app.get('/api/cron/automation', async (c) => {
@@ -1010,16 +1080,73 @@ Sitemap: ${origin}/sitemap.xml
       return c.json({ error: 'CRON_SECRET is not configured' }, 403)
     }
 
-    const scheduled = await publishDueArticles()
-    const result = await runAutomationCron()
-    const digest = await runScheduledNewsletter().catch((error) => {
-      console.error('[newsletter] scheduled digest failed', error)
-      return { status: 'error' as const, reason: 'failed' as const }
-    })
-    await pruneAnalytics().catch(() => undefined)
-    await pruneRateLimits()
-    await pruneAuditLog()
-    return c.json({ scheduled, ...result, digest })
+    try {
+      const scheduled = await publishDueArticles()
+      const result = await runAutomationCron()
+      let digestError: string | null = null
+      const digest = await runScheduledNewsletter().catch((error) => {
+        digestError = error instanceof Error ? error.message : String(error)
+        return { status: 'error' as const, reason: 'failed' as const }
+      })
+      await pruneAnalytics().catch(() => undefined)
+      await pruneRateLimits()
+      await pruneAuditLog()
+      await pruneOpsEvents().catch(() => undefined)
+
+      if (result.generated.errors.length > 0) {
+        await recordOpsEvent({
+          level: 'error',
+          source: 'cron.automation',
+          code: 'generation_failed',
+          message: result.generated.errors[0] ?? 'Automation generation reported an error',
+          detail: { errors: result.generated.errors, scheduled, generated: result.generated.generated.length },
+          requestId: c.get('requestId'),
+          path: c.req.path,
+        })
+      }
+      if (digestError || digest.status === 'error') {
+        const digestReason = 'reason' in digest && digest.reason ? digest.reason : 'unknown'
+        await recordOpsEvent({
+          level: 'error',
+          source: 'cron.automation',
+          code: 'digest_failed',
+          message: digestError ?? `Scheduled newsletter digest failed (${digestReason})`,
+          detail: { scheduled, digest },
+          requestId: c.get('requestId'),
+          path: c.req.path,
+        })
+      }
+      if (result.generated.errors.length === 0 && !digestError && digest.status !== 'error') {
+        await recordOpsEvent({
+          level: 'info',
+          source: 'cron.automation',
+          code: 'cron_completed',
+          message: `Automation cron ran (${result.generated.generated.length} generated, ${result.published + scheduled} published)`,
+          detail: {
+            scheduled,
+            autoPublished: result.published,
+            generated: result.generated.generated.length,
+            reason: result.generated.reason,
+            digest: digest.status,
+          },
+          requestId: c.get('requestId'),
+          path: c.req.path,
+          notify: false,
+        })
+      }
+      return c.json({ scheduled, ...result, digest })
+    } catch (error) {
+      await recordOpsEvent({
+        level: 'error',
+        source: 'cron.automation',
+        code: 'cron_crashed',
+        message: error instanceof Error ? error.message : String(error),
+        detail: error instanceof Error ? (error.stack ?? error.message) : String(error),
+        requestId: c.get('requestId'),
+        path: c.req.path,
+      })
+      return c.json({ ok: false, error: 'Automation cron failed' }, 500)
+    }
   })
 
   app.get('/api/search', async (c) => {

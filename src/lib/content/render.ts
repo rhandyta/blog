@@ -18,8 +18,9 @@ function hastToHtml(node: HastNode): string {
   if (node.type === 'root') return (node.children ?? []).map(hastToHtml).join('')
   if (node.type !== 'element') return ''
   const tag = node.tagName === 'span' ? 'span' : 'span'
-  const className = Array.isArray(node.properties?.className)
-    ? (node.properties?.className as unknown[]).filter((name): name is string => typeof name === 'string')
+  const rawClassName = node.properties?.className
+  const className = Array.isArray(rawClassName)
+    ? rawClassName.filter((name): name is string => typeof name === 'string')
     : []
   const classAttr = className.length ? ` class="${escapeAttr(className.join(' '))}"` : ''
   return `<${tag}${classAttr}>${(node.children ?? []).map(hastToHtml).join('')}</${tag}>`

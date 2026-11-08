@@ -287,7 +287,7 @@ export function ShareLinks({ url, title }: { url: string; title: string }) {
   const encodedUrl = encodeURIComponent(url)
   const encodedTitle = encodeURIComponent(title)
   return (
-    <div className="rail-actions" aria-label={ui.article.share}>
+    <div className="rail-actions" role="group" aria-label={ui.article.share}>
       <button
         className="rail-action"
         type="button"

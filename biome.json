@@ -1,0 +1,68 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.6/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["src/**", "scripts/**", "tests/**", "e2e/**", "public/**/*.js", "server.ts", "vite.config.ts"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "semicolons": "asNeeded",
+      "trailingCommas": "all"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "a11y": {
+        "noAutofocus": "warn",
+        "noStaticElementInteractions": "warn",
+        "useAnchorContent": "warn",
+        "useKeyWithClickEvents": "warn",
+        "useSemanticElements": "warn"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "warn"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["public/**/*.js"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noArguments": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/pages/admin/editor-shell.tsx", "src/pages/public/article.tsx"],
+      "linter": {
+        "rules": {
+          "security": {
+            "noDangerouslySetInnerHtml": "off"
+          }
+        }
+      }
+    }
+  ]
+}

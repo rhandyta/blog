@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import type { Hono } from 'hono'
 import { getConnInfo } from 'hono/bun'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
-import { getConfig, isProd } from '../../lib/config'
+import { getConfig, isBlobStorage, isProd } from '../../lib/config'
 import { collectMediaIds, docToText, isDoc, makeExcerpt, parseDoc, readingMinutes, slugify } from '../../lib/content/doc'
 import { createPreviewToken } from '../../lib/seo/preview-token'
 import {
@@ -75,6 +75,7 @@ import {
   countMedia,
   deleteMedia,
   getMediaById,
+  getMediaMap,
   getMediaReferences,
   listMedia,
   mediaUsage,
@@ -139,6 +140,15 @@ import {
 import { generateAutomationDraft, generationWindowStart } from '../../lib/automation/generate'
 import { hasGeminiKey } from '../../lib/automation/gemini'
 import { hasImageGenerationKey } from '../../lib/automation/image'
+import { articleToMarkdownFile, buildContentBackup, buildMarkdownArchive } from '../../lib/ops/export'
+import {
+  checkDatabaseHealth,
+  getLatestCronHeartbeat,
+  listOpsEvents,
+  pruneOpsEvents,
+  sendTestAlert,
+  type OpsLevel,
+} from '../../lib/ops/monitor'
 import { AdminNavStatsProvider, type AdminNavStats } from '../../components/layout'
 import { baseHead } from '../head'
 import { renderPageResponse } from '../render-page'
@@ -152,6 +162,7 @@ import { AutomationPage } from '../../pages/admin/automation'
 import { ArticleListPage, DashboardPage, RevisionsPage } from '../../pages/admin/dashboard'
 import { LoginPage } from '../../pages/admin/login'
 import { SettingsPage, SubscribersPage } from '../../pages/admin/settings'
+import { SystemPage } from '../../pages/admin/system'
 import { AuthorsPage, AuthorEditPage, CategoryEditPage, CategoriesPage, TagEditPage, TagsPage } from '../../pages/admin/taxonomy'
 import { AccountPage, UserEditPage, UsersPage } from '../../pages/admin/users'
 import type { Flash } from '../../pages/admin/shared'
@@ -220,6 +231,10 @@ const FLASH_MESSAGES: Record<string, Flash> = {
   'error-self-lockout': { tone: 'error', message: 'You cannot disable or demote your own administrator account.' },
   'error-last-admin': { tone: 'error', message: 'At least one active administrator must remain.' },
   'error-author-taken': { tone: 'error', message: 'That author profile is already linked to another user.' },
+  'alert-test-sent': { tone: 'success', message: 'Test alert delivered.' },
+  'alert-test-not-configured': { tone: 'error', message: 'Configure OPS_ALERT_WEBHOOK_URL or OPS_ALERT_EMAIL first.' },
+  'alert-test-error': { tone: 'error', message: 'Test alert delivery failed. Check the operational events table.' },
+  'events-pruned': { tone: 'success', message: 'Old operational events pruned.' },
 }
 
 function flashFrom(c: Context<AppEnv>): Flash {
@@ -736,6 +751,34 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
       `/admin/articles/${article.id}/revisions?flash=${restored ? 'restored' : 'error'}`,
       303,
     )
+  })
+
+  app.get('/admin/articles/:id/export.md', async (c) => {
+    const user = c.get('user')!
+    const article = await getArticleById(c.req.param('id'))
+    if (!article) return c.notFound()
+    const ownAuthor = await getAuthorForUser(user.id)
+    if (!canEditArticle(user, article, ownAuthor?.id)) {
+      return c.text('Forbidden', 403)
+    }
+    const [author, category, articleTags, mediaMap] = await Promise.all([
+      getAuthorById(article.authorId),
+      article.categoryId ? getCategoryById(article.categoryId) : Promise.resolve(undefined),
+      getArticleTags(article.id),
+      getMediaMap(collectMediaIds(parseDoc(article.bodyJson))),
+    ])
+    const markdown = articleToMarkdownFile({
+      article,
+      authorName: author?.displayName ?? null,
+      categoryName: category?.name ?? null,
+      tags: articleTags.map((tag) => tag.name),
+      mediaMap,
+    })
+    const safeFilename = (article.slug.replace(/[^a-z0-9-_]/gi, '-').replace(/^-+|-+$/g, '') || article.id) + '.md'
+    c.header('Content-Type', 'text/markdown; charset=utf-8')
+    c.header('Content-Disposition', `attachment; filename="${safeFilename}"`)
+    c.header('Cache-Control', 'private, no-store')
+    return c.body(markdown)
   })
 
   /* ------------------------------------------------------------------ *
@@ -1746,6 +1789,107 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         csrfToken={c.get('session')!.csrfToken}
       />,
     )
+  })
+
+  app.get('/admin/system', async (c) => {
+    const user = c.get('user')!
+    if (!isAdmin(user)) return c.redirect('/admin?flash=error', 303)
+    const page = pageParam(c.req.query('page'))
+    const levelRaw = c.req.query('level') ?? 'all'
+    const level: OpsLevel | 'all' =
+      levelRaw === 'error' || levelRaw === 'warn' || levelRaw === 'info' ? levelRaw : 'all'
+    const config = getConfig()
+    const [db, latestCron, events] = await Promise.all([
+      checkDatabaseHealth(),
+      getLatestCronHeartbeat(),
+      listOpsEvents({ limit: 40, offset: (page - 1) * 40, level }),
+    ])
+    const totalPages = Math.max(1, Math.ceil(events.total / 40))
+    return renderAdminPage(
+      c,
+      <SystemPage
+        user={user}
+        status={{
+          db,
+          storage: isBlobStorage() ? 'blob' : 'local',
+          emailConfigured: emailConfigured(),
+          webhookConfigured: Boolean(config.RESEND_WEBHOOK_SECRET),
+          geminiConfigured: hasGeminiKey(),
+          cloudflareConfigured: hasImageGenerationKey('cloudflare'),
+          cronSecretConfigured: Boolean(config.CRON_SECRET),
+          alertWebhookConfigured: Boolean(config.OPS_ALERT_WEBHOOK_URL),
+          alertEmailConfigured: Boolean(config.OPS_ALERT_EMAIL && emailConfigured()),
+        }}
+        latestCron={latestCron}
+        events={events.items}
+        summary={events.summary}
+        page={page}
+        totalPages={totalPages}
+        level={level}
+        session={c.get('session')!}
+        flash={flashFrom(c)}
+      />,
+    )
+  })
+
+  app.get('/admin/system/backup.json', async (c) => {
+    const user = c.get('user')!
+    if (!isAdmin(user)) return c.text('Forbidden', 403)
+    const backup = await buildContentBackup()
+    await recordAudit({
+      actorId: user.id,
+      action: 'export.json_backup',
+      detail: 'Downloaded full JSON content backup',
+      ipHash: hashVisitor(clientIp(c), 'audit'),
+    }).catch(() => undefined)
+    const stamp = new Date().toISOString().slice(0, 10)
+    c.header('Content-Type', 'application/json; charset=utf-8')
+    c.header('Content-Disposition', `attachment; filename="rhandytaverse-backup-${stamp}.json"`)
+    c.header('Cache-Control', 'private, no-store')
+    return c.body(JSON.stringify(backup, null, 2))
+  })
+
+  app.get('/admin/system/articles.zip', async (c) => {
+    const user = c.get('user')!
+    if (!isAdmin(user)) return c.text('Forbidden', 403)
+    const archive = await buildMarkdownArchive()
+    await recordAudit({
+      actorId: user.id,
+      action: 'export.markdown_zip',
+      detail: 'Downloaded Markdown archive ZIP',
+      ipHash: hashVisitor(clientIp(c), 'audit'),
+    }).catch(() => undefined)
+    const stamp = new Date().toISOString().slice(0, 10)
+    c.header('Content-Type', 'application/zip')
+    c.header('Content-Disposition', `attachment; filename="rhandytaverse-articles-${stamp}.zip"`)
+    c.header('Cache-Control', 'private, no-store')
+    return c.body(new Uint8Array(archive))
+  })
+
+  app.post('/admin/system/test-alert', async (c) => {
+    const user = c.get('user')!
+    if (!isAdmin(user)) return c.redirect('/admin?flash=error', 303)
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/system?flash=error-csrf', 303)
+    const result = await sendTestAlert(user.email)
+    const code =
+      result.status === 'sent'
+        ? 'alert-test-sent'
+        : result.status === 'not-configured'
+          ? 'alert-test-not-configured'
+          : 'alert-test-error'
+    return c.redirect(`/admin/system?flash=${code}`, 303)
+  })
+
+  app.post('/admin/system/prune-events', async (c) => {
+    const user = c.get('user')!
+    if (!isAdmin(user)) return c.redirect('/admin?flash=error', 303)
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/system?flash=error-csrf', 303)
+    await pruneOpsEvents(30)
+    return c.redirect('/admin/system?flash=events-pruned', 303)
   })
 
   app.get('/admin/settings', async (c) => {

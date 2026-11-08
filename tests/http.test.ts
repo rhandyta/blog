@@ -425,6 +425,7 @@ describe('authentication and authorization', () => {
       '/admin/subscribers',
       '/admin/newsletter',
       '/admin/settings',
+      '/admin/system',
       '/admin/account',
       '/admin/users',
       '/admin/audit',

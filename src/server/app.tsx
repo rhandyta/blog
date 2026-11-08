@@ -7,6 +7,7 @@ import { getSessionUser, SESSION_COOKIE } from '../lib/auth/session'
 import { getSiteSettings } from '../lib/db/queries/taxonomy'
 import { defaultSettings } from '../lib/db/queries/taxonomy'
 import { listCategories } from '../lib/db/queries/taxonomy'
+import { recordOpsEvent } from '../lib/ops/monitor'
 import { NotFoundPage } from '../pages/public/search'
 import { registerAdminRoutes } from './routes/admin'
 import { registerPublicRoutes } from './routes/public'
@@ -237,7 +238,17 @@ export function createApp(): Hono<AppEnv> {
 
   app.onError(async (error, c) => {
     const requestId = c.get('requestId')
-    console.error(`[error] ${requestId} ${c.req.method} ${c.req.path}`, error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorDetail = error instanceof Error ? (error.stack ?? error.name) : String(error)
+    await recordOpsEvent({
+      level: 'error',
+      source: 'http',
+      code: 'unhandled_error',
+      message: errorMessage || 'Unhandled server error',
+      detail: errorDetail,
+      requestId,
+      path: c.req.path,
+    })
     if (c.req.path.startsWith('/api/')) {
       return c.json({ error: 'Internal server error', requestId }, 500)
     }

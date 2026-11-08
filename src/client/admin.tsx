@@ -931,7 +931,7 @@ function ArticleEditor({ props }: { props: EditorProps }) {
           <section className="editor-side__section">
             <h2>Publishing</h2>
             <div className="field">
-              <label>Status</label>
+              <span className="label">Status</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <StatusBadge status={status} />
                 <span className="meta">
@@ -1133,7 +1133,7 @@ function ArticleEditor({ props }: { props: EditorProps }) {
               />
             </div>
             <div className="field">
-              <label>Social image</label>
+              <span className="label">Social image</span>
               <div className="media-preview" style={{ aspectRatio: '1200 / 630' }}>
                 {og ? <img src={og.src} alt={og.alt} /> : featured ? <img src={featured.src} alt={featured.alt} /> : null}
               </div>

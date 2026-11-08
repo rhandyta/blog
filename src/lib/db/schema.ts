@@ -291,6 +291,22 @@ export const sessions = sqliteTable('sessions', {
   expiresIdx: index('sessions_expires_idx').on(table.expiresAt),
 }))
 
+export const opsEvents = sqliteTable('ops_events', {
+  id: text('id').primaryKey(),
+  level: text('level', { enum: ['info', 'warn', 'error'] }).notNull().default('info'),
+  source: text('source').notNull(),
+  code: text('code').notNull(),
+  message: text('message').notNull(),
+  detail: text('detail'),
+  requestId: text('request_id'),
+  path: text('path'),
+  notified: integer('notified', { mode: 'boolean' }).notNull().default(false),
+  createdAt: text('created_at').notNull(),
+}, (table) => ({
+  createdIdx: index('ops_events_created_idx').on(table.createdAt),
+  levelIdx: index('ops_events_level_idx').on(table.level, table.createdAt),
+}))
+
 export type User = typeof users.$inferSelect
 export type Author = typeof authors.$inferSelect
 export type Article = typeof articles.$inferSelect
@@ -308,3 +324,4 @@ export type ArticleReader = typeof articleReaders.$inferSelect
 export type Session = typeof sessions.$inferSelect
 export type AutomationActivity = typeof automationActivity.$inferSelect
 export type AutomationRun = typeof automationRuns.$inferSelect
+export type OpsEvent = typeof opsEvents.$inferSelect

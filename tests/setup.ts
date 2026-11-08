@@ -13,6 +13,8 @@ delete process.env.TURSO_AUTH_TOKEN
 delete process.env.BLOB_READ_WRITE_TOKEN
 delete process.env.RESEND_API_KEY
 delete process.env.RESEND_WEBHOOK_SECRET
+delete process.env.OPS_ALERT_WEBHOOK_URL
+delete process.env.OPS_ALERT_EMAIL
 
 const { ensureDb } = await import('../src/lib/db/migrate')
 const { getDb } = await import('../src/lib/db/client')

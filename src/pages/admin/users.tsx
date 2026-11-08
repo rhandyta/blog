@@ -46,16 +46,16 @@ export function AccountPage({
               />
             </div>
             <div className="field">
-              <label>Email</label>
+              <span className="label">Email</span>
               <p className="hint">{user.email}</p>
             </div>
             <div className="form-row">
               <div className="field">
-                <label>Role</label>
+                <span className="label">Role</span>
                 <p className="hint">{roleLabel(user.role)}</p>
               </div>
               <div className="field">
-                <label>Author profile</label>
+                <span className="label">Author profile</span>
                 <p className="hint">
                   {linkedAuthor ? `${linkedAuthor.displayName} (/${linkedAuthor.slug})` : 'None linked'}
                 </p>

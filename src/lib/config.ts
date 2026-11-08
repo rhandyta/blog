@@ -5,6 +5,16 @@ const optionalString = z.preprocess(
   z.string().min(1).optional(),
 )
 
+const optionalUrl = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().url().optional(),
+)
+
+const optionalEmail = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().email().optional(),
+)
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PUBLIC_ORIGIN: z.string().url().default('http://localhost:3000'),
@@ -28,6 +38,8 @@ const envSchema = z.object({
   NEWSLETTER_FROM: optionalString,
   NEWSLETTER_REPLY_TO: optionalString,
   RESEND_WEBHOOK_SECRET: optionalString,
+  OPS_ALERT_WEBHOOK_URL: optionalUrl,
+  OPS_ALERT_EMAIL: optionalEmail,
 })
 
 export type AppConfig = z.infer<typeof envSchema>

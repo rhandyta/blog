@@ -15,7 +15,12 @@
     "db:rebuild-search": "bun scripts/rebuild-search.ts",
     "db:clear-content": "bun scripts/clear-content.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "test:e2e": "node e2e/run.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "bun run lint && bun run typecheck"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.1.1",
@@ -46,11 +51,13 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.6",
     "@tailwindcss/vite": "^4.0.0",
     "@types/bun": "latest",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "playwright": "^1.65.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.7"

@@ -382,6 +382,7 @@ export function AdminLayout({
               {adminLink(path, '/admin/settings', 'Settings')}
               {user.role === 'admin' ? adminLink(path, '/admin/users', 'Users') : null}
               {user.role === 'admin' ? adminLink(path, '/admin/audit', 'Audit log') : null}
+              {user.role === 'admin' ? adminLink(path, '/admin/system', 'System') : null}
             </>
           ) : null}
           <div className="admin-nav__group">Account</div>

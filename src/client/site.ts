@@ -90,7 +90,9 @@ function setupMobileMenu(): void {
 
   openButton.addEventListener('click', open)
   closeButton?.addEventListener('click', close)
-  menu.querySelectorAll('a').forEach((link) => link.addEventListener('click', close))
+  menu.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', close)
+  })
   document.addEventListener('keydown', (event) => {
     if (menu.hasAttribute('hidden')) return
     if (event.key === 'Escape') {
@@ -171,7 +173,9 @@ function setupTocSpy(): void {
     },
     { rootMargin: '-10% 0px -70% 0px', threshold: [0, 1] },
   )
-  targets.forEach((target) => observer.observe(target))
+  targets.forEach((target) => {
+    observer.observe(target)
+  })
 }
 
 function setupBookmarks(): void {

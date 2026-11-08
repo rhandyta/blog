@@ -328,4 +328,23 @@ CREATE INDEX IF NOT EXISTS admin_audit_actor_idx ON admin_audit_log(actor_id, cr
 ALTER TABLE articles ADD COLUMN language TEXT;
 `,
   },
+  {
+    name: '011_ops_monitoring.sql',
+    sql: `
+CREATE TABLE IF NOT EXISTS ops_events (
+  id TEXT PRIMARY KEY,
+  level TEXT NOT NULL DEFAULT 'info' CHECK (level IN ('info', 'warn', 'error')),
+  source TEXT NOT NULL,
+  code TEXT NOT NULL,
+  message TEXT NOT NULL,
+  detail TEXT,
+  request_id TEXT,
+  path TEXT,
+  notified INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ops_events_created_idx ON ops_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS ops_events_level_idx ON ops_events(level, created_at DESC);
+`,
+  },
 ]

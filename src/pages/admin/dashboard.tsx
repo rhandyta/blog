@@ -264,6 +264,7 @@ export function ArticleListPage({
                 <td>
                   <div className="actions">
                     <a className="btn btn--ghost btn--small" href={`/admin/articles/${article.id}/revisions`}>History</a>
+                    <a className="btn btn--ghost btn--small" href={`/admin/articles/${article.id}/export.md`}>.md</a>
                     <a className="btn btn--ghost btn--small" href={`/admin/articles/${article.id}/edit`}>Edit</a>
                     <form method="post" action={`/admin/articles/${article.id}/delete`} data-confirm="Delete this article? This cannot be undone.">
                       <CsrfField token={session.csrfToken} />
@@ -312,7 +313,12 @@ export function RevisionsPage({
       path="/admin/articles"
       title="Revision history"
       subtitle={article.title}
-      actions={<a className="btn btn--ghost" href={`/admin/articles/${article.id}/edit`}>Back to editor</a>}
+      actions={
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <a className="btn btn--ghost" href={`/admin/articles/${article.id}/export.md`}>Export Markdown</a>
+          <a className="btn btn--ghost" href={`/admin/articles/${article.id}/edit`}>Back to editor</a>
+        </div>
+      }
       flash={flash}
       csrfToken={session.csrfToken}
     >
