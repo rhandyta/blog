@@ -9,6 +9,7 @@ export type AdminMediaSummary = {
   height: number
   originalName?: string
   createdAt?: string
+  canEdit?: boolean
 }
 
 export type EditorArticleState = {

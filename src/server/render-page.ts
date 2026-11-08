@@ -16,6 +16,7 @@ export function renderPageResponse(
     entry?: Entry
     extraEntries?: Entry[]
     noScripts?: boolean
+    noAnalytics?: boolean
   },
 ): Response {
   const body = renderToString(options.element)
@@ -27,6 +28,7 @@ export function renderPageResponse(
     bodyClass: (options.entry ?? 'site').startsWith('admin') ? 'admin-body' : 'site-body',
     lang: options.head.lang,
     noScripts: options.noScripts,
+    noAnalytics: options.noAnalytics,
   })
   c.header('Content-Type', 'text/html; charset=utf-8')
   return c.html(html, (options.status ?? 200) as 200)

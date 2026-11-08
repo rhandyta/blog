@@ -46,22 +46,25 @@ export const defaultAutomationSettings: AutomationSettings = {
     'Write a reflective personal essay grounded in ordinary daily life: attention, work, the city, small observations, and the things worth returning to. Do not invent specific facts about real people.',
 }
 
-let cached: AutomationSettings | null = null
+export const AUTOMATION_CACHE_TTL_MS = 30_000
+let cached: { value: AutomationSettings; expiresAt: number } | null = null
 
 export async function getAutomationSettings(): Promise<AutomationSettings> {
-  if (cached) return cached
+  if (cached && Date.now() < cached.expiresAt) return cached.value
   const rows = await getDb().select().from(settings).where(eq(settings.key, SETTINGS_KEY)).limit(1)
+  let resolved: AutomationSettings
   if (!rows[0]) {
-    cached = { ...defaultAutomationSettings }
-    return cached
+    resolved = { ...defaultAutomationSettings }
+  } else {
+    try {
+      const stored = JSON.parse(rows[0].value) as Partial<AutomationSettings>
+      resolved = { ...defaultAutomationSettings, ...stored }
+    } catch {
+      resolved = { ...defaultAutomationSettings }
+    }
   }
-  try {
-    const stored = JSON.parse(rows[0].value) as Partial<AutomationSettings>
-    cached = { ...defaultAutomationSettings, ...stored }
-  } catch {
-    cached = { ...defaultAutomationSettings }
-  }
-  return cached
+  cached = { value: resolved, expiresAt: Date.now() + AUTOMATION_CACHE_TTL_MS }
+  return resolved
 }
 
 export function invalidateAutomationSettings(): void {
@@ -76,7 +79,7 @@ export async function saveAutomationSettings(patch: Partial<AutomationSettings>)
     .insert(settings)
     .values({ key: SETTINGS_KEY, value: JSON.stringify(next), updatedAt: now })
     .onConflictDoUpdate({ target: settings.key, set: { value: JSON.stringify(next), updatedAt: now } })
-  cached = next
+  cached = { value: next, expiresAt: Date.now() + AUTOMATION_CACHE_TTL_MS }
   return next
 }
 

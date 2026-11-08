@@ -169,7 +169,7 @@ function renderNode(node: PMNode, context: RenderContext): string {
       const language = typeof node.attrs?.language === 'string' ? node.attrs.language : undefined
       const code = node.content?.map((child) => child.text ?? '').join('') ?? ''
       const label = language ? `<span class="code-lang">${escapeHtml(language)}</span>` : ''
-      return `<div class="code-block">${label}<button class="code-copy" type="button" data-copy-code aria-label="Copy code to clipboard">Copy</button><pre><code${language ? ` class="language-${escapeAttr(language)}"` : ''}>${highlightCode(code, language)}</code></pre></div>`
+      return `<div class="code-block">${label}<button class="code-copy" type="button" data-copy-code aria-label="Copy code to clipboard">Salin</button><pre><code${language ? ` class="language-${escapeAttr(language)}"` : ''}>${highlightCode(code, language)}</code></pre></div>`
     }
     case 'horizontalRule':
       return '<hr class="article-rule">'
@@ -187,7 +187,7 @@ function renderNode(node: PMNode, context: RenderContext): string {
       const src = embedUrl(node)
       if (!src) return ''
       const caption = typeof node.attrs?.caption === 'string' ? node.attrs.caption : ''
-      const title = caption || 'Embedded media'
+      const title = caption || 'Media tersemat'
       return `<figure class="embed"><div class="embed-frame"><iframe src="${escapeAttr(src)}" title="${escapeAttr(title)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ''}</figure>`
     }
     default:
@@ -212,7 +212,7 @@ export function renderDoc(doc: PMDoc, media: Map<string, MediaInfo> = new Map())
         const id = seen === 0 ? base : `${base}-${seen + 1}`
         ids.set(node, id)
         const level = typeof node.attrs?.level === 'number' ? node.attrs.level : 2
-        if (level <= 4) toc.push({ id, text: text || 'Untitled section', level })
+        if (level <= 4) toc.push({ id, text: text || 'Bagian tanpa judul', level })
       }
       walk(node.content)
     }

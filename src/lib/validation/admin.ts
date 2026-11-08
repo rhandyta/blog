@@ -108,6 +108,50 @@ export const mediaPatchSchema = z.object({
   originalName: z.string().trim().max(200).optional(),
 })
 
+export const USER_ROLES = ['admin', 'editor', 'author'] as const
+
+export const accountProfileSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(80),
+})
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword: z.string().min(8, 'Password must be at least 8 characters').max(200),
+    confirmPassword: z.string().min(1),
+    revokeOthers: z.boolean().optional(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  })
+
+export const createUserSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(80),
+  email: z.string().trim().email('Valid email is required').max(200),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
+  role: z.enum(USER_ROLES),
+  createAuthor: z.boolean().optional(),
+})
+
+export const updateUserSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(80),
+  email: z.string().trim().email('Valid email is required').max(200),
+  role: z.enum(USER_ROLES),
+  active: z.boolean(),
+  authorId: z.string().trim().max(80).nullable().optional(),
+})
+
+export const adminResetPasswordSchema = z
+  .object({
+    newPassword: z.string().min(8, 'Password must be at least 8 characters').max(200),
+    confirmPassword: z.string().min(1),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  })
+
 export function validHttpUrl(value: string): boolean {
   if (!value) return true
   try {

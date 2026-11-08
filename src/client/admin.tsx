@@ -1374,6 +1374,7 @@ function MediaLibrary({ props }: { props: MediaPageProps }) {
       {filtered.length ? (
         <div className="media-grid">
           {filtered.map((item) => {
+            const canEdit = item.canEdit !== false
             const draft = editing[item.id] ?? { alt: item.alt, caption: item.caption ?? '' }
             return (
               <div className="media-item" key={item.id}>
@@ -1387,10 +1388,14 @@ function MediaLibrary({ props }: { props: MediaPageProps }) {
                     aria-label={`Alt text for ${item.originalName ?? item.id}`}
                     value={draft.alt}
                     placeholder="Alt text"
-                    onChange={(event) =>
+                    disabled={!canEdit}
+                    onChange={(event) => {
+                      if (!canEdit) return
                       setEditing((current) => ({ ...current, [item.id]: { ...draft, alt: event.target.value } }))
-                    }
-                    onBlur={() => void saveMetadata(item)}
+                    }}
+                    onBlur={() => {
+                      if (canEdit) void saveMetadata(item)
+                    }}
                     style={{ padding: '0.4rem 0.5rem', fontSize: '0.82rem' }}
                   />
                   <input
@@ -1398,10 +1403,14 @@ function MediaLibrary({ props }: { props: MediaPageProps }) {
                     aria-label={`Caption for ${item.originalName ?? item.id}`}
                     value={draft.caption}
                     placeholder="Caption (optional)"
-                    onChange={(event) =>
+                    disabled={!canEdit}
+                    onChange={(event) => {
+                      if (!canEdit) return
                       setEditing((current) => ({ ...current, [item.id]: { ...draft, caption: event.target.value } }))
-                    }
-                    onBlur={() => void saveMetadata(item)}
+                    }}
+                    onBlur={() => {
+                      if (canEdit) void saveMetadata(item)
+                    }}
                     style={{ padding: '0.4rem 0.5rem', fontSize: '0.82rem' }}
                   />
                   <div className="media-item__actions">
@@ -1419,9 +1428,11 @@ function MediaLibrary({ props }: { props: MediaPageProps }) {
                     >
                       Copy URL
                     </button>
-                    <button className="btn btn--danger btn--small" type="button" onClick={() => void remove(item)}>
-                      Delete
-                    </button>
+                    {canEdit ? (
+                      <button className="btn btn--danger btn--small" type="button" onClick={() => void remove(item)}>
+                        Delete
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </div>

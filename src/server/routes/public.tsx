@@ -6,6 +6,7 @@ import { absoluteUrl, splitParagraphs } from '../../lib/content/html'
 import { collectMediaIds, countWords, parseDoc } from '../../lib/content/doc'
 import { articleLanguage, ogLocale } from '../../lib/content/language'
 import { renderDoc } from '../../lib/content/render'
+import { ui } from '../../lib/content/ui-copy'
 import { getMediaById, getMediaMap } from '../../lib/db/queries/media'
 import {
   countArticlesByTag,
@@ -128,6 +129,35 @@ function shouldCountView(c: Context<AppEnv>, articleId: string): boolean {
   return true
 }
 
+function scheduleBackgroundTask(c: Context<AppEnv>, promise: Promise<unknown>): boolean {
+  const tracked = promise.catch((error) => {
+    console.error('[background] task failed', error)
+  })
+  try {
+    const reqCtx = (
+      globalThis as Record<
+        symbol,
+        { get?: () => { waitUntil?: (p: Promise<unknown>) => void } } | undefined
+      >
+    )[Symbol.for('@vercel/request-context')]?.get?.()
+    if (reqCtx && typeof reqCtx.waitUntil === 'function') {
+      reqCtx.waitUntil(tracked)
+      return true
+    }
+  } catch {
+    // ignore missing Vercel request context
+  }
+  try {
+    if (typeof c.executionCtx?.waitUntil === 'function') {
+      c.executionCtx.waitUntil(tracked)
+      return true
+    }
+  } catch {
+    // Hono throws when c.executionCtx is accessed outside a FetchEvent context
+  }
+  return false
+}
+
 async function layout() {
   const [settings, categories] = await Promise.all([getSiteSettings(), listCategories({ withCounts: true })])
   return { settings, categories }
@@ -235,12 +265,27 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
     const detail = await getPublishedArticleDetail(c.req.param('slug'))
     if (!detail) return c.notFound()
     const doc = parseDoc(detail.article.bodyJson)
-    const media = await getMediaMap(collectMediaIds(doc))
-    const { html, toc } = renderDoc(doc, media)
-    const [related, neighbours] = await Promise.all([
+    let viewPromise: Promise<unknown> | null = null
+    if (shouldCountView(c, detail.article.id)) {
+      const visit = buildVisitContext({
+        ip: clientIp(c),
+        userAgent: c.req.header('user-agent') ?? null,
+        referer: c.req.header('referer') ?? null,
+        country: c.req.header('x-vercel-ip-country') ?? c.req.header('cf-ipcountry') ?? null,
+        origin,
+      })
+      const write = recordArticleView({ articleId: detail.article.id, ...visit }).catch(() => undefined)
+      if (process.env.NODE_ENV === 'test' || !scheduleBackgroundTask(c, write)) {
+        viewPromise = write
+      }
+    }
+    const [media, related, neighbours] = await Promise.all([
+      getMediaMap(collectMediaIds(doc)),
       getRelatedArticles(detail.article, 3),
       getNeighbourArticles(detail.article),
+      viewPromise ?? Promise.resolve(),
     ])
+    const { html, toc } = renderDoc(doc, media)
     const url = absoluteUrl(origin, `/articles/${detail.article.slug}`)
     const canonicalPath = detail.article.canonicalUrl || `/articles/${detail.article.slug}`
     const description = detail.article.seoDescription || detail.article.excerpt
@@ -274,23 +319,13 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       }),
       breadcrumbJsonLd(
         [
-          { name: 'Home', path: '/' },
+          { name: 'Beranda', path: '/' },
           ...(detail.category ? [{ name: detail.category.name, path: `/category/${detail.category.slug}` }] : []),
           { name: detail.article.title, path: `/articles/${detail.article.slug}` },
         ],
         origin,
       ),
     ]
-    if (shouldCountView(c, detail.article.id)) {
-      const visit = buildVisitContext({
-        ip: clientIp(c),
-        userAgent: c.req.header('user-agent') ?? null,
-        referer: c.req.header('referer') ?? null,
-        country: c.req.header('x-vercel-ip-country') ?? c.req.header('cf-ipcountry') ?? null,
-        origin,
-      })
-      await recordArticleView({ articleId: detail.article.id, ...visit }).catch(() => undefined)
-    }
     return renderPageResponse(c, {
       element: (
         <ArticlePage
@@ -359,6 +394,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
     const previewUrl = `${absoluteUrl(origin, `/preview/${id}`)}?token=${encodeURIComponent(token ?? '')}`
     const previewLanguage = articleLanguage(detail.article.language, detail.article.bodyText)
     return renderPageResponse(c, {
+      noAnalytics: true,
       element: (
         <ArticlePage
           settings={settings}
@@ -376,7 +412,7 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: `Preview — ${detail.article.title}`,
+        title: `Pratinjau — ${detail.article.title}`,
         description: detail.article.excerpt,
         path: `/preview/${id}`,
         robots: 'noindex, nofollow',
@@ -544,8 +580,8 @@ export function registerPublicRoutes(app: Hono<AppEnv>): void {
       head: baseHead({
         settings,
         origin,
-        title: `Tagged “${tag.name}”`,
-        description: tag.description || `Every piece filed under ${tag.name}.`,
+        title: ui.listing.taggedTitle(tag.name),
+        description: tag.description || ui.listing.taggedBlurb(tag.name),
         path: page > 1 ? `/tags/${tag.slug}?page=${page}` : `/tags/${tag.slug}`,
         pagination: paginationLinks(`/tags/${tag.slug}`, page, totalPages),
         ogImage: items[0]?.media ? ogFromMedia(items[0].media) : null,
@@ -1000,7 +1036,7 @@ Sitemap: ${origin}/sitemap.xml
       results: hits.map((hit) => ({
         slug: hit.card.slug,
         title: hit.card.title,
-        category: hit.card.category?.name ?? 'Essay',
+        category: hit.card.category?.name ?? ui.common.essay,
         accent: hit.card.category?.accent ?? 'vermilion',
         publishedAt: hit.card.publishedAt,
         readingMinutes: hit.card.readingMinutes,
@@ -1029,7 +1065,7 @@ Sitemap: ${origin}/sitemap.xml
         slug: card.article.slug,
         title: card.article.title,
         excerpt: card.article.excerpt,
-        category: card.category?.name ?? 'Essay',
+        category: card.category?.name ?? ui.common.essay,
         accent: card.category?.accent ?? 'vermilion',
         publishedAt: card.article.publishedAt,
         readingMinutes: card.article.readingMinutes,

@@ -49,7 +49,7 @@ function setupTheme(): void {
   const apply = (theme: 'light' | 'dark') => {
     document.documentElement.dataset.theme = theme
     document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]').forEach((button) => {
-      button.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme')
+      button.setAttribute('aria-label', theme === 'dark' ? 'Ganti ke tema terang' : 'Ganti ke tema gelap')
       button.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false')
     })
   }
@@ -249,14 +249,14 @@ function setupNewsletter(): void {
       message.textContent = ''
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
         message.dataset.state = 'error'
-        message.textContent = 'Please enter a valid email address.'
+        message.textContent = 'Masukkan alamat surel yang valid.'
         form.querySelector<HTMLInputElement>('input[name="email"]')?.focus()
         return
       }
       const original = submit?.textContent ?? ''
       if (submit) {
         submit.disabled = true
-        submit.textContent = 'Subscribing…'
+        submit.textContent = 'Mendaftar…'
       }
       try {
         const response = await fetch('/api/subscribe', {

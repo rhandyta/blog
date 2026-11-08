@@ -36,11 +36,11 @@ function resultNode(result: SearchResult): HTMLAnchorElement {
   const date = document.createElement('span')
   date.className = 'meta'
   date.textContent = result.publishedAt
-    ? new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(result.publishedAt))
+    ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(result.publishedAt))
     : ''
   const reading = document.createElement('span')
   reading.className = 'meta'
-  reading.textContent = `${result.readingMinutes} min read`
+  reading.textContent = `${result.readingMinutes} menit baca`
   top.append(category, date, reading)
 
   const title = document.createElement('h2')
@@ -90,7 +90,7 @@ function setupSearch(): void {
       return
     }
     loading.hidden = false
-    status.textContent = `Searching for “${trimmed}”`
+    status.textContent = `Mencari “${trimmed}”`
     liveResults.hidden = false
     if (serverResults) serverResults.hidden = true
     if (liveEmpty) liveEmpty.hidden = true
@@ -105,17 +105,17 @@ function setupSearch(): void {
       if (!payload.results.length) {
         liveResults.hidden = true
         if (liveEmpty) liveEmpty.hidden = false
-        status.textContent = `No results for “${trimmed}”`
+        status.textContent = `Tidak ada hasil untuk “${trimmed}”`
       } else {
         for (const result of payload.results) liveResults.append(resultNode(result))
-        status.textContent = `${payload.results.length} ${payload.results.length === 1 ? 'result' : 'results'} for “${trimmed}”`
+        status.textContent = `${payload.results.length} hasil untuk “${trimmed}”`
       }
       const url = new URL(window.location.href)
       url.searchParams.set('q', trimmed)
       window.history.replaceState({}, '', url)
     } catch (error) {
       if ((error as Error).name === 'AbortError') return
-      status.textContent = 'Search is unavailable right now. Submit the form to try again.'
+      status.textContent = 'Pencarian sedang tidak tersedia. Kirim formulir untuk mencoba lagi.'
     } finally {
       loading.hidden = true
     }

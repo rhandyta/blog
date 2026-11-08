@@ -9,13 +9,17 @@ import { createPreviewToken } from '../../lib/seo/preview-token'
 import {
   csrfMatches,
   createSession,
+  createUser,
   destroySession,
+  destroyUserSessions,
   getUserByEmail,
+  getUserById,
   SESSION_COOKIE,
   touchLogin,
+  updateUserPassword,
   verifyPassword,
 } from '../../lib/auth/session'
-import { canEditArticle, canManageContent, canManageSettings, isAdmin } from '../../lib/auth/permissions'
+import { canEditArticle, canEditMediaAsset, canManageContent, canManageSettings, canManageUsers, isAdmin } from '../../lib/auth/permissions'
 import { rateLimit } from '../../lib/auth/rate-limit'
 import {
   archiveArticle,
@@ -52,10 +56,21 @@ import {
   listCategories,
   listTags,
   saveSiteSettings,
+  setAuthorUserLink,
+  uniqueAuthorSlug,
   updateTag,
   upsertAuthor,
   upsertCategory,
 } from '../../lib/db/queries/taxonomy'
+import {
+  countActiveAdmins,
+  listUserSessions,
+  listUsers,
+  revokeOtherUserSessions,
+  revokeSessionById,
+  updateUserByAdmin,
+  updateUserProfile,
+} from '../../lib/db/queries/users'
 import {
   countMedia,
   deleteMedia,
@@ -94,7 +109,23 @@ import {
   getReferrerBreakdown,
   getTopArticles,
 } from '../../lib/db/queries/analytics'
-import { automationSettingsSchema, parseScheduleDate, articlePayloadSchema, authorInputSchema, categoryInputSchema, loginSchema, mediaPatchSchema, settingsInputSchema, tagInputSchema, validHttpUrl } from '../../lib/validation/admin'
+import {
+  accountProfileSchema,
+  adminResetPasswordSchema,
+  automationSettingsSchema,
+  changePasswordSchema,
+  createUserSchema,
+  parseScheduleDate,
+  articlePayloadSchema,
+  authorInputSchema,
+  categoryInputSchema,
+  loginSchema,
+  mediaPatchSchema,
+  settingsInputSchema,
+  tagInputSchema,
+  updateUserSchema,
+  validHttpUrl,
+} from '../../lib/validation/admin'
 import { deleteStoredFiles, MAX_UPLOAD_BYTES, saveUpload, sniffImage } from '../../lib/media/storage'
 import {
   countAiCoversSince,
@@ -122,6 +153,7 @@ import { ArticleListPage, DashboardPage, RevisionsPage } from '../../pages/admin
 import { LoginPage } from '../../pages/admin/login'
 import { SettingsPage, SubscribersPage } from '../../pages/admin/settings'
 import { AuthorsPage, AuthorEditPage, CategoryEditPage, CategoriesPage, TagEditPage, TagsPage } from '../../pages/admin/taxonomy'
+import { AccountPage, UserEditPage, UsersPage } from '../../pages/admin/users'
 import type { Flash } from '../../pages/admin/shared'
 
 const LOGIN_CSRF_COOKIE = 'login_csrf'
@@ -176,6 +208,18 @@ const FLASH_MESSAGES: Record<string, Flash> = {
   'automation-limit': { tone: 'error', message: 'The daily generation limit has been reached.' },
   'automation-no-category': { tone: 'error', message: 'Create at least one category before generating.' },
   'automation-error': { tone: 'error', message: 'The draft could not be generated. Check the automation history.' },
+  'profile-saved': { tone: 'success', message: 'Profile saved.' },
+  'password-changed': { tone: 'success', message: 'Password updated.' },
+  'error-current-password': { tone: 'error', message: 'Your current password is incorrect.' },
+  'error-password-mismatch': { tone: 'error', message: 'The new passwords do not match.' },
+  'session-revoked': { tone: 'success', message: 'Session signed out.' },
+  'sessions-revoked': { tone: 'success', message: 'Other active sessions signed out.' },
+  'user-created': { tone: 'success', message: 'User created.' },
+  'user-saved': { tone: 'success', message: 'User details saved.' },
+  'error-email-taken': { tone: 'error', message: 'That email address is already in use by another account.' },
+  'error-self-lockout': { tone: 'error', message: 'You cannot disable or demote your own administrator account.' },
+  'error-last-admin': { tone: 'error', message: 'At least one active administrator must remain.' },
+  'error-author-taken': { tone: 'error', message: 'That author profile is already linked to another user.' },
 }
 
 function flashFrom(c: Context<AppEnv>): Flash {
@@ -947,6 +991,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   })
 
   app.get('/api/admin/media', async (c) => {
+    const user = c.get('user')!
     const media = await listMedia({ q: c.req.query('q') || undefined, limit: 100 })
     return c.json({
       media: media.map((asset) => ({
@@ -958,6 +1003,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         height: asset.height,
         originalName: asset.originalName,
         createdAt: asset.createdAt,
+        canEdit: canEditMediaAsset(user, asset),
       })),
       total: await countMedia(),
     })
@@ -996,6 +1042,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
             height: media.height,
             originalName: media.originalName,
             createdAt: media.createdAt,
+            canEdit: true,
           },
         },
         201,
@@ -1007,9 +1054,21 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   })
 
   app.patch('/api/admin/media/:id', async (c) => {
-    const parsed = mediaPatchSchema.safeParse(await c.req.json())
+    const user = c.get('user')!
+    const asset = await getMediaById(c.req.param('id'))
+    if (!asset) return c.json({ error: 'Not found.' }, 404)
+    if (!canEditMediaAsset(user, asset)) {
+      return c.json({ error: 'You can only update media you uploaded.' }, 403)
+    }
+    let json: unknown
+    try {
+      json = await c.req.json()
+    } catch {
+      return c.json({ error: 'Expected JSON' }, 400)
+    }
+    const parsed = mediaPatchSchema.safeParse(json)
     if (!parsed.success) return c.json({ error: 'Invalid media details.' }, 400)
-    const ok = await updateMedia(c.req.param('id'), {
+    const ok = await updateMedia(asset.id, {
       ...(parsed.data.alt !== undefined ? { alt: parsed.data.alt } : {}),
       ...(parsed.data.caption !== undefined ? { caption: parsed.data.caption } : {}),
       ...(parsed.data.originalName !== undefined ? { originalName: parsed.data.originalName } : {}),
@@ -1019,8 +1078,12 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   })
 
   app.delete('/api/admin/media/:id', async (c) => {
+    const user = c.get('user')!
     const asset = await getMediaById(c.req.param('id'))
     if (!asset) return c.json({ error: 'Not found.' }, 404)
+    if (!canEditMediaAsset(user, asset)) {
+      return c.json({ error: 'You can only delete media you uploaded.' }, 403)
+    }
     const usage = await mediaUsage(asset.id)
     if (usage.articles > 0 || usage.authors > 0 || usage.settings > 0) {
       const references = await getMediaReferences(asset.id)
@@ -1717,6 +1780,267 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     if (!parsed.success) return c.redirect('/admin/settings?flash=error-fields', 303)
     await saveSiteSettings(parsed.data)
     return c.redirect('/admin/settings?flash=saved', 303)
+  })
+
+  /* ------------------------------------------------------------------ *
+   *  Account & Users
+   * ------------------------------------------------------------------ */
+
+  app.get('/admin/account', async (c) => {
+    const user = c.get('user')!
+    const session = c.get('session')!
+    const [linkedAuthor, sessions] = await Promise.all([
+      getAuthorForUser(user.id),
+      listUserSessions(user.id),
+    ])
+    return renderAdminPage(
+      c,
+      <AccountPage
+        user={user}
+        linkedAuthor={linkedAuthor ?? null}
+        sessions={sessions}
+        currentSessionId={session.id}
+        session={session}
+        flash={flashFrom(c)}
+      />,
+    )
+  })
+
+  app.post('/admin/account/profile', async (c) => {
+    const user = c.get('user')!
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/account?flash=error-csrf', 303)
+    const parsed = accountProfileSchema.safeParse({ name: text(body.name) })
+    if (!parsed.success) return c.redirect('/admin/account?flash=error-fields', 303)
+    await updateUserProfile(user.id, parsed.data)
+    return c.redirect('/admin/account?flash=profile-saved', 303)
+  })
+
+  app.post('/admin/account/password', async (c) => {
+    const user = c.get('user')!
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/account?flash=error-csrf', 303)
+    const currentPassword = text(body.currentPassword)
+    const newPassword = text(body.newPassword)
+    const confirmPassword = text(body.confirmPassword)
+    const revokeOthers = checkbox(body.revokeOthers)
+    if (newPassword !== confirmPassword) {
+      return c.redirect('/admin/account?flash=error-password-mismatch', 303)
+    }
+    const parsed = changePasswordSchema.safeParse({
+      currentPassword,
+      newPassword,
+      confirmPassword,
+      revokeOthers,
+    })
+    if (!parsed.success) return c.redirect('/admin/account?flash=error-fields', 303)
+    const valid = await verifyPassword(parsed.data.currentPassword, user.passwordHash)
+    if (!valid) return c.redirect('/admin/account?flash=error-current-password', 303)
+    await updateUserPassword(user.id, parsed.data.newPassword)
+    if (revokeOthers) {
+      await revokeOtherUserSessions(user.id, session.id)
+    }
+    return c.redirect('/admin/account?flash=password-changed', 303)
+  })
+
+  app.post('/admin/account/sessions/revoke-others', async (c) => {
+    const user = c.get('user')!
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/account?flash=error-csrf', 303)
+    await revokeOtherUserSessions(user.id, session.id)
+    return c.redirect('/admin/account?flash=sessions-revoked', 303)
+  })
+
+  app.post('/admin/account/sessions/:id/revoke', async (c) => {
+    const user = c.get('user')!
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/account?flash=error-csrf', 303)
+    const targetSessionId = c.req.param('id')
+    if (targetSessionId === session.id) return c.redirect('/admin/account?flash=error', 303)
+    const revoked = await revokeSessionById(user.id, targetSessionId)
+    return c.redirect(`/admin/account?flash=${revoked ? 'session-revoked' : 'error'}`, 303)
+  })
+
+  app.get('/admin/users', async (c) => {
+    const user = c.get('user')!
+    if (!canManageUsers(user)) return c.redirect('/admin?flash=error', 303)
+    const users = await listUsers()
+    return renderAdminPage(
+      c,
+      <UsersPage user={user} users={users} session={c.get('session')!} flash={flashFrom(c)} />,
+    )
+  })
+
+  app.post('/admin/users', async (c) => {
+    const user = c.get('user')!
+    if (!canManageUsers(user)) return c.redirect('/admin?flash=error', 303)
+    const session = c.get('session')!
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect('/admin/users?flash=error-csrf', 303)
+    const parsed = createUserSchema.safeParse({
+      name: text(body.name),
+      email: text(body.email).trim().toLowerCase(),
+      password: text(body.password),
+      role: text(body.role),
+      createAuthor: checkbox(body.createAuthor),
+    })
+    if (!parsed.success) return c.redirect('/admin/users?flash=error-fields', 303)
+    if (await getUserByEmail(parsed.data.email)) {
+      return c.redirect('/admin/users?flash=error-email-taken', 303)
+    }
+    const newUserId = crypto.randomUUID()
+    await createUser({
+      id: newUserId,
+      email: parsed.data.email,
+      password: parsed.data.password,
+      name: parsed.data.name,
+      role: parsed.data.role,
+    })
+    if (parsed.data.createAuthor) {
+      const slug = await uniqueAuthorSlug(slugify(parsed.data.name))
+      await upsertAuthor({
+        id: crypto.randomUUID(),
+        slug,
+        displayName: parsed.data.name,
+        userId: newUserId,
+        isDemo: false,
+      })
+    }
+    return c.redirect('/admin/users?flash=user-created', 303)
+  })
+
+  app.get('/admin/users/:id', async (c) => {
+    const user = c.get('user')!
+    if (!canManageUsers(user)) return c.redirect('/admin?flash=error', 303)
+    const target = await getUserById(c.req.param('id'))
+    if (!target) return c.notFound()
+    const [authors, linkedAuthor, sessions] = await Promise.all([
+      listAuthors(),
+      getAuthorForUser(target.id),
+      listUserSessions(target.id),
+    ])
+    return renderAdminPage(
+      c,
+      <UserEditPage
+        user={user}
+        target={target}
+        authors={authors}
+        linkedAuthorId={linkedAuthor?.id ?? null}
+        sessions={sessions}
+        session={c.get('session')!}
+        flash={flashFrom(c)}
+      />,
+    )
+  })
+
+  app.post('/admin/users/:id', async (c) => {
+    const user = c.get('user')!
+    if (!canManageUsers(user)) return c.redirect('/admin?flash=error', 303)
+    const session = c.get('session')!
+    const targetId = c.req.param('id')
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect(`/admin/users/${targetId}?flash=error-csrf`, 303)
+    const target = await getUserById(targetId)
+    if (!target) return c.notFound()
+    const parsed = updateUserSchema.safeParse({
+      name: text(body.name),
+      email: text(body.email).trim().toLowerCase(),
+      role: text(body.role),
+      active: checkbox(body.active),
+      authorId: text(body.authorId).trim() || null,
+    })
+    if (!parsed.success) return c.redirect(`/admin/users/${target.id}?flash=error-fields`, 303)
+
+    const conflict = await getUserByEmail(parsed.data.email)
+    if (conflict && conflict.id !== target.id) {
+      return c.redirect(`/admin/users/${target.id}?flash=error-email-taken`, 303)
+    }
+
+    const isSelf = target.id === user.id
+    if (isSelf && (!parsed.data.active || parsed.data.role !== 'admin')) {
+      return c.redirect(`/admin/users/${target.id}?flash=error-self-lockout`, 303)
+    }
+
+    const wasActiveAdmin = target.role === 'admin' && target.active
+    const remainsActiveAdmin = parsed.data.role === 'admin' && parsed.data.active
+    if (wasActiveAdmin && !remainsActiveAdmin) {
+      const activeAdmins = await countActiveAdmins()
+      if (activeAdmins <= 1) {
+        return c.redirect(`/admin/users/${target.id}?flash=error-last-admin`, 303)
+      }
+    }
+
+    if (parsed.data.authorId !== undefined) {
+      const linkedOk = await setAuthorUserLink(parsed.data.authorId ?? null, target.id)
+      if (!linkedOk) {
+        return c.redirect(`/admin/users/${target.id}?flash=error-author-taken`, 303)
+      }
+    }
+
+    await updateUserByAdmin(target.id, {
+      name: parsed.data.name,
+      email: parsed.data.email,
+      role: parsed.data.role,
+      active: parsed.data.active,
+    })
+
+    const downgradedPrivilege =
+      target.role !== parsed.data.role &&
+      (target.role === 'admin' || (target.role === 'editor' && parsed.data.role === 'author'))
+    if (!parsed.data.active || downgradedPrivilege) {
+      if (isSelf) {
+        await revokeOtherUserSessions(target.id, session.id)
+      } else {
+        await destroyUserSessions(target.id)
+      }
+    }
+    return c.redirect(`/admin/users/${target.id}?flash=user-saved`, 303)
+  })
+
+  app.post('/admin/users/:id/password', async (c) => {
+    const user = c.get('user')!
+    if (!canManageUsers(user)) return c.redirect('/admin?flash=error', 303)
+    const session = c.get('session')!
+    const targetId = c.req.param('id')
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect(`/admin/users/${targetId}?flash=error-csrf`, 303)
+    const target = await getUserById(targetId)
+    if (!target) return c.notFound()
+    const newPassword = text(body.newPassword)
+    const confirmPassword = text(body.confirmPassword)
+    if (newPassword !== confirmPassword) {
+      return c.redirect(`/admin/users/${target.id}?flash=error-password-mismatch`, 303)
+    }
+    const parsed = adminResetPasswordSchema.safeParse({ newPassword, confirmPassword })
+    if (!parsed.success) return c.redirect(`/admin/users/${target.id}?flash=error-fields`, 303)
+    await updateUserPassword(target.id, parsed.data.newPassword)
+    if (target.id === user.id) {
+      await revokeOtherUserSessions(target.id, session.id)
+    } else {
+      await destroyUserSessions(target.id)
+    }
+    return c.redirect(`/admin/users/${target.id}?flash=password-changed`, 303)
+  })
+
+  app.post('/admin/users/:id/revoke-sessions', async (c) => {
+    const user = c.get('user')!
+    if (!canManageUsers(user)) return c.redirect('/admin?flash=error', 303)
+    const session = c.get('session')!
+    const targetId = c.req.param('id')
+    const body = await parseBody(c)
+    if (!formCsrfOk(session, body)) return c.redirect(`/admin/users/${targetId}?flash=error-csrf`, 303)
+    const target = await getUserById(targetId)
+    if (!target) return c.notFound()
+    if (target.id === user.id) {
+      await revokeOtherUserSessions(target.id, session.id)
+    } else {
+      await destroyUserSessions(target.id)
+    }
+    return c.redirect(`/admin/users/${target.id}?flash=sessions-revoked`, 303)
   })
 
   /* ------------------------------------------------------------------ *

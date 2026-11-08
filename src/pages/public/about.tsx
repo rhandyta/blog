@@ -70,9 +70,9 @@ export function AboutPage({
               dan menyimpan artikel untuk nanti.
             </p>
             <p>
-              Huruf disajikan bersama situs ini, bukan diambil dari pihak ketiga. Tidak ada pelacak, tidak ada skrip
-              iklan, dan tidak ada analitik eksternal. Pembaca diukur sendiri tanpa cookie analitik dan tanpa alamat
-              IP mentah.
+              Huruf disajikan bersama situs ini, bukan diambil dari pihak ketiga. Tidak ada jaringan atau skrip iklan.
+              Pengukuran pembaca internal dilakukan sendiri tanpa cookie analitik dan tanpa alamat IP mentah, sementara
+              halaman publik memuat Google Tag Manager untuk pengukuran trafik dasar.
             </p>
 
             <h2>Independensi editorial</h2>
@@ -112,7 +112,8 @@ export function AboutPage({
               <li><a href="/admin">{ui.footer.editorialDesk}</a></li>
             </ul>
             <p className="meta" style={{ marginTop: '2rem', lineHeight: 1.8 }}>
-              Tanpa pelacak pihak ketiga. Tanpa iklan. Pengukuran pembaca dilakukan sendiri, tanpa cookie.
+              Tanpa iklan. Analitik internal tanpa cookie dan IP mentah; halaman publik memakai Google Tag Manager.{' '}
+              <a href="/privacy">Lihat kebijakan privasi</a>.
             </p>
           </aside>
         </div>

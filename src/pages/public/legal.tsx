@@ -62,7 +62,7 @@ export function PrivacyPage({
       path="/privacy"
       kicker="Privasi"
       title="Kebijakan privasi"
-      updated="6 November 2026"
+      updated="8 November 2026"
     >
       <p>
         RhandytaVERSE adalah publikasi personal yang ditulis dan disunting oleh Rhandyta Briantama. Kebijakan ini
@@ -83,29 +83,37 @@ export function PrivacyPage({
 
       <h2>Pembaca dan analitik pengunjung</h2>
       <p>
-        Meja editorial mengukur pembaca tanpa cookie analitik, jaringan iklan, atau pelacak pihak ketiga. Alamat IP
-        mentah dan string user-agent mentah tidak disimpan. Pengenal pengunjung adalah hash bergaram yang hanya dipakai
-        untuk menghapus duplikasi kunjungan; alamatnya disamarkan sebelum di-hash. Saya menyimpan informasi kasar
-        tentang perangkat, peramban, sistem operasi, negara, dan host perujuk eksternal untuk laporan agregat.
+        Analitik internal meja editorial mengukur pembaca tanpa cookie analitik internal, jaringan iklan, atau
+        penyimpanan alamat IP dan user-agent mentah. Pengenal pengunjung adalah hash bergaram yang hanya dipakai untuk
+        menghapus duplikasi kunjungan; alamat IP disamarkan sebelum di-hash. Saya menyimpan informasi kasar tentang
+        perangkat, peramban, sistem operasi, negara, dan host perujuk eksternal untuk laporan agregat.
       </p>
       <p>
-        Peristiwa analitik disimpan 180 hari. Jumlah pembaca unik agregat tetap disimpan agar total artikel tetap
-        bermakna. Permintaan DNT dan Global Privacy Control dikecualikan. Kunjungan internal/admin, bot, dan prefetch
-        juga dikecualikan.
+        Peristiwa analitik internal disimpan 180 hari, sementara jumlah pembaca unik agregat tetap disimpan agar total
+        artikel tetap bermakna. Permintaan DNT dan Global Privacy Control dikecualikan dari analitik internal. Kunjungan
+        internal/admin, bot, dan prefetch juga dikecualikan.
+      </p>
+      <p>
+        Selain analitik internal tersebut, halaman publik (tidak termasuk meja editorial dan halaman pratinjau)
+        memuat Google Tag Manager (<code>googletagmanager.com</code>) untuk pengukuran trafik situs. Pemroses pihak
+        ketiga ini beroperasi sesuai pengaturan peramban atau pemblokir skrip yang kamu gunakan serta kebijakan privasi
+        Google.
       </p>
 
       <h2>Hosting dan pemroses data</h2>
       <p>
-        Situs berjalan di Vercel, memakai Turso untuk basis data produksi, Vercel Blob untuk media, dan Resend untuk
-        surel. Penyedia tersebut memproses data sebagai infrastruktur/subprosesor. Saya tidak menjual data pribadi atau
-        memakainya untuk iklan.
+        Situs berjalan di Vercel, memakai Turso untuk basis data produksi, Vercel Blob untuk media, Resend untuk
+        surel, dan Google Tag Manager pada halaman publik untuk pengukuran trafik. Penyedia tersebut memproses data
+        sebagai infrastruktur atau layanan pengukuran terkait. Saya tidak menjual data pribadi atau menayangkan iklan.
       </p>
 
       <h2>Cookie dan penyimpanan lokal</h2>
       <p>
-        Pembaca publik tidak menerima cookie analitik. Meja editorial memakai cookie sesi pihak pertama untuk masuk.
-        Situs dapat memakai penyimpanan lokal peramban untuk preferensi tema dan artikel tersimpan; preferensi itu
-        tetap di perambanmu.
+        Situs inti dan analitik internal tidak menyetel cookie analitik sendiri. Pada halaman publik, Google Tag
+        Manager dapat memuat tag pengukuran atau cookie pihak ketiga sesuai konfigurasi Google Analytics. Meja
+        editorial memakai cookie sesi pihak pertama (<code>sid</code>) untuk autentikasi penulis dan penyunting. Situs
+        juga memakai penyimpanan lokal peramban untuk preferensi tema warna dan daftar artikel tersimpan; preferensi
+        tersebut tetap berada di perambanmu.
       </p>
 
       <h2>Pilihanmu</h2>

@@ -1,6 +1,7 @@
 import type { CategoryWithCount, SiteSettings, TagWithCount } from '../../lib/db/queries/taxonomy'
 import type { Author, MediaAsset, User } from '../../lib/db/schema'
 import type { EditorProps, EditorArticleState, AdminMediaSummary, MediaPageProps } from '../../lib/admin/types'
+import { canEditMediaAsset } from '../../lib/auth/permissions'
 import { parseDoc } from '../../lib/content/doc'
 import { AdminLayout } from '../../components/layout'
 import { Flash } from './shared'
@@ -9,7 +10,7 @@ function serializeProps(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')
 }
 
-export function mediaSummary(asset: MediaAsset): AdminMediaSummary {
+export function mediaSummary(asset: MediaAsset, canEdit?: boolean): AdminMediaSummary {
   return {
     id: asset.id,
     src: asset.src,
@@ -19,6 +20,7 @@ export function mediaSummary(asset: MediaAsset): AdminMediaSummary {
     height: asset.height,
     originalName: asset.originalName,
     createdAt: asset.createdAt,
+    ...(canEdit !== undefined ? { canEdit } : {}),
   }
 }
 
@@ -48,7 +50,7 @@ export function ArticleEditorPage({
     categories: categories.map((category) => ({ id: category.id, name: category.name, accent: category.accent })),
     authors: authors.map((author) => ({ id: author.id, displayName: author.displayName })),
     tags: tags.map((tag) => ({ id: tag.id, name: tag.name })),
-    media: media.map(mediaSummary),
+    media: media.map((asset) => mediaSummary(asset)),
     csrfToken,
     previewToken,
     defaultAuthorId,
@@ -147,7 +149,7 @@ export function MediaLibraryPage({
   flash: Flash
 }) {
   const props: MediaPageProps = {
-    media: media.map(mediaSummary),
+    media: media.map((asset) => mediaSummary(asset, canEditMediaAsset(user, asset))),
     csrfToken,
   }
   return (
@@ -171,8 +173,8 @@ export function MediaLibraryPage({
         dangerouslySetInnerHTML={{ __html: serializeProps(props) }}
       />
       <p className="hint" style={{ marginTop: '1rem' }}>
-        Uploads are converted to WebP and AVIF at several widths, with a 1200×630 social crop. The media library is
-        shared by everyone with editorial access.
+        Uploads are converted to WebP and AVIF at several widths, with a 1200×630 social crop. Authors can update or
+        delete their own uploads; editors and administrators manage the full library.
       </p>
     </AdminLayout>
   )

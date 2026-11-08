@@ -55,13 +55,13 @@ export function ArticlePage({
         {preview ? (
           <div className="shell" style={{ paddingTop: '1rem' }}>
             <div className="flash" data-tone="success" role="status">
-              Preview — artikel ini berstatus {article.status}. Hanya orang dengan tautan ini yang dapat melihatnya selama belum diterbitkan.
+              Pratinjau — artikel ini berstatus {article.status}. Hanya orang dengan tautan ini yang dapat melihatnya selama belum diterbitkan.
             </div>
           </div>
         ) : null}
         <div className="shell">
-          <nav className="breadcrumb" aria-label="Remah roti">
-            <a href="/">Home</a>
+          <nav className="breadcrumb" aria-label="Navigasi lokasi">
+            <a href="/">Beranda</a>
             <span className="sep" aria-hidden="true">/</span>
             {category ? (
               <>

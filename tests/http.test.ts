@@ -425,6 +425,8 @@ describe('authentication and authorization', () => {
       '/admin/subscribers',
       '/admin/newsletter',
       '/admin/settings',
+      '/admin/account',
+      '/admin/users',
       '/admin/audit',
     ]
     for (const path of paths) {

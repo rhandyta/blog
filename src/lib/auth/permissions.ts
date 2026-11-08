@@ -32,6 +32,15 @@ export function canManageMedia(user: User | null | undefined): boolean {
   return canManageContent(user)
 }
 
+export function canEditMediaAsset(
+  user: User | null | undefined,
+  asset: { uploadedBy: string | null } | null,
+): boolean {
+  if (!user || !asset) return false
+  if (canManageMedia(user)) return true
+  return Boolean(asset.uploadedBy && asset.uploadedBy === user.id)
+}
+
 export function roleLabel(role: string): string {
   if (role === 'admin') return 'Administrator'
   if (role === 'editor') return 'Editor'

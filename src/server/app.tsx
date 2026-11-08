@@ -24,16 +24,24 @@ const CONTENT_TYPES: Record<string, string> = {
   svg: 'image/svg+xml',
 }
 
-function contentSecurityPolicy(): string {
+function contentSecurityPolicy(allowAnalytics: boolean): string {
   const dev = !isProd()
   const viteOrigin = process.env.VITE_ORIGIN || 'http://localhost:5173'
   const devSources = dev
     ? ` ${viteOrigin} http://127.0.0.1:5173 ws://localhost:5173 ws://127.0.0.1:5173`
     : ''
-  const gtmScriptSources = " https://www.googletagmanager.com https://www.google-analytics.com 'unsafe-inline'"
-  const gtmConnectSources = ' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com'
-  const gtmImgSources = ' https://www.googletagmanager.com https://*.google-analytics.com'
-  const scriptSrc = `'self'${gtmScriptSources}${devSources}`
+  const devScriptSources = dev ? ` 'unsafe-inline'${devSources}` : ''
+  const gtmScriptSources = allowAnalytics
+    ? ' https://www.googletagmanager.com https://www.google-analytics.com'
+    : ''
+  const gtmConnectSources = allowAnalytics
+    ? ' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com'
+    : ''
+  const gtmImgSources = allowAnalytics
+    ? ' https://www.googletagmanager.com https://*.google-analytics.com'
+    : ''
+  const gtmFrameSources = allowAnalytics ? ' https://www.googletagmanager.com' : ''
+  const scriptSrc = `'self'${gtmScriptSources}${devScriptSources}`
   const styleSrc = `'self' 'unsafe-inline'${dev ? devSources : ''}`
   const connectSrc = `'self'${gtmConnectSources}${dev ? devSources : ''}`
   const blobSources = ' https://*.public.blob.vercel-storage.com'
@@ -44,13 +52,44 @@ function contentSecurityPolicy(): string {
     `img-src 'self' data: blob:${blobSources}${gtmImgSources}${dev ? devSources : ''}`,
     `font-src 'self' data:${dev ? devSources : ''}`,
     `connect-src ${connectSrc}`,
-    "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com https://www.googletagmanager.com",
+    `frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com${gtmFrameSources}`,
     "media-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
   ].join('; ')
+}
+
+function isPublicCacheableHtmlPath(path: string): boolean {
+  if (
+    path === '/' ||
+    path === '/articles' ||
+    path === '/topics' ||
+    path === '/archive' ||
+    path === '/about' ||
+    path === '/privacy' ||
+    path === '/terms'
+  ) {
+    return true
+  }
+  return (
+    path.startsWith('/articles/') ||
+    path.startsWith('/category/') ||
+    path.startsWith('/author/') ||
+    path.startsWith('/tags/')
+  )
+}
+
+function isPrivateNoStorePath(path: string): boolean {
+  return (
+    path === '/admin' ||
+    path.startsWith('/admin/') ||
+    path.startsWith('/preview/') ||
+    path === '/subscribe' ||
+    path === '/confirm' ||
+    path === '/unsubscribe'
+  )
 }
 
 export function createApp(): Hono<AppEnv> {
@@ -65,11 +104,13 @@ export function createApp(): Hono<AppEnv> {
 
   app.use('*', async (c, next) => {
     await next()
+    const path = c.req.path
+    const allowAnalytics = path !== '/admin' && !path.startsWith('/admin/') && !path.startsWith('/preview/')
     c.header('X-Content-Type-Options', 'nosniff')
     c.header('X-Frame-Options', 'DENY')
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
     c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()')
-    c.header('Content-Security-Policy', contentSecurityPolicy())
+    c.header('Content-Security-Policy', contentSecurityPolicy(allowAnalytics))
     if (isProd()) c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
   })
 
@@ -109,12 +150,17 @@ export function createApp(): Hono<AppEnv> {
     await next()
     if (c.res.ok) c.header('Cache-Control', 'public, max-age=3600')
   })
+  app.use('/analytics.js', async (c, next) => {
+    await next()
+    if (c.res.ok) c.header('Cache-Control', 'public, max-age=3600')
+  })
   // Vite copies public assets into dist/client during a production build, so
   // the deployed function only needs that directory.
   const staticRoot = isProd() ? './dist/client' : './public'
   app.use('/assets/*', serveStatic({ root: './dist/client' }))
   app.use('/fonts/*', serveStatic({ root: staticRoot }))
   app.use('/theme.js', serveStatic({ root: staticRoot }))
+  app.use('/analytics.js', serveStatic({ root: staticRoot }))
   app.use('/favicon.svg', serveStatic({ root: staticRoot }))
   app.use('/manifest.webmanifest', serveStatic({ root: staticRoot }))
 
@@ -154,8 +200,15 @@ export function createApp(): Hono<AppEnv> {
       const duration = Math.round(performance.now() - start)
       console.log(`${c.req.method} ${c.req.path} → ${c.res.status} (${duration}ms)`)
     }
-    if (c.res.headers.get('content-type')?.includes('text/html')) {
-      c.header('Cache-Control', 'no-cache')
+    if (c.res.headers.get('content-type')?.includes('text/html') && !c.res.headers.has('cache-control')) {
+      const path = c.req.path
+      if (isPrivateNoStorePath(path) || c.get('user')) {
+        c.header('Cache-Control', 'private, no-store')
+      } else if (c.req.method === 'GET' && c.res.status === 200 && isPublicCacheableHtmlPath(path)) {
+        c.header('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=300')
+      } else {
+        c.header('Cache-Control', 'no-cache')
+      }
     }
   })
 
@@ -173,7 +226,7 @@ export function createApp(): Hono<AppEnv> {
       head: baseHead({
         settings,
         origin,
-        title: 'Page not found',
+        title: 'Halaman tidak ditemukan',
         description: 'Alamat yang kamu minta tidak ada di indeks.',
         path: c.req.path,
         robots: 'noindex, follow',
@@ -198,8 +251,8 @@ export function createApp(): Hono<AppEnv> {
       head: baseHead({
         settings,
         origin,
-        title: 'Server error',
-        description: 'An unexpected error occurred.',
+        title: 'Kesalahan server',
+        description: 'Terjadi kesalahan tak terduga.',
         path: c.req.path,
         robots: 'noindex, nofollow',
       }),

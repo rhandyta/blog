@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, ne, sql } from 'drizzle-orm'
 import { getDb } from '../client'
 import { articleTags, articles, authors, categories, settings, tags } from '../schema'
 
@@ -63,23 +63,27 @@ export const defaultSettings: SiteSettings = {
   siteLanguage: 'id',
 }
 
-let cachedSettings: SiteSettings | null = null
+export const SETTINGS_CACHE_TTL_MS = 30_000
+let cachedSettings: { value: SiteSettings; expiresAt: number } | null = null
 
 export async function getSiteSettings(): Promise<SiteSettings> {
-  if (cachedSettings) return cachedSettings
+  if (cachedSettings && Date.now() < cachedSettings.expiresAt) {
+    return cachedSettings.value
+  }
   const rows = await getDb().select().from(settings).where(eq(settings.key, 'site')).limit(1)
+  let resolved: SiteSettings
   if (!rows[0]) {
-    cachedSettings = { ...defaultSettings }
-    return cachedSettings
+    resolved = { ...defaultSettings }
+  } else {
+    try {
+      const stored = JSON.parse(rows[0].value) as Partial<SiteSettings>
+      resolved = { ...defaultSettings, ...stored }
+    } catch {
+      resolved = { ...defaultSettings }
+    }
   }
-  try {
-    const stored = JSON.parse(rows[0].value) as Partial<SiteSettings>
-    cachedSettings = { ...defaultSettings, ...stored }
-    return cachedSettings
-  } catch {
-    cachedSettings = { ...defaultSettings }
-    return cachedSettings
-  }
+  cachedSettings = { value: resolved, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS }
+  return resolved
 }
 
 export function invalidateSettingsCache(): void {
@@ -94,7 +98,7 @@ export async function saveSiteSettings(patch: Partial<SiteSettings>): Promise<Si
     .insert(settings)
     .values({ key: 'site', value: JSON.stringify(next), updatedAt: now })
     .onConflictDoUpdate({ target: settings.key, set: { value: JSON.stringify(next), updatedAt: now } })
-  cachedSettings = next
+  cachedSettings = { value: next, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS }
   return next
 }
 
@@ -266,6 +270,35 @@ export async function getAuthorById(id: string) {
 export async function getAuthorForUser(userId: string) {
   const rows = await getDb().select().from(authors).where(eq(authors.userId, userId)).limit(1)
   return rows[0]
+}
+
+export async function uniqueAuthorSlug(baseSlug: string, excludeId?: string): Promise<string> {
+  const clean = baseSlug || 'author'
+  let candidate = clean
+  for (let suffix = 2; suffix < 100; suffix += 1) {
+    const existing = await getAuthorBySlug(candidate)
+    if (!existing || existing.id === excludeId) return candidate
+    candidate = `${clean}-${suffix}`
+  }
+  return `${clean}-${crypto.randomUUID().slice(0, 6)}`
+}
+
+export async function setAuthorUserLink(authorId: string | null, userId: string): Promise<boolean> {
+  const db = getDb()
+  const now = new Date().toISOString()
+  if (authorId) {
+    const target = await getAuthorById(authorId)
+    if (!target) return false
+    if (target.userId && target.userId !== userId) return false
+    await db
+      .update(authors)
+      .set({ userId: null, updatedAt: now })
+      .where(and(eq(authors.userId, userId), ne(authors.id, authorId)))
+    await db.update(authors).set({ userId, updatedAt: now }).where(eq(authors.id, authorId))
+    return true
+  }
+  await db.update(authors).set({ userId: null, updatedAt: now }).where(eq(authors.userId, userId))
+  return true
 }
 
 export async function upsertAuthor(input: {

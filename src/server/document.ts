@@ -9,6 +9,7 @@ export type DocumentOptions = {
   bodyClass?: string
   lang?: string
   noScripts?: boolean
+  noAnalytics?: boolean
 }
 
 export function renderDocument(options: DocumentOptions): string {
@@ -17,6 +18,8 @@ export function renderDocument(options: DocumentOptions): string {
   const styles = [...new Set(assets.flatMap((asset) => asset.styles))]
   const scripts = [...new Set(assets.flatMap((asset) => asset.scripts))]
   const viteClient = viteClientScript()
+  const includeAnalytics =
+    !options.noAnalytics && options.entry !== 'admin' && options.entry !== 'admin-common'
 
   const styleTags = styles.map((href) => `<link rel="stylesheet" href="${href}">`).join('\n    ')
   const scriptTags = scripts
@@ -47,13 +50,11 @@ export function renderDocument(options: DocumentOptions): string {
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="preload" href="/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+    ${includeAnalytics
+      ? `<script src="/analytics.js"></script>
     <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-NSRP398Z"></script>
-    <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-TW77C5JM"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-    </script>
+    <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-TW77C5JM"></script>`
+      : ''}
     <script src="/theme.js"></script>
     ${options.head}
     ${styleTags}

@@ -99,7 +99,7 @@ export function SiteHeader({
       </div>
 
       <div className="shell masthead">
-        <a href="/" className="wordmark" aria-label={`${settings.title} — home`}>
+        <a href="/" className="wordmark" aria-label={`${settings.title} — beranda`}>
           <Fleuron size={19} />
           {settings.title}
         </a>
@@ -171,7 +171,7 @@ export function SiteFooter({
       <div className="shell">
         <div className="footer-grid">
           <div className="footer-brand">
-            <a href="/" className="wordmark" aria-label={`${settings.title} — home`}>
+            <a href="/" className="wordmark" aria-label={`${settings.title} — beranda`}>
               <Fleuron size={22} />
               {settings.title}
             </a>
@@ -367,9 +367,9 @@ export function AdminLayout({
             navStats ? `${navStats.drafts} draft${navStats.drafts === 1 ? '' : 's'}` : undefined,
           )}
           {adminLink(path, '/admin/media', 'Media')}
-          {adminLink(path, '/admin/automation', 'Automation')}
           {user.role !== 'author' ? (
             <>
+              {adminLink(path, '/admin/automation', 'Automation')}
               <div className="admin-nav__group">Organise</div>
               {adminLink(path, '/admin/categories', 'Categories')}
               {adminLink(path, '/admin/tags', 'Tags')}
@@ -380,9 +380,12 @@ export function AdminLayout({
               {adminLink(path, '/admin/newsletter', 'Newsletter')}
               <div className="admin-nav__group">Settings</div>
               {adminLink(path, '/admin/settings', 'Settings')}
+              {user.role === 'admin' ? adminLink(path, '/admin/users', 'Users') : null}
               {user.role === 'admin' ? adminLink(path, '/admin/audit', 'Audit log') : null}
             </>
           ) : null}
+          <div className="admin-nav__group">Account</div>
+          {adminLink(path, '/admin/account', 'Account')}
         </nav>
         <div className="admin-side__foot">
           <a href="/" target="_blank" rel="noopener">View site ↗</a>
