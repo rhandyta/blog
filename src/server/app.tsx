@@ -30,18 +30,21 @@ function contentSecurityPolicy(): string {
   const devSources = dev
     ? ` ${viteOrigin} http://127.0.0.1:5173 ws://localhost:5173 ws://127.0.0.1:5173`
     : ''
-  const scriptSrc = dev ? `'self' 'unsafe-inline'${devSources}` : "'self'"
+  const gtmScriptSources = " https://www.googletagmanager.com https://www.google-analytics.com 'unsafe-inline'"
+  const gtmConnectSources = ' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com'
+  const gtmImgSources = ' https://www.googletagmanager.com https://*.google-analytics.com'
+  const scriptSrc = `'self'${gtmScriptSources}${devSources}`
   const styleSrc = `'self' 'unsafe-inline'${dev ? devSources : ''}`
-  const connectSrc = `'self'${dev ? devSources : ''}`
+  const connectSrc = `'self'${gtmConnectSources}${dev ? devSources : ''}`
   const blobSources = ' https://*.public.blob.vercel-storage.com'
   return [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     `style-src ${styleSrc}`,
-    `img-src 'self' data: blob:${blobSources}${dev ? devSources : ''}`,
+    `img-src 'self' data: blob:${blobSources}${gtmImgSources}${dev ? devSources : ''}`,
     `font-src 'self' data:${dev ? devSources : ''}`,
     `connect-src ${connectSrc}`,
-    "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com",
+    "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com https://www.googletagmanager.com",
     "media-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
