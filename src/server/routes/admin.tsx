@@ -23,6 +23,7 @@ import {
   deleteArticle,
   getArticleById,
   getArticleTags,
+  getAdminNavStats,
   getDashboardStats,
   listAdminArticles,
   listRevisions,
@@ -107,6 +108,7 @@ import {
 import { generateAutomationDraft, generationWindowStart } from '../../lib/automation/generate'
 import { hasGeminiKey } from '../../lib/automation/gemini'
 import { hasImageGenerationKey } from '../../lib/automation/image'
+import { AdminNavStatsProvider, type AdminNavStats } from '../../components/layout'
 import { baseHead } from '../head'
 import { renderPageResponse } from '../render-page'
 import type { AppEnv } from '../types'
@@ -199,11 +201,23 @@ async function renderAdminPage(
   c: Context<AppEnv>,
   element: ReactElement,
   entry: 'admin' | 'admin-common' = 'admin-common',
+  navStats?: AdminNavStats | null,
 ): Promise<Response> {
-  const settings = await getSiteSettings().catch(() => defaultSettings)
+  const [settings, resolvedStats] = await Promise.all([
+    getSiteSettings().catch(() => defaultSettings),
+    navStats === null
+      ? Promise.resolve(undefined)
+      : navStats
+        ? Promise.resolve(navStats)
+        : getAdminNavStats().catch(() => undefined),
+  ])
   const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
   return renderPageResponse(c, {
-    element,
+    element: resolvedStats ? (
+      <AdminNavStatsProvider stats={resolvedStats}>{element}</AdminNavStatsProvider>
+    ) : (
+      element
+    ),
     entry,
     head: baseHead({
       settings,
@@ -447,6 +461,8 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         subscriberCount={subs.subscribed}
         csrfToken={c.get('session')!.csrfToken}
       />,
+      'admin-common',
+      { drafts: stats.drafts, scheduled: stats.scheduled },
     )
   })
 
@@ -563,6 +579,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         origin={getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')}
       />,
       'admin',
+      null,
     )
   })
 
@@ -618,6 +635,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         origin={getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')}
       />,
       'admin',
+      null,
     )
   })
 

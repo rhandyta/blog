@@ -191,7 +191,6 @@ export function ArticleListPage({
       subtitle={`${total} pieces`}
       actions={<a className="btn btn--solid" href="/admin/articles/new">New article</a>}
       flash={flash}
-      stats={{ drafts: 0, scheduled: 0 }}
       csrfToken={session.csrfToken}
     >
       <form className="filter-bar" method="get" action="/admin/articles">

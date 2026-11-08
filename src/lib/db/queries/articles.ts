@@ -879,6 +879,21 @@ export async function rebuildSearchIndex(): Promise<number> {
  *  Dashboard stats
  * ------------------------------------------------------------------ */
 
+export async function getAdminNavStats(): Promise<{ drafts: number; scheduled: number }> {
+  const rows = await getDb()
+    .select({ status: articles.status, n: count() })
+    .from(articles)
+    .where(inArray(articles.status, ['draft', 'scheduled']))
+    .groupBy(articles.status)
+  let drafts = 0
+  let scheduled = 0
+  for (const row of rows) {
+    if (row.status === 'draft') drafts = Number(row.n) || 0
+    if (row.status === 'scheduled') scheduled = Number(row.n) || 0
+  }
+  return { drafts, scheduled }
+}
+
 export async function getDashboardStats() {
   const db = getDb()
   const [total, published, drafts, scheduled, subscriberRows, mediaRows, weekViews, weekReaders] = await Promise.all([

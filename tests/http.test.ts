@@ -410,6 +410,32 @@ describe('authentication and authorization', () => {
     expect(await response.text()).toContain('Overview')
   })
 
+  test('sidebar Articles draft count is consistent across all admin pages', async () => {
+    const { cookie } = await login()
+    const paths = [
+      '/admin',
+      '/admin/articles',
+      '/admin/articles/art_test_published/revisions',
+      '/admin/media',
+      '/admin/automation',
+      '/admin/categories',
+      '/admin/tags',
+      '/admin/authors',
+      '/admin/analytics',
+      '/admin/subscribers',
+      '/admin/newsletter',
+      '/admin/settings',
+      '/admin/audit',
+    ]
+    for (const path of paths) {
+      const response = await app.request(path, { headers: { cookie } })
+      expect({ path, status: response.status }).toEqual({ path, status: 200 })
+      const html = await response.text()
+      const match = /<a href="\/admin\/articles"[^>]*><span>Articles<\/span><span class="count"[^>]*>(\d+)<\/span><\/a>/.exec(html)
+      expect({ path, badge: match?.[1] }).toEqual({ path, badge: '1' })
+    }
+  })
+
   test('logout requires a CSRF token and destroys the session', async () => {
     const { cookie, csrfToken } = await login()
     const missing = await app.request('/admin/logout', {

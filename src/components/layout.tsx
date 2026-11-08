@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import type { SiteSettings, CategoryWithCount } from '../lib/db/queries/taxonomy'
 import type { User } from '../lib/db/schema'
 import { roleLabel } from '../lib/auth/permissions'
@@ -303,11 +303,25 @@ export function NewsletterBand({ settings }: { settings: SiteSettings }) {
  *  Admin shell
  * ------------------------------------------------------------------ */
 
-function adminLink(path: string, href: string, label: string, badge?: number) {
+export type AdminNavStats = { drafts: number; scheduled: number }
+
+const AdminNavStatsContext = createContext<AdminNavStats | undefined>(undefined)
+
+export function AdminNavStatsProvider({
+  stats,
+  children,
+}: {
+  stats: AdminNavStats | undefined
+  children: ReactNode
+}) {
+  return <AdminNavStatsContext.Provider value={stats}>{children}</AdminNavStatsContext.Provider>
+}
+
+function adminLink(path: string, href: string, label: string, badge?: number, badgeTitle?: string) {
   return (
     <a key={href} href={href} aria-current={path === href || (href !== '/admin' && path.startsWith(href)) ? 'page' : undefined}>
       <span>{label}</span>
-      {badge !== undefined ? <span className="count">{badge}</span> : null}
+      {badge !== undefined ? <span className="count" title={badgeTitle}>{badge}</span> : null}
     </a>
   )
 }
@@ -330,9 +344,11 @@ export function AdminLayout({
   subtitle?: string
   actions?: ReactNode
   flash?: { tone: 'success' | 'error'; message: string } | null
-  stats?: { drafts: number; scheduled: number }
+  stats?: AdminNavStats
   csrfToken?: string
 }) {
+  const contextStats = useContext(AdminNavStatsContext)
+  const navStats = stats ?? contextStats
   return (
     <div className="admin-shell">
       <aside className="admin-side">
@@ -343,7 +359,13 @@ export function AdminLayout({
         <div className="admin-side__context">Editorial desk</div>
         <nav className="admin-nav" aria-label="Admin">
           {adminLink(path, '/admin', 'Overview')}
-          {adminLink(path, '/admin/articles', 'Articles', stats?.drafts)}
+          {adminLink(
+            path,
+            '/admin/articles',
+            'Articles',
+            navStats?.drafts,
+            navStats ? `${navStats.drafts} draft${navStats.drafts === 1 ? '' : 's'}` : undefined,
+          )}
           {adminLink(path, '/admin/media', 'Media')}
           {adminLink(path, '/admin/automation', 'Automation')}
           {user.role !== 'author' ? (

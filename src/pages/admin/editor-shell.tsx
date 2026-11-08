@@ -157,7 +157,6 @@ export function MediaLibraryPage({
       title="Media"
       subtitle={`${media.length} assets · images are optimised on upload`}
       flash={flash}
-      stats={{ drafts: 0, scheduled: 0 }}
       csrfToken={csrfToken}
     >
       <div id="admin-root" data-mode="media">
