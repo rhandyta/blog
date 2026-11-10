@@ -5,25 +5,17 @@ import { getSiteSettings } from '../db/queries/taxonomy'
 import { getDigestArticles } from '../db/queries/analytics'
 import { getNewsletterSchedule, hasDigestForPeriod } from '../db/queries/newsletter'
 import { listConfirmedSubscribers, recordNewsletterBroadcast } from '../db/queries/subscribers'
-import {
-  cadenceLabel,
-  digestIntro,
-  digestSubject,
-  isDigestDue,
-  periodDays,
-  periodKey,
-} from './schedule'
+import { DEFAULT_LOCALE, localizedPath, parseLocale } from '../i18n'
+import { cadenceLabel, digestIntro, digestSubject, isDigestDue, periodDays, periodKey } from './schedule'
 
 export type DigestRunResult =
   | { status: 'sent'; sent: number; failed: number; recipients: number; articles: number; period: string }
   | { status: 'skipped'; reason: 'disabled' | 'not-due' | 'already-sent' | 'no-articles' | 'no-subscribers' }
   | { status: 'error'; reason: 'not-configured' | 'too-many' | 'failed' }
 
-export async function runScheduledNewsletter(options: {
-  force?: boolean
-  actorId?: string | null
-  now?: Date
-} = {}): Promise<DigestRunResult> {
+export async function runScheduledNewsletter(
+  options: { force?: boolean; actorId?: string | null; now?: Date } = {},
+): Promise<DigestRunResult> {
   const now = options.now ?? new Date()
   const schedule = await getNewsletterSchedule()
   if (!options.force) {
@@ -47,17 +39,18 @@ export async function runScheduledNewsletter(options: {
 
   const settings = await getSiteSettings()
   const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
-  const subject = digestSubject(schedule.cadence)
-  const intro = digestIntro(schedule.cadence)
   const messages = recipients.map((subscriber) => {
-    const unsubscribeUrl = `${origin}/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribeToken)}`
+    // Each subscriber receives the digest in the language they subscribed with.
+    const locale = parseLocale(subscriber.locale) ?? DEFAULT_LOCALE
+    const unsubscribeUrl = `${origin}${localizedPath(locale, `/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribeToken)}`)}`
     return {
       to: subscriber.email,
       ...digestEmail({
         siteTitle: settings.title,
         origin,
-        subject,
-        intro,
+        subject: digestSubject(schedule.cadence, locale, settings.title),
+        intro: digestIntro(schedule.cadence, locale),
+        locale,
         articles,
         unsubscribeUrl,
       }),
@@ -72,8 +65,9 @@ export async function runScheduledNewsletter(options: {
   const failed = results.length - sent
 
   await recordNewsletterBroadcast({
-    subject,
-    body: `${cadenceLabel(schedule.cadence)} digest · ${articles.map((article) => article.title).join(' · ')}`,
+    // The desk record is written in the publication's default language.
+    subject: digestSubject(schedule.cadence, DEFAULT_LOCALE, settings.title),
+    body: `${cadenceLabel(schedule.cadence, DEFAULT_LOCALE)} digest · ${articles.map((article) => article.title).join(' · ')}`,
     recipientCount: recipients.length,
     sentCount: sent,
     failedCount: failed,

@@ -2,6 +2,7 @@ import { createLowlight, common } from 'lowlight'
 import type { MediaInfo, PMDoc, PMMark, PMNode, TocEntry } from './doc'
 import { nodeText, slugify } from './doc'
 import { escapeAttr, escapeHtml, safeUrl } from './html'
+import { DEFAULT_LOCALE, getTranslator, type Locale } from '../i18n'
 
 const lowlight = createLowlight(common)
 
@@ -86,8 +87,7 @@ function srcset(variants: Array<{ w: number; src: string }> | undefined): string
 function renderImage(node: PMNode, media: Map<string, MediaInfo>): string {
   const mediaId = typeof node.attrs?.mediaId === 'string' ? node.attrs.mediaId : null
   const info = mediaId ? media.get(mediaId) : undefined
-  const caption =
-    (typeof node.attrs?.caption === 'string' && node.attrs.caption) || info?.caption || ''
+  const caption = (typeof node.attrs?.caption === 'string' && node.attrs.caption) || info?.caption || ''
   const alt = (typeof node.attrs?.alt === 'string' && node.attrs.alt) || info?.alt || ''
   let inner = ''
 
@@ -132,6 +132,14 @@ type RenderContext = {
   ids: WeakMap<object, string>
   html: string[]
   toc: TocEntry[]
+  labels: {
+    copy: string
+    copyAria: string
+    copied: string
+    manual: string
+    mediaEmbed: string
+    untitledSection: string
+  }
 }
 
 function renderChildren(nodes: PMNode[] | undefined, context: RenderContext): string {
@@ -159,7 +167,8 @@ function renderNode(node: PMNode, context: RenderContext): string {
     case 'bulletList':
       return `<ul>${renderChildren(node.content, context)}</ul>`
     case 'orderedList': {
-      const start = typeof node.attrs?.start === 'number' && node.attrs.start !== 1 ? ` start="${node.attrs.start}"` : ''
+      const start =
+        typeof node.attrs?.start === 'number' && node.attrs.start !== 1 ? ` start="${node.attrs.start}"` : ''
       return `<ol${start}>${renderChildren(node.content, context)}</ol>`
     }
     case 'listItem':
@@ -170,7 +179,9 @@ function renderNode(node: PMNode, context: RenderContext): string {
       const language = typeof node.attrs?.language === 'string' ? node.attrs.language : undefined
       const code = node.content?.map((child) => child.text ?? '').join('') ?? ''
       const label = language ? `<span class="code-lang">${escapeHtml(language)}</span>` : ''
-      return `<div class="code-block">${label}<button class="code-copy" type="button" data-copy-code aria-label="Copy code to clipboard">Salin</button><pre><code${language ? ` class="language-${escapeAttr(language)}"` : ''}>${highlightCode(code, language)}</code></pre></div>`
+      // The copy button carries its translated states so the client script does
+      // not need to know the language.
+      return `<div class="code-block">${label}<button class="code-copy" type="button" data-copy-code aria-label="${escapeAttr(context.labels.copyAria)}" data-copied-label="${escapeAttr(context.labels.copied)}" data-manual-label="${escapeAttr(context.labels.manual)}">${escapeHtml(context.labels.copy)}</button><pre><code${language ? ` class="language-${escapeAttr(language)}"` : ''}>${highlightCode(code, language)}</code></pre></div>`
     }
     case 'horizontalRule':
       return '<hr class="article-rule">'
@@ -188,7 +199,7 @@ function renderNode(node: PMNode, context: RenderContext): string {
       const src = embedUrl(node)
       if (!src) return ''
       const caption = typeof node.attrs?.caption === 'string' ? node.attrs.caption : ''
-      const title = caption || 'Media tersemat'
+      const title = caption || context.labels.mediaEmbed
       return `<figure class="embed"><div class="embed-frame"><iframe src="${escapeAttr(src)}" title="${escapeAttr(title)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ''}</figure>`
     }
     default:
@@ -198,10 +209,23 @@ function renderNode(node: PMNode, context: RenderContext): string {
 
 export type RenderResult = { html: string; toc: TocEntry[] }
 
-export function renderDoc(doc: PMDoc, media: Map<string, MediaInfo> = new Map()): RenderResult {
+export function renderDoc(
+  doc: PMDoc,
+  media: Map<string, MediaInfo> = new Map(),
+  locale: Locale = DEFAULT_LOCALE,
+): RenderResult {
   const ids = new WeakMap<object, string>()
   const toc: TocEntry[] = []
   const used = new Map<string, number>()
+  const t = getTranslator(locale)
+  const labels = {
+    copy: t('article.copy'),
+    copyAria: t('article.copyAria'),
+    copied: t('article.copied'),
+    manual: t('article.selectManually'),
+    mediaEmbed: t('article.mediaEmbed'),
+    untitledSection: t('article.untitledSection'),
+  }
 
   const walk = (nodes: PMNode[] | undefined) => {
     for (const node of nodes ?? []) {
@@ -213,14 +237,14 @@ export function renderDoc(doc: PMDoc, media: Map<string, MediaInfo> = new Map())
         const id = seen === 0 ? base : `${base}-${seen + 1}`
         ids.set(node, id)
         const level = typeof node.attrs?.level === 'number' ? node.attrs.level : 2
-        if (level <= 4) toc.push({ id, text: text || 'Bagian tanpa judul', level })
+        if (level <= 4) toc.push({ id, text: text || labels.untitledSection, level })
       }
       walk(node.content)
     }
   }
   walk(doc.content)
 
-  const context: RenderContext = { media, ids, html: [], toc }
+  const context: RenderContext = { media, ids, html: [], toc, labels }
   const html = renderChildren(doc.content, context)
   return { html, toc }
 }

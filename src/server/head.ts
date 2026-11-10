@@ -2,6 +2,7 @@ import type { MediaInfo } from '../lib/content/doc'
 import type { SiteSettings } from '../lib/db/queries/taxonomy'
 import { ACCENTS } from '../lib/db/queries/taxonomy'
 import type { MediaAsset } from '../lib/db/schema'
+import { LOCALE_META, isExternalHref, localizedPath, type Locale } from '../lib/i18n'
 import { fallbackOgPath } from '../lib/media/og-fallback'
 import type { OgImage, PageHead } from '../lib/seo/meta'
 
@@ -12,7 +13,11 @@ export function parseMediaVariants(value: string | null | undefined): {
 } {
   if (!value) return {}
   try {
-    return JSON.parse(value) as { avif?: Array<{ w: number; src: string }>; webp?: Array<{ w: number; src: string }>; og?: string }
+    return JSON.parse(value) as {
+      avif?: Array<{ w: number; src: string }>
+      webp?: Array<{ w: number; src: string }>
+      og?: string
+    }
   } catch {
     return {}
   }
@@ -34,9 +39,15 @@ export function ogFromMedia(media: MediaAsset | MediaInfo | null): OgImage | nul
   }
 }
 
+/**
+ * Builds the head for one localized page. `path` is the locale-free path
+ * (`/articles/slug`); the canonical URL and every hreflang alternate are
+ * derived from it so new routes cannot forget their translations.
+ */
 export function baseHead(input: {
   settings: SiteSettings
   origin: string
+  locale: Locale
   title: string
   description: string
   path: string
@@ -49,10 +60,12 @@ export function baseHead(input: {
   section?: string | null
   tags?: string[]
   jsonLd?: unknown[]
-  lang?: string
-  locale?: string
+  alternates?: PageHead['alternates']
+  /** Set when the page's language differs from the interface language. */
+  htmlLang?: string
   pagination?: { prev?: string | null; next?: string | null }
 }): PageHead {
+  const meta = LOCALE_META[input.locale]
   const noIndex = (input.robots ?? '').includes('noindex')
   const ogImage =
     input.ogImage ??
@@ -65,10 +78,22 @@ export function baseHead(input: {
           alt: input.settings.title,
         })
 
+  const canonicalPath = isExternalHref(input.path) ? input.path : localizedPath(input.locale, input.path)
+  const alternates =
+    input.alternates ??
+    (noIndex || isExternalHref(input.path)
+      ? undefined
+      : [
+          { hreflang: 'id', path: localizedPath('id', input.path) },
+          { hreflang: 'en', path: localizedPath('en', input.path) },
+          // The Indonesian page is the default document for unqualified links.
+          { hreflang: 'x-default', path: localizedPath('id', input.path) },
+        ])
+
   return {
     title: input.title,
     description: input.description,
-    canonicalPath: input.path,
+    canonicalPath,
     robots: input.robots,
     ogType: input.ogType,
     ogImage,
@@ -80,9 +105,9 @@ export function baseHead(input: {
     jsonLd: input.jsonLd ?? [],
     siteName: input.settings.title,
     origin: input.origin,
-    lang: input.lang ?? input.settings.siteLanguage ?? 'en',
-    locale: input.locale ?? (input.settings.siteLanguage === 'id' ? 'id_ID' : 'en_US'),
+    lang: input.htmlLang ?? meta.htmlLang,
+    locale: meta.ogLocale,
+    alternates,
     pagination: input.pagination,
   }
 }
-

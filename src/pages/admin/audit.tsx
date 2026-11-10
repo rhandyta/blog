@@ -1,5 +1,5 @@
 import type { AdminAuditEntry, User } from '../../lib/db/schema'
-import { formatDate } from '../../lib/content/html'
+import { useI18n } from '../../lib/i18n'
 import { AdminLayout } from '../../components/layout'
 import { PaginationNav } from './shared'
 
@@ -18,41 +18,45 @@ export function AuditPage({
   totalPages: number
   csrfToken: string
 }) {
+  const { t, formatDate } = useI18n()
   return (
     <AdminLayout
       user={user}
       path="/admin/audit"
-      title="Audit log"
-      subtitle={`${total} recorded action${total === 1 ? '' : 's'}`}
+      title={t('adminDashboard.audit.title')}
+      subtitle={t('adminDashboard.audit.subtitle', { count: total })}
       csrfToken={csrfToken}
     >
       <p className="hint" style={{ marginBottom: '1rem' }}>
-        Administrative mutations are recorded with the actor, action, response status, and a hashed IP. This log is
-        visible to administrators only.
+        {t('adminDashboard.audit.hint')}
       </p>
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Time</th>
-              <th>Actor</th>
-              <th>Action</th>
-              <th>Detail</th>
-              <th>IP hash</th>
+              <th>{t('adminDashboard.audit.colTime')}</th>
+              <th>{t('adminDashboard.audit.colActor')}</th>
+              <th>{t('adminDashboard.audit.colAction')}</th>
+              <th>{t('adminDashboard.audit.colDetail')}</th>
+              <th>{t('adminDashboard.audit.colIpHash')}</th>
             </tr>
           </thead>
           <tbody>
             {entries.map(({ entry, actorName }) => (
               <tr key={entry.id}>
                 <td className="muted-cell">{formatDate(entry.createdAt, 'long')}</td>
-                <td className="muted-cell">{actorName ?? 'System'}</td>
+                <td className="muted-cell">{actorName ?? t('adminDashboard.audit.system')}</td>
                 <td className="title-cell">{entry.action}</td>
                 <td className="muted-cell">{entry.detail ?? '—'}</td>
                 <td className="muted-cell">{entry.ipHash ? entry.ipHash.slice(0, 12) : '—'}</td>
               </tr>
             ))}
             {!entries.length ? (
-              <tr><td colSpan={5} className="hint" style={{ padding: '1.5rem' }}>No audit entries yet.</td></tr>
+              <tr>
+                <td colSpan={5} className="hint" style={{ padding: '1.5rem' }}>
+                  {t('adminDashboard.audit.empty')}
+                </td>
+              </tr>
             ) : null}
           </tbody>
         </table>

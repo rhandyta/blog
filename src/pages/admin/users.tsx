@@ -1,9 +1,9 @@
 import type { UserSummary, UserSessionSummary } from '../../lib/db/queries/users'
 import type { Author, User } from '../../lib/db/schema'
-import { roleLabel } from '../../lib/auth/permissions'
-import { formatDate } from '../../lib/content/html'
+import { roleKey } from '../../lib/auth/permissions'
+import { useI18n } from '../../lib/i18n'
 import { AdminLayout } from '../../components/layout'
-import { CsrfField, Flash } from './shared'
+import { CsrfField, type Flash } from './shared'
 
 export function AccountPage({
   user,
@@ -20,59 +20,57 @@ export function AccountPage({
   session: { csrfToken: string }
   flash: Flash
 }) {
+  const { t, formatDate } = useI18n()
   return (
     <AdminLayout
       user={user}
       path="/admin/account"
-      title="Account"
-      subtitle={`${user.email} · ${roleLabel(user.role)}`}
+      title={t('adminSystem.account.title')}
+      subtitle={t('adminSystem.account.subtitle', { email: user.email, role: t(roleKey(user.role)) })}
       flash={flash}
       csrfToken={session.csrfToken}
     >
       <div className="admin-grid">
         <section className="admin-card" style={{ gridColumn: 'span 6' }}>
-          <h2>Profile</h2>
+          <h2>{t('adminSystem.account.profile')}</h2>
           <form method="post" action="/admin/account/profile" className="admin-form">
             <CsrfField token={session.csrfToken} />
             <div className="field">
-              <label htmlFor="account-name">Display name</label>
-              <input
-                className="input"
-                id="account-name"
-                name="name"
-                defaultValue={user.name}
-                required
-                maxLength={80}
-              />
+              <label htmlFor="account-name">{t('adminSystem.account.displayName')}</label>
+              <input className="input" id="account-name" name="name" defaultValue={user.name} required maxLength={80} />
             </div>
             <div className="field">
-              <span className="label">Email</span>
+              <span className="label">{t('adminSystem.account.email')}</span>
               <p className="hint">{user.email}</p>
             </div>
             <div className="form-row">
               <div className="field">
-                <span className="label">Role</span>
-                <p className="hint">{roleLabel(user.role)}</p>
+                <span className="label">{t('adminSystem.account.role')}</span>
+                <p className="hint">{t(roleKey(user.role))}</p>
               </div>
               <div className="field">
-                <span className="label">Author profile</span>
+                <span className="label">{t('adminSystem.account.authorProfile')}</span>
                 <p className="hint">
-                  {linkedAuthor ? `${linkedAuthor.displayName} (/${linkedAuthor.slug})` : 'None linked'}
+                  {linkedAuthor
+                    ? `${linkedAuthor.displayName} (/${linkedAuthor.slug})`
+                    : t('adminSystem.account.noneLinked')}
                 </p>
               </div>
             </div>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Save profile</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminSystem.account.saveProfile')}
+              </button>
             </div>
           </form>
         </section>
 
         <section className="admin-card" style={{ gridColumn: 'span 6' }}>
-          <h2>Change password</h2>
+          <h2>{t('adminSystem.account.changePassword')}</h2>
           <form method="post" action="/admin/account/password" className="admin-form">
             <CsrfField token={session.csrfToken} />
             <div className="field">
-              <label htmlFor="currentPassword">Current password</label>
+              <label htmlFor="currentPassword">{t('adminSystem.account.currentPassword')}</label>
               <input
                 className="input"
                 id="currentPassword"
@@ -83,7 +81,7 @@ export function AccountPage({
               />
             </div>
             <div className="field">
-              <label htmlFor="newPassword">New password</label>
+              <label htmlFor="newPassword">{t('adminSystem.account.newPassword')}</label>
               <input
                 className="input"
                 id="newPassword"
@@ -94,10 +92,10 @@ export function AccountPage({
                 maxLength={200}
                 required
               />
-              <p className="hint">Use at least 8 characters.</p>
+              <p className="hint">{t('adminSystem.account.passwordHint')}</p>
             </div>
             <div className="field">
-              <label htmlFor="confirmPassword">Confirm new password</label>
+              <label htmlFor="confirmPassword">{t('adminSystem.account.confirmNewPassword')}</label>
               <input
                 className="input"
                 id="confirmPassword"
@@ -112,27 +110,31 @@ export function AccountPage({
             <label className="checkbox">
               <input type="checkbox" name="revokeOthers" defaultChecked />
               <span>
-                Sign out other active sessions
-                <small>Keeps this browser signed in and ends all other sessions.</small>
+                {t('adminSystem.account.signOutOthers')}
+                <small>{t('adminSystem.account.signOutOthersHint')}</small>
               </span>
             </label>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Update password</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminSystem.account.updatePassword')}
+              </button>
             </div>
           </form>
         </section>
 
         <section className="admin-card" style={{ gridColumn: '1 / -1' }}>
           <div className="admin-card__head">
-            <h2>Active sessions ({sessions.length})</h2>
+            <h2>{t('adminSystem.account.activeSessions', { count: sessions.length })}</h2>
             {sessions.length > 1 ? (
               <form
                 method="post"
                 action="/admin/account/sessions/revoke-others"
-                data-confirm="Sign out all other active sessions?"
+                data-confirm={t('adminSystem.account.signOutOthersConfirm')}
               >
                 <CsrfField token={session.csrfToken} />
-                <button className="btn btn--ghost btn--small" type="submit">Sign out other sessions</button>
+                <button className="btn btn--ghost btn--small" type="submit">
+                  {t('adminSystem.account.signOutOtherSessions')}
+                </button>
               </form>
             ) : null}
           </div>
@@ -140,10 +142,10 @@ export function AccountPage({
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Session</th>
-                  <th>Device / Browser</th>
-                  <th>Created</th>
-                  <th>Expires</th>
+                  <th>{t('adminSystem.account.session')}</th>
+                  <th>{t('adminSystem.account.deviceBrowser')}</th>
+                  <th>{t('adminSystem.account.created')}</th>
+                  <th>{t('adminSystem.account.expires')}</th>
                   <th />
                 </tr>
               </thead>
@@ -154,22 +156,24 @@ export function AccountPage({
                     <tr key={row.id}>
                       <td>
                         <span className="status" data-status={isCurrentSession ? 'published' : 'draft'}>
-                          {isCurrentSession ? 'Current' : 'Active'}
+                          {isCurrentSession ? t('adminSystem.account.current') : t('adminSystem.account.active')}
                         </span>
                       </td>
                       <td className="muted-cell" style={{ textTransform: 'none', maxWidth: '28rem' }}>
-                        {row.userAgent ? row.userAgent.slice(0, 90) : 'Unknown browser'}
+                        {row.userAgent ? row.userAgent.slice(0, 90) : t('adminSystem.account.unknownBrowser')}
                       </td>
                       <td className="muted-cell">{formatDate(row.createdAt, 'short')}</td>
                       <td className="muted-cell">{formatDate(row.expiresAt, 'short')}</td>
                       <td>
                         <div className="actions">
                           {isCurrentSession ? (
-                            <span className="muted-cell">This browser</span>
+                            <span className="muted-cell">{t('adminSystem.account.thisBrowser')}</span>
                           ) : (
                             <form method="post" action={`/admin/account/sessions/${row.id}/revoke`}>
                               <CsrfField token={session.csrfToken} />
-                              <button className="btn btn--danger btn--small" type="submit">Revoke</button>
+                              <button className="btn btn--danger btn--small" type="submit">
+                                {t('adminSystem.account.revoke')}
+                              </button>
                             </form>
                           )}
                         </div>
@@ -179,7 +183,9 @@ export function AccountPage({
                 })}
                 {!sessions.length ? (
                   <tr>
-                    <td colSpan={5} className="hint" style={{ padding: '1.25rem' }}>No active sessions found.</td>
+                    <td colSpan={5} className="hint" style={{ padding: '1.25rem' }}>
+                      {t('adminSystem.account.noSessions')}
+                    </td>
                   </tr>
                 ) : null}
               </tbody>
@@ -202,13 +208,14 @@ export function UsersPage({
   session: { csrfToken: string }
   flash: Flash
 }) {
+  const { t, formatDate, href } = useI18n()
   const activeCount = users.filter((item) => item.active).length
   return (
     <AdminLayout
       user={user}
       path="/admin/users"
-      title="Users"
-      subtitle={`${users.length} accounts · ${activeCount} active`}
+      title={t('adminSystem.users.title')}
+      subtitle={t('adminSystem.users.subtitle', { total: users.length, active: activeCount })}
       flash={flash}
       csrfToken={session.csrfToken}
     >
@@ -218,11 +225,11 @@ export function UsersPage({
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th className="num">Sessions</th>
-                  <th>Last login</th>
+                  <th>{t('adminSystem.users.name')}</th>
+                  <th>{t('adminSystem.users.role')}</th>
+                  <th>{t('adminSystem.users.status')}</th>
+                  <th className="num">{t('adminSystem.users.sessions')}</th>
+                  <th>{t('adminSystem.users.lastLogin')}</th>
                   <th />
                 </tr>
               </thead>
@@ -230,23 +237,31 @@ export function UsersPage({
                 {users.map((item) => (
                   <tr key={item.id}>
                     <td className="title-cell">
-                      <a href={`/admin/users/${item.id}`}>{item.name}</a>
-                      {item.id === user.id ? <span className="muted-cell" style={{ marginLeft: '0.4rem' }}>(you)</span> : null}
+                      <a href={href(`/admin/users/${item.id}`)}>{item.name}</a>
+                      {item.id === user.id ? (
+                        <span className="muted-cell" style={{ marginLeft: '0.4rem' }}>
+                          {t('adminSystem.users.you')}
+                        </span>
+                      ) : null}
                       <div className="meta" style={{ marginTop: '0.2rem' }}>
                         {item.email}
                         {item.authorSlug ? ` · /author/${item.authorSlug}` : ''}
                       </div>
                     </td>
-                    <td className="muted-cell">{roleLabel(item.role)}</td>
+                    <td className="muted-cell">{t(roleKey(item.role))}</td>
                     <td>
                       <span className="status" data-status={item.active ? 'published' : 'archived'}>
-                        {item.active ? 'active' : 'disabled'}
+                        {item.active ? t('adminSystem.users.activeStatus') : t('adminSystem.users.disabledStatus')}
                       </span>
                     </td>
                     <td className="num">{item.sessionCount}</td>
-                    <td className="muted-cell">{item.lastLoginAt ? formatDate(item.lastLoginAt, 'short') : 'Never'}</td>
+                    <td className="muted-cell">
+                      {item.lastLoginAt ? formatDate(item.lastLoginAt, 'short') : t('adminSystem.users.never')}
+                    </td>
                     <td>
-                      <a className="btn btn--ghost btn--small" href={`/admin/users/${item.id}`}>Edit</a>
+                      <a className="btn btn--ghost btn--small" href={href(`/admin/users/${item.id}`)}>
+                        {t('adminSystem.users.edit')}
+                      </a>
                     </td>
                   </tr>
                 ))}
@@ -256,19 +271,19 @@ export function UsersPage({
         </section>
 
         <section className="admin-card" style={{ gridColumn: 'span 4' }}>
-          <h2>New user</h2>
+          <h2>{t('adminSystem.users.newUser')}</h2>
           <form method="post" action="/admin/users" className="admin-form">
             <CsrfField token={session.csrfToken} />
             <div className="field">
-              <label htmlFor="new-user-name">Name</label>
+              <label htmlFor="new-user-name">{t('adminSystem.users.name')}</label>
               <input className="input" id="new-user-name" name="name" required maxLength={80} />
             </div>
             <div className="field">
-              <label htmlFor="new-user-email">Email</label>
+              <label htmlFor="new-user-email">{t('adminSystem.users.email')}</label>
               <input className="input" id="new-user-email" name="email" type="email" required maxLength={200} />
             </div>
             <div className="field">
-              <label htmlFor="new-user-password">Password</label>
+              <label htmlFor="new-user-password">{t('adminSystem.users.password')}</label>
               <input
                 className="input"
                 id="new-user-password"
@@ -278,25 +293,27 @@ export function UsersPage({
                 maxLength={200}
                 required
               />
-              <p className="hint">At least 8 characters.</p>
+              <p className="hint">{t('adminSystem.users.passwordHint')}</p>
             </div>
             <div className="field">
-              <label htmlFor="new-user-role">Role</label>
+              <label htmlFor="new-user-role">{t('adminSystem.users.role')}</label>
               <select className="select" id="new-user-role" name="role" defaultValue="author">
-                <option value="author">Author — own articles &amp; own uploads</option>
-                <option value="editor">Editor — editorial desk, analytics &amp; settings</option>
-                <option value="admin">Administrator — full desk &amp; user management</option>
+                <option value="author">{t('adminSystem.users.roleAuthor')}</option>
+                <option value="editor">{t('adminSystem.users.roleEditor')}</option>
+                <option value="admin">{t('adminSystem.users.roleAdmin')}</option>
               </select>
             </div>
             <label className="checkbox">
               <input type="checkbox" name="createAuthor" defaultChecked />
               <span>
-                Create matching public author profile
-                <small>Allows Author accounts to draft and save articles right away.</small>
+                {t('adminSystem.users.createAuthorProfile')}
+                <small>{t('adminSystem.users.createAuthorHint')}</small>
               </span>
             </label>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Create user</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminSystem.users.create')}
+              </button>
             </div>
           </form>
         </section>
@@ -322,6 +339,7 @@ export function UserEditPage({
   session: { csrfToken: string }
   flash: Flash
 }) {
+  const { t, formatDate, href } = useI18n()
   const isSelf = target.id === user.id
   const assignableAuthors = authors.filter((author) => !author.userId || author.userId === target.id)
 
@@ -330,19 +348,26 @@ export function UserEditPage({
       user={user}
       path="/admin/users"
       title={target.name}
-      subtitle={`${target.email} · ${roleLabel(target.role)}`}
-      actions={<a className="btn btn--ghost" href="/admin/users">← All users</a>}
+      subtitle={t('adminSystem.userEdit.subtitle', {
+        email: target.email,
+        role: t(roleKey(target.role)),
+      })}
+      actions={
+        <a className="btn btn--ghost" href={href('/admin/users')}>
+          {t('adminSystem.userEdit.allUsers')}
+        </a>
+      }
       flash={flash}
       csrfToken={session.csrfToken}
     >
       <div className="admin-grid">
         <section className="admin-card" style={{ gridColumn: 'span 8' }}>
-          <h2>Account details</h2>
+          <h2>{t('adminSystem.userEdit.accountDetails')}</h2>
           <form method="post" action={`/admin/users/${target.id}`} className="admin-form">
             <CsrfField token={session.csrfToken} />
             <div className="form-row">
               <div className="field">
-                <label htmlFor="edit-user-name">Name</label>
+                <label htmlFor="edit-user-name">{t('adminSystem.userEdit.name')}</label>
                 <input
                   className="input"
                   id="edit-user-name"
@@ -353,7 +378,7 @@ export function UserEditPage({
                 />
               </div>
               <div className="field">
-                <label htmlFor="edit-user-email">Email</label>
+                <label htmlFor="edit-user-email">{t('adminSystem.userEdit.email')}</label>
                 <input
                   className="input"
                   id="edit-user-email"
@@ -367,22 +392,17 @@ export function UserEditPage({
             </div>
             <div className="form-row">
               <div className="field">
-                <label htmlFor="edit-user-role">Role</label>
+                <label htmlFor="edit-user-role">{t('adminSystem.userEdit.role')}</label>
                 <select className="select" id="edit-user-role" name="role" defaultValue={target.role}>
-                  <option value="author">Author</option>
-                  <option value="editor">Editor</option>
-                  <option value="admin">Administrator</option>
+                  <option value="author">{t(roleKey('author'))}</option>
+                  <option value="editor">{t(roleKey('editor'))}</option>
+                  <option value="admin">{t(roleKey('admin'))}</option>
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="edit-user-author">Linked author profile</label>
-                <select
-                  className="select"
-                  id="edit-user-author"
-                  name="authorId"
-                  defaultValue={linkedAuthorId ?? ''}
-                >
-                  <option value="">No linked author profile</option>
+                <label htmlFor="edit-user-author">{t('adminSystem.userEdit.linkedAuthor')}</label>
+                <select className="select" id="edit-user-author" name="authorId" defaultValue={linkedAuthorId ?? ''}>
+                  <option value="">{t('adminSystem.userEdit.noLinkedAuthor')}</option>
                   {assignableAuthors.map((author) => (
                     <option key={author.id} value={author.id}>
                       {author.displayName} (/{author.slug})
@@ -394,27 +414,27 @@ export function UserEditPage({
             <label className="checkbox">
               <input type="checkbox" name="active" defaultChecked={target.active} />
               <span>
-                Active account
+                {t('adminSystem.userEdit.activeAccount')}
                 <small>
-                  {isSelf
-                    ? 'You cannot disable or demote your own administrator account.'
-                    : 'Disabled accounts are signed out immediately and cannot log in.'}
+                  {isSelf ? t('adminSystem.userEdit.selfLockoutHint') : t('adminSystem.userEdit.disabledHint')}
                 </small>
               </span>
             </label>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Save user</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminSystem.userEdit.save')}
+              </button>
             </div>
           </form>
         </section>
 
         <aside style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <section className="admin-card">
-            <h2>Reset password</h2>
+            <h2>{t('adminSystem.userEdit.resetPassword')}</h2>
             <form method="post" action={`/admin/users/${target.id}/password`} className="admin-form">
               <CsrfField token={session.csrfToken} />
               <div className="field">
-                <label htmlFor="reset-password">New password</label>
+                <label htmlFor="reset-password">{t('adminSystem.userEdit.newPassword')}</label>
                 <input
                   className="input"
                   id="reset-password"
@@ -426,7 +446,7 @@ export function UserEditPage({
                 />
               </div>
               <div className="field">
-                <label htmlFor="reset-confirm">Confirm password</label>
+                <label htmlFor="reset-confirm">{t('adminSystem.userEdit.confirmPassword')}</label>
                 <input
                   className="input"
                   id="reset-confirm"
@@ -438,30 +458,34 @@ export function UserEditPage({
                 />
               </div>
               <p className="hint">
-                {isSelf
-                  ? 'Ends other active sessions on password reset.'
-                  : 'Immediately signs out all active sessions for this user.'}
+                {isSelf ? t('adminSystem.userEdit.resetSelfHint') : t('adminSystem.userEdit.resetOtherHint')}
               </p>
               <div className="form-actions">
-                <button className="btn btn--solid" type="submit">Set new password</button>
+                <button className="btn btn--solid" type="submit">
+                  {t('adminSystem.userEdit.setNewPassword')}
+                </button>
               </div>
             </form>
           </section>
 
           <section className="admin-card">
-            <h2>Active sessions ({sessions.length})</h2>
+            <h2>{t('adminSystem.userEdit.activeSessions', { count: sessions.length })}</h2>
             <p className="hint" style={{ marginBottom: '1rem' }}>
-              Created {formatDate(target.createdAt, 'short')} · Last login{' '}
-              {target.lastLoginAt ? formatDate(target.lastLoginAt, 'short') : 'never'}.
+              {t('adminSystem.userEdit.sessionMeta', {
+                created: formatDate(target.createdAt, 'short'),
+                lastLogin: target.lastLoginAt
+                  ? formatDate(target.lastLoginAt, 'short')
+                  : t('adminSystem.userEdit.never'),
+              })}
             </p>
             <form
               method="post"
               action={`/admin/users/${target.id}/revoke-sessions`}
-              data-confirm="Sign out all active sessions for this user?"
+              data-confirm={t('adminSystem.userEdit.revokeAllConfirm')}
             >
               <CsrfField token={session.csrfToken} />
               <button className="btn btn--danger" type="submit" disabled={sessions.length === 0}>
-                Revoke all sessions
+                {t('adminSystem.userEdit.revokeAll')}
               </button>
             </form>
           </section>

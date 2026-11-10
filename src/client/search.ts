@@ -1,3 +1,5 @@
+import { clientMessages, fill, formatDateFor } from './client-i18n'
+
 type Part = { text: string; match: boolean }
 
 type SearchResult = {
@@ -10,6 +12,9 @@ type SearchResult = {
   titleParts: Part[]
   snippetParts: Part[]
 }
+
+const messages = clientMessages()
+const prefix = messages?.prefix ?? '/id'
 
 function partsNode(parts: Part[], parent: HTMLElement): void {
   for (const part of parts) {
@@ -26,7 +31,7 @@ function partsNode(parts: Part[], parent: HTMLElement): void {
 function resultNode(result: SearchResult): HTMLAnchorElement {
   const link = document.createElement('a')
   link.className = 'search-result'
-  link.href = `/articles/${result.slug}`
+  link.href = `${prefix}/articles/${result.slug}`
 
   const top = document.createElement('div')
   top.className = 'search-result__top'
@@ -35,12 +40,13 @@ function resultNode(result: SearchResult): HTMLAnchorElement {
   category.textContent = result.category
   const date = document.createElement('span')
   date.className = 'meta'
-  date.textContent = result.publishedAt
-    ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(result.publishedAt))
-    : ''
+  date.textContent = formatDateFor(messages?.dateLocale ?? 'id-ID', result.publishedAt)
   const reading = document.createElement('span')
   reading.className = 'meta'
-  reading.textContent = `${result.readingMinutes} menit baca`
+  const readingTemplate = result.readingMinutes === 1 ? messages?.search.readingOne : messages?.search.reading
+  reading.textContent = readingTemplate
+    ? fill(readingTemplate, { count: result.readingMinutes })
+    : String(result.readingMinutes)
   top.append(category, date, reading)
 
   const title = document.createElement('h2')
@@ -53,6 +59,26 @@ function resultNode(result: SearchResult): HTMLAnchorElement {
 
   link.append(top, title, excerpt)
   return link
+}
+
+function templateFor(query: string, count?: number): string {
+  const withQuery = (template: string | undefined, fallback: string) =>
+    template ? fill(template, { query }) : fallback
+  if (count === undefined) {
+    return withQuery(messages?.search.searching, `Searching “${query}”`)
+  }
+  const source = count === 1 ? messages?.search.countOne : messages?.search.count
+  const template = source ? fill(source, { query }) : ''
+  return template ? fill(template, { count }) : fallbackCount(query, count)
+}
+
+function fallbackCount(query: string, count: number): string {
+  return `${count} — “${query}”`
+}
+
+function noResults(query: string): string {
+  const template = messages?.search.none
+  return template ? fill(template, { query }) : `No results for “${query}”`
 }
 
 function setupSearch(): void {
@@ -90,12 +116,13 @@ function setupSearch(): void {
       return
     }
     loading.hidden = false
-    status.textContent = `Mencari “${trimmed}”`
+    status.textContent = templateFor(trimmed)
     liveResults.hidden = false
     if (serverResults) serverResults.hidden = true
     if (liveEmpty) liveEmpty.hidden = true
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`, {
+      const lang = messages?.locale ?? 'id'
+      const response = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}&lang=${lang}`, {
         signal: controller.signal,
         headers: { Accept: 'application/json' },
       })
@@ -105,17 +132,17 @@ function setupSearch(): void {
       if (!payload.results.length) {
         liveResults.hidden = true
         if (liveEmpty) liveEmpty.hidden = false
-        status.textContent = `Tidak ada hasil untuk “${trimmed}”`
+        status.textContent = noResults(trimmed)
       } else {
         for (const result of payload.results) liveResults.append(resultNode(result))
-        status.textContent = `${payload.results.length} hasil untuk “${trimmed}”`
+        status.textContent = templateFor(trimmed, payload.results.length)
       }
       const url = new URL(window.location.href)
       url.searchParams.set('q', trimmed)
       window.history.replaceState({}, '', url)
     } catch (error) {
       if ((error as Error).name === 'AbortError') return
-      status.textContent = 'Pencarian sedang tidak tersedia. Kirim formulir untuk mencoba lagi.'
+      status.textContent = messages?.search.unavailable ?? 'Search is unavailable right now.'
     } finally {
       loading.hidden = true
     }

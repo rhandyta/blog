@@ -1,13 +1,17 @@
-import type { CategoryWithCount, SiteSettings, TagWithCount } from '../../lib/db/queries/taxonomy'
+import type { CategoryWithCount, TagWithCount } from '../../lib/db/queries/taxonomy'
 import type { Author, MediaAsset, User } from '../../lib/db/schema'
 import type { EditorProps, EditorArticleState, AdminMediaSummary, MediaPageProps } from '../../lib/admin/types'
 import { canEditMediaAsset } from '../../lib/auth/permissions'
 import { parseDoc } from '../../lib/content/doc'
+import { useI18n } from '../../lib/i18n'
 import { AdminLayout } from '../../components/layout'
-import { Flash } from './shared'
+import type { Flash } from './shared'
 
 function serializeProps(value: unknown): string {
-  return JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
 }
 
 export function mediaSummary(asset: MediaAsset, canEdit?: boolean): AdminMediaSummary {
@@ -45,6 +49,7 @@ export function ArticleEditorPage({
   defaultAuthorId: string | null
   origin: string
 }) {
+  const { t } = useI18n()
   const props: EditorProps = {
     article,
     categories: categories.map((category) => ({ id: category.id, name: category.name, accent: category.accent })),
@@ -61,18 +66,20 @@ export function ArticleEditorPage({
     <div className="editor-page">
       <div id="admin-root" data-mode="editor">
         <div style={{ padding: '2rem' }}>
-          <a className="text-link" href="/admin/articles">← All articles</a>
-          <p className="hint" style={{ marginTop: '1rem' }}>Loading the editor…</p>
+          <a className="text-link" href="/admin/articles">
+            {t('adminContent.editor.allArticles')}
+          </a>
+          <p className="hint" style={{ marginTop: '1rem' }}>
+            {t('adminContent.editor.loading')}
+          </p>
           <noscript>
-            <p className="flash" data-tone="error">The rich text editor requires JavaScript. The public site works without it.</p>
+            <p className="flash" data-tone="error">
+              {t('adminContent.editor.noscript')}
+            </p>
           </noscript>
         </div>
       </div>
-      <script
-        type="application/json"
-        id="admin-props"
-        dangerouslySetInnerHTML={{ __html: serializeProps(props) }}
-      />
+      <script type="application/json" id="admin-props" dangerouslySetInnerHTML={{ __html: serializeProps(props) }} />
     </div>
   )
 }
@@ -137,17 +144,16 @@ export function articleToEditorState(input: {
 
 export function MediaLibraryPage({
   user,
-  settings,
   media,
   csrfToken,
   flash,
 }: {
   user: User
-  settings: SiteSettings
   media: MediaAsset[]
   csrfToken: string
   flash: Flash
 }) {
+  const { t } = useI18n()
   const props: MediaPageProps = {
     media: media.map((asset) => mediaSummary(asset, canEditMediaAsset(user, asset))),
     csrfToken,
@@ -156,25 +162,22 @@ export function MediaLibraryPage({
     <AdminLayout
       user={user}
       path="/admin/media"
-      title="Media"
-      subtitle={`${media.length} assets · images are optimised on upload`}
+      title={t('adminContent.media.title')}
+      subtitle={t('adminContent.media.subtitle', { count: media.length })}
       flash={flash}
       csrfToken={csrfToken}
     >
       <div id="admin-root" data-mode="media">
-        <p className="hint">Loading media library…</p>
+        <p className="hint">{t('adminContent.media.loading')}</p>
         <noscript>
-          <p className="flash" data-tone="error">The media library requires JavaScript.</p>
+          <p className="flash" data-tone="error">
+            {t('adminContent.media.noscript')}
+          </p>
         </noscript>
       </div>
-      <script
-        type="application/json"
-        id="admin-props"
-        dangerouslySetInnerHTML={{ __html: serializeProps(props) }}
-      />
+      <script type="application/json" id="admin-props" dangerouslySetInnerHTML={{ __html: serializeProps(props) }} />
       <p className="hint" style={{ marginTop: '1rem' }}>
-        Uploads are converted to WebP and AVIF at several widths, with a 1200×630 social crop. Authors can update or
-        delete their own uploads; editors and administrators manage the full library.
+        {t('adminContent.media.uploadHint')}
       </p>
     </AdminLayout>
   )

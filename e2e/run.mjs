@@ -188,7 +188,7 @@ async function main() {
     })
 
     // 1. Public homepage + strict CSP + external analytics.js initialization
-    await page.goto(`${origin}/`, { waitUntil: 'networkidle' })
+    await page.goto(`${origin}/id`, { waitUntil: 'networkidle' })
     const homeTitle = await page.title()
     assert.ok(homeTitle.includes('RhandytaVERSE'), `Unexpected title: ${homeTitle}`)
     await page.locator('text=The Published Test Article').first().waitFor({ state: 'visible' })
@@ -223,29 +223,31 @@ async function main() {
     logStep('Mobile navigation drawer opens and closes via Escape')
 
     // 4. Live client search on /search
-    await page.goto(`${origin}/search`, { waitUntil: 'networkidle' })
+    await page.goto(`${origin}/id/search`, { waitUntil: 'networkidle' })
     await page.locator('[data-search-input]').fill('notebook')
-    const liveHit = page.locator('[data-live-results] a[href="/articles/test-published"]')
+    const liveHit = page.locator('[data-live-results] a[href="/id/articles/test-published"]')
     await liveHit.waitFor({ state: 'visible' })
     const searchStatusText = await page.locator('[data-search-status]').textContent()
     assert.ok(searchStatusText?.includes('hasil'), `Unexpected search status: ${searchStatusText}`)
     logStep('Live client search queries /api/search and renders highlighted hits')
 
     // 5. Bookmarks & /saved list
-    await page.goto(`${origin}/articles/test-published`, { waitUntil: 'networkidle' })
+    await page.goto(`${origin}/id/articles/test-published`, { waitUntil: 'networkidle' })
     const bookmarkBtn = page.locator('[data-bookmark="test-published"]').first()
     await bookmarkBtn.click()
     assert.equal(await bookmarkBtn.getAttribute('aria-pressed'), 'true')
     assert.equal(await page.locator('[data-saved-count]').first().textContent(), '1')
 
-    await page.goto(`${origin}/saved`, { waitUntil: 'networkidle' })
-    await page.locator('[data-saved-list] a.article-row__title[href="/articles/test-published"]').waitFor({ state: 'visible' })
+    await page.goto(`${origin}/id/saved`, { waitUntil: 'networkidle' })
+    await page
+      .locator('[data-saved-list] a.article-row__title[href="/id/articles/test-published"]')
+      .waitFor({ state: 'visible' })
     await page.locator('[data-saved-list] button:has-text("Hapus")').first().click()
     await page.locator('[data-saved-empty]').waitFor({ state: 'visible' })
     logStep('Bookmarks persist to /saved and remove cleanly')
 
     // 6. Newsletter validation & progressive subscribe flow
-    await page.goto(`${origin}/subscribe`, { waitUntil: 'networkidle' })
+    await page.goto(`${origin}/id/subscribe`, { waitUntil: 'networkidle' })
     const newsletterForm = page.locator('form[data-newsletter]').first()
     await newsletterForm.locator('input[name="email"]').fill('invalid@no-tld')
     await newsletterForm.locator('button[type="submit"]').click()
@@ -259,14 +261,16 @@ async function main() {
     // 7. Admin route isolation & login
     await page.goto(`${origin}/admin`, { waitUntil: 'networkidle' })
     assert.ok(page.url().includes('/admin/login'))
-    const adminLoginHasAnalytics = await page.evaluate(() => Boolean(document.querySelector('script[src="/analytics.js"]')))
+    const adminLoginHasAnalytics = await page.evaluate(() =>
+      Boolean(document.querySelector('script[src="/analytics.js"]')),
+    )
     assert.equal(adminLoginHasAnalytics, false)
 
     await page.locator('input[name="email"]').fill('test@example.com')
     await page.locator('input[name="password"]').fill('test-password-123')
-    await page.locator('button[type="submit"]').click()
+    await page.locator('.login-form button[type="submit"]').click()
     await page.waitForURL(`${origin}/admin`)
-    await page.locator('h1:has-text("Overview")').waitFor({ state: 'visible' })
+    await page.locator('.admin-shell').waitFor({ state: 'visible' })
     logStep('Admin login establishes production session cookie and enforces no-analytics isolation')
 
     // 8. TipTap rich-text editor create & save draft

@@ -7,10 +7,13 @@ import { getSessionUser, SESSION_COOKIE } from '../lib/auth/session'
 import { getSiteSettings } from '../lib/db/queries/taxonomy'
 import { defaultSettings } from '../lib/db/queries/taxonomy'
 import { listCategories } from '../lib/db/queries/taxonomy'
+import { stripLocalePrefix, getTranslator } from '../lib/i18n'
 import { recordOpsEvent } from '../lib/ops/monitor'
 import { NotFoundPage } from '../pages/public/search'
 import { registerAdminRoutes } from './routes/admin'
+import { registerLocaleRoutes } from './routes/locale'
 import { registerPublicRoutes } from './routes/public'
+import { localeMiddleware, resolveRequestLocale } from './locale'
 import { renderPageResponse } from './render-page'
 import { baseHead } from './head'
 import type { AppEnv } from './types'
@@ -28,19 +31,13 @@ const CONTENT_TYPES: Record<string, string> = {
 function contentSecurityPolicy(allowAnalytics: boolean): string {
   const dev = !isProd()
   const viteOrigin = process.env.VITE_ORIGIN || 'http://localhost:5173'
-  const devSources = dev
-    ? ` ${viteOrigin} http://127.0.0.1:5173 ws://localhost:5173 ws://127.0.0.1:5173`
-    : ''
+  const devSources = dev ? ` ${viteOrigin} http://127.0.0.1:5173 ws://localhost:5173 ws://127.0.0.1:5173` : ''
   const devScriptSources = dev ? ` 'unsafe-inline'${devSources}` : ''
-  const gtmScriptSources = allowAnalytics
-    ? ' https://www.googletagmanager.com https://www.google-analytics.com'
-    : ''
+  const gtmScriptSources = allowAnalytics ? ' https://www.googletagmanager.com https://www.google-analytics.com' : ''
   const gtmConnectSources = allowAnalytics
     ? ' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com'
     : ''
-  const gtmImgSources = allowAnalytics
-    ? ' https://www.googletagmanager.com https://*.google-analytics.com'
-    : ''
+  const gtmImgSources = allowAnalytics ? ' https://www.googletagmanager.com https://*.google-analytics.com' : ''
   const gtmFrameSources = allowAnalytics ? ' https://www.googletagmanager.com' : ''
   const scriptSrc = `'self'${gtmScriptSources}${devScriptSources}`
   const styleSrc = `'self' 'unsafe-inline'${dev ? devSources : ''}`
@@ -62,7 +59,8 @@ function contentSecurityPolicy(allowAnalytics: boolean): string {
   ].join('; ')
 }
 
-function isPublicCacheableHtmlPath(path: string): boolean {
+function isPublicCacheableHtmlPath(rawPath: string): boolean {
+  const path = stripLocalePrefix(rawPath)
   if (
     path === '/' ||
     path === '/articles' ||
@@ -82,7 +80,8 @@ function isPublicCacheableHtmlPath(path: string): boolean {
   )
 }
 
-function isPrivateNoStorePath(path: string): boolean {
+function isPrivateNoStorePath(rawPath: string): boolean {
+  const path = stripLocalePrefix(rawPath)
   return (
     path === '/admin' ||
     path.startsWith('/admin/') ||
@@ -122,17 +121,17 @@ export function createApp(): Hono<AppEnv> {
     }
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(c.req.method)) {
       const origin = c.req.header('origin')
+      // Locale middleware has not run yet at this point, so negotiate directly
+      // from the URL, cookie and headers to keep guard messages translated.
+      const guardT = getTranslator(resolveRequestLocale(c).locale)
       if (origin) {
-        const allowed = new Set([
-          new URL(c.req.url).origin,
-          getConfig().PUBLIC_ORIGIN.replace(/\/$/, ''),
-        ])
+        const allowed = new Set([new URL(c.req.url).origin, getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')])
         if (!allowed.has(origin.replace(/\/$/, ''))) {
-          return c.text('Cross-origin request blocked.', 403)
+          return c.text(guardT('api.forbidden'), 403)
         }
       }
       if (c.req.header('sec-fetch-site') === 'cross-site') {
-        return c.text('Cross-site request blocked.', 403)
+        return c.text(guardT('api.forbidden'), 403)
       }
     }
     await next()
@@ -194,6 +193,9 @@ export function createApp(): Hono<AppEnv> {
     await next()
   })
 
+  // Language negotiation needs the signed-in user, so it runs after sessions.
+  app.use('*', localeMiddleware)
+
   app.use('*', async (c, next) => {
     const start = performance.now()
     await next()
@@ -215,21 +217,23 @@ export function createApp(): Hono<AppEnv> {
 
   registerPublicRoutes(app)
   registerAdminRoutes(app)
+  registerLocaleRoutes(app)
 
   app.notFound(async (c) => {
     const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
+    const t = c.get('t')
     const settings = await getSiteSettings().catch(() => defaultSettings)
     const categories = await listCategories({ withCounts: true }).catch(() => [])
+    const path = stripLocalePrefix(c.req.path)
     return renderPageResponse(c, {
-      element: (
-        <NotFoundPage settings={settings} categories={categories} status={404} />
-      ),
+      element: <NotFoundPage settings={settings} categories={categories} status={404} />,
       head: baseHead({
         settings,
         origin,
-        title: 'Halaman tidak ditemukan',
-        description: 'Alamat yang kamu minta tidak ada di indeks.',
-        path: c.req.path,
+        locale: c.get('locale'),
+        title: t('seo.notFoundTitle'),
+        description: t('seo.notFoundDescription'),
+        path,
         robots: 'noindex, follow',
       }),
       status: 404,
@@ -250,21 +254,22 @@ export function createApp(): Hono<AppEnv> {
       path: c.req.path,
     })
     if (c.req.path.startsWith('/api/')) {
-      return c.json({ error: 'Internal server error', requestId }, 500)
+      const message = c.get('t') ? c.get('t')('api.internalError') : 'Internal server error'
+      return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message }, requestId }, 500)
     }
+    const t = c.get('t')
     const settings = await getSiteSettings().catch(() => defaultSettings)
     const categories = await listCategories({ withCounts: true }).catch(() => [])
     const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
     return renderPageResponse(c, {
-      element: (
-        <NotFoundPage settings={settings} categories={categories} status={500} requestId={requestId} />
-      ),
+      element: <NotFoundPage settings={settings} categories={categories} status={500} requestId={requestId} />,
       head: baseHead({
         settings,
         origin,
-        title: 'Kesalahan server',
-        description: 'Terjadi kesalahan tak terduga.',
-        path: c.req.path,
+        locale: c.get('locale'),
+        title: t('seo.serverErrorTitle'),
+        description: t('seo.serverErrorDescription'),
+        path: stripLocalePrefix(c.req.path),
         robots: 'noindex, nofollow',
       }),
       status: 500,

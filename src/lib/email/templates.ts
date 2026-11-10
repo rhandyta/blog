@@ -1,13 +1,9 @@
 import { escapeHtml, splitParagraphs } from '../content/html'
+import { DEFAULT_LOCALE, LOCALE_META, getTranslator, localizedPath, type Locale } from '../i18n'
 
-function shell(input: {
-  siteTitle: string
-  title: string
-  body: string
-  footer: string
-}): string {
+function shell(input: { siteTitle: string; title: string; body: string; footer: string; lang: string }): string {
   return `<!doctype html>
-<html>
+<html lang="${escapeHtml(input.lang)}">
   <body style="margin:0;padding:0;background:#f6f2e9;color:#17140f;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f2e9;">
       <tr>
@@ -49,28 +45,36 @@ function paragraphs(text: string): string {
     .join('')
 }
 
-export function confirmationEmail(input: {
-  siteTitle: string
-  origin: string
-  token: string
-}): { subject: string; html: string; text: string } {
-  const confirmUrl = `${input.origin.replace(/\/$/, '')}/confirm?token=${encodeURIComponent(input.token)}`
-  const subject = `Konfirmasi langganan ${input.siteTitle}`
+/** Absolute link to a localized page, used inside emails. */
+function localizedUrl(origin: string, locale: Locale, path: string): string {
+  return `${origin.replace(/\/$/, '')}${localizedPath(locale, path)}`
+}
+
+export function confirmationEmail(input: { siteTitle: string; origin: string; token: string; locale?: Locale }): {
+  subject: string
+  html: string
+  text: string
+} {
+  const locale = input.locale ?? DEFAULT_LOCALE
+  const t = getTranslator(locale)
+  const confirmUrl = localizedUrl(input.origin, locale, `/confirm?token=${encodeURIComponent(input.token)}`)
+  const subject = t('mail.confirmSubject', { site: input.siteTitle })
   const body = `
-    <p style="margin:0 0 1em;">Kamu meminta menerima surat dari ${escapeHtml(input.siteTitle)}. Konfirmasi alamatmu untuk bergabung.</p>
+    <p style="margin:0 0 1em;">${escapeHtml(t('mail.confirmIntro', { site: input.siteTitle }))}</p>
     <p style="margin:0 0 1.4em;">
-      <a href="${escapeHtml(confirmUrl)}" style="display:inline-block;background:#17140f;color:#f6f2e9;text-decoration:none;padding:12px 18px;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;">Konfirmasi langganan</a>
+      <a href="${escapeHtml(confirmUrl)}" style="display:inline-block;background:#17140f;color:#f6f2e9;text-decoration:none;padding:12px 18px;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;">${escapeHtml(t('mail.confirmButton'))}</a>
     </p>
-    <p style="margin:0;font-size:14px;color:#7c7364;">Jika kamu tidak memintanya, abaikan surel ini. Tautan berlaku tujuh hari.</p>`
+    <p style="margin:0;font-size:14px;color:#7c7364;">${escapeHtml(t('mail.confirmIgnore'))}</p>`
   return {
     subject,
     html: shell({
       siteTitle: input.siteTitle,
-      title: 'Konfirmasi langganan',
+      title: t('mail.confirmTitle'),
       body,
-      footer: `Jika tombolnya tidak berfungsi, buka alamat ini:<br><a href="${escapeHtml(confirmUrl)}" style="color:#7c7364;">${escapeHtml(confirmUrl)}</a>`,
+      lang: LOCALE_META[locale].htmlLang,
+      footer: `${escapeHtml(t('mail.confirmFallback'))}<br><a href="${escapeHtml(confirmUrl)}" style="color:#7c7364;">${escapeHtml(confirmUrl)}</a>`,
     }),
-    text: `Konfirmasi langganan ${input.siteTitle}\n\nKamu meminta menerima surat dari ${input.siteTitle}. Konfirmasi alamatmu:\n${confirmUrl}\n\nJika kamu tidak memintanya, abaikan surel ini. Tautan berlaku tujuh hari.`,
+    text: `${t('mail.confirmText', { site: input.siteTitle })}\n\n${t('mail.confirmTextIntro', { site: input.siteTitle })}\n${confirmUrl}\n\n${t('mail.confirmIgnore')}`,
   }
 }
 
@@ -79,6 +83,7 @@ export function digestEmail(input: {
   origin: string
   subject: string
   intro: string
+  locale?: Locale
   articles: Array<{
     slug: string
     title: string
@@ -90,43 +95,47 @@ export function digestEmail(input: {
   }>
   unsubscribeUrl: string
 }): { subject: string; html: string; text: string } {
-  const base = input.origin.replace(/\/$/, '')
+  const locale = input.locale ?? DEFAULT_LOCALE
+  const t = getTranslator(locale)
   const items = input.articles
     .map((article, index) => {
-      const url = `${base}/articles/${article.slug}`
+      const url = localizedUrl(input.origin, locale, `/articles/${article.slug}`)
       return `
         <div style="padding:20px 0;border-top:1px solid #d8cfbf;">
           <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#7c7364;">
-            ${String(index + 1).padStart(2, '0')} · ${escapeHtml(article.categoryName ?? 'Esai')} · ${article.readingMinutes} menit baca
+            ${String(index + 1).padStart(2, '0')} · ${escapeHtml(article.categoryName ?? t('common.essay'))} · ${escapeHtml(t('mail.minRead', { count: article.readingMinutes }))}
           </div>
           <h2 style="margin:8px 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;font-weight:500;">
             <a href="${escapeHtml(url)}" style="color:#17140f;text-decoration:none;">${escapeHtml(article.title)}</a>
           </h2>
           <p style="margin:0 0 8px;font-size:15px;line-height:1.55;color:#4b453b;">${escapeHtml(article.excerpt)}</p>
           <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#7c7364;">
-            ${article.readers} pembaca · ${article.views} kunjungan
+            ${escapeHtml(t('mail.readers', { count: article.readers }))} · ${escapeHtml(t('mail.views', { count: article.views }))}
           </div>
           <p style="margin:10px 0 0;">
-            <a href="${escapeHtml(url)}" style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#17140f;">Baca tulisannya →</a>
+            <a href="${escapeHtml(url)}" aria-label="${escapeHtml(t('mail.digestReadAria', { title: article.title }))}" style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#17140f;">${escapeHtml(t('mail.digestRead'))} →</a>
           </p>
         </div>`
     })
     .join('')
-  const footer = `Kamu menerima ini karena berlangganan ${escapeHtml(input.siteTitle)}.<br><a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#7c7364;">Berhenti berlangganan</a>`
+  const footer = `${escapeHtml(t('mail.digestFooter', { site: input.siteTitle }))}<br><a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#7c7364;">${escapeHtml(t('mail.unsubscribe'))}</a>`
   return {
     subject: input.subject,
     html: shell({
       siteTitle: input.siteTitle,
       title: input.subject,
       body: `<p style="margin:0 0 1.2em;">${escapeHtml(input.intro)}</p>${items}`,
+      lang: LOCALE_META[locale].htmlLang,
       footer,
     }),
     text: `${input.subject}\n\n${input.intro}\n\n${input.articles
       .map(
-        (article, index) =>
-          `${index + 1}. ${article.title}\n${base}/articles/${article.slug}\n${article.readers} pembaca · ${article.views} kunjungan\n${article.excerpt}`,
+        (article) =>
+          `${article.title}\n${localizedUrl(input.origin, locale, `/articles/${article.slug}`)}\n${t('mail.readers', { count: article.readers })} · ${t('mail.views', { count: article.views })}\n${article.excerpt}`,
       )
-      .join('\n\n')}\n\nKamu menerima ini karena berlangganan ${input.siteTitle}.\nBerhenti berlangganan: ${input.unsubscribeUrl}`,
+      .join(
+        '\n\n',
+      )}\n\n${t('mail.digestTextFooter', { site: input.siteTitle })}\n${t('mail.unsubscribe')}: ${input.unsubscribeUrl}`,
   }
 }
 
@@ -136,16 +145,20 @@ export function newsletterEmail(input: {
   subject: string
   body: string
   unsubscribeUrl: string
+  locale?: Locale
 }): { subject: string; html: string; text: string } {
-  const footer = `Kamu menerima ini karena berlangganan ${escapeHtml(input.siteTitle)}.<br><a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#7c7364;">Berhenti berlangganan</a>`
+  const locale = input.locale ?? DEFAULT_LOCALE
+  const t = getTranslator(locale)
+  const footer = `${escapeHtml(t('mail.digestFooter', { site: input.siteTitle }))}<br><a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#7c7364;">${escapeHtml(t('mail.unsubscribe'))}</a>`
   return {
     subject: input.subject,
     html: shell({
       siteTitle: input.siteTitle,
       title: input.subject,
       body: paragraphs(input.body),
+      lang: LOCALE_META[locale].htmlLang,
       footer,
     }),
-    text: `${input.subject}\n\n${input.body.trim()}\n\nKamu menerima ini karena berlangganan ${input.siteTitle}.\nBerhenti berlangganan: ${input.unsubscribeUrl}`,
+    text: `${input.subject}\n\n${input.body.trim()}\n\n${t('mail.digestTextFooter', { site: input.siteTitle })}\n${t('mail.unsubscribe')}: ${input.unsubscribeUrl}`,
   }
 }

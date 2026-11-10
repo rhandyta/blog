@@ -36,7 +36,10 @@ export function externalLink(raw: string): boolean {
 }
 
 export function stripTags(html: string): string {
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /**
@@ -56,19 +59,6 @@ export function absoluteUrl(origin: string, path: string): string {
   if (/^https?:\/\//i.test(path)) return path
   const base = origin.replace(/\/$/, '')
   return `${base}${path.startsWith('/') ? path : `/${path}`}`
-}
-
-export function formatDate(iso: string | null | undefined, style: 'long' | 'short' | 'month' = 'long'): string {
-  if (!iso) return ''
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  if (style === 'short') {
-    return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
-  }
-  if (style === 'month') {
-    return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(date)
-  }
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
 }
 
 export function isoDay(date = new Date()): string {

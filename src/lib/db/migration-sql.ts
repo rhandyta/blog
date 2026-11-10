@@ -347,4 +347,11 @@ CREATE INDEX IF NOT EXISTS ops_events_created_idx ON ops_events(created_at DESC)
 CREATE INDEX IF NOT EXISTS ops_events_level_idx ON ops_events(level, created_at DESC);
 `,
   },
+  {
+    name: '012_i18n_locale.sql',
+    sql: `
+ALTER TABLE users ADD COLUMN locale TEXT;
+ALTER TABLE subscribers ADD COLUMN locale TEXT;
+`,
+  },
 ]

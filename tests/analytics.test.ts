@@ -16,7 +16,8 @@ const articleId = 'art_analytics_test'
 
 function cookieFrom(response: Response): string {
   const headers = response.headers as Headers & { getSetCookie?: () => string[] }
-  const values = headers.getSetCookie?.() ?? (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')!] : [])
+  const values =
+    headers.getSetCookie?.() ?? (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')!] : [])
   return values.map((value) => value.split(';')[0]).join('; ')
 }
 
@@ -56,16 +57,25 @@ describe('visitor privacy helpers', () => {
   })
 
   test('classifies devices, browsers and operating systems coarsely', () => {
-    expect(parseUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36'))
-      .toEqual({ device: 'desktop', browser: 'Chrome', os: 'Windows' })
-    expect(parseUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1'))
-      .toEqual({ device: 'mobile', browser: 'Safari', os: 'iOS' })
-    expect(parseUserAgent('Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1'))
-      .toEqual({ device: 'tablet', browser: 'Safari', os: 'iOS' })
+    expect(
+      parseUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36'),
+    ).toEqual({ device: 'desktop', browser: 'Chrome', os: 'Windows' })
+    expect(
+      parseUserAgent(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1',
+      ),
+    ).toEqual({ device: 'mobile', browser: 'Safari', os: 'iOS' })
+    expect(
+      parseUserAgent(
+        'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1',
+      ),
+    ).toEqual({ device: 'tablet', browser: 'Safari', os: 'iOS' })
   })
 
   test('keeps only an external referrer host and a valid country code', () => {
-    expect(normalizeReferrer('https://www.example.com/posts/1?email=secret', 'https://lab-rb.my.id')).toBe('example.com')
+    expect(normalizeReferrer('https://www.example.com/posts/1?email=secret', 'https://lab-rb.my.id')).toBe(
+      'example.com',
+    )
     expect(normalizeReferrer('https://lab-rb.my.id/articles/one', 'https://lab-rb.my.id')).toBeNull()
     expect(normalizeReferrer('not a url', 'https://lab-rb.my.id')).toBeNull()
     expect(normalizeCountry('id')).toBe('ID')
@@ -153,7 +163,7 @@ describe('admin analytics', () => {
 
   test('renders the audience page and per-article counters for editors', async () => {
     const cookie = await login()
-    const audience = await app.request('/admin/analytics', { headers: { cookie } })
+    const audience = await app.request('/admin/analytics', { headers: { cookie, 'accept-language': 'en-US' } })
     expect(audience.status).toBe(200)
     const audienceHtml = await audience.text()
     expect(audienceHtml).toContain('Audience')
@@ -164,23 +174,23 @@ describe('admin analytics', () => {
     expect(audienceHtml).toContain('Indonesia')
     expect(audienceHtml).toContain('Mobile')
 
-    const articles = await app.request('/admin/articles', { headers: { cookie } })
+    const articles = await app.request('/admin/articles', { headers: { cookie, 'accept-language': 'en-US' } })
     expect(articles.status).toBe(200)
     const articlesHtml = await articles.text()
     expect(articlesHtml).toContain('<th class="num">Readers</th>')
     expect(articlesHtml).toContain('<th class="num">Views</th>')
 
-    const newsletter = await app.request('/admin/newsletter', { headers: { cookie } })
+    const newsletter = await app.request('/admin/newsletter', { headers: { cookie, 'accept-language': 'en-US' } })
     expect(newsletter.status).toBe(200)
     const newsletterHtml = await newsletter.text()
     expect(newsletterHtml).toContain('Newsletter')
     expect(newsletterHtml).toContain('Compose')
 
-    const subscribers = await app.request('/admin/subscribers', { headers: { cookie } })
+    const subscribers = await app.request('/admin/subscribers', { headers: { cookie, 'accept-language': 'en-US' } })
     expect(subscribers.status).toBe(200)
     expect(await subscribers.text()).toContain('Pending confirmation')
 
-    const audit = await app.request('/admin/audit', { headers: { cookie } })
+    const audit = await app.request('/admin/audit', { headers: { cookie, 'accept-language': 'en-US' } })
     expect(audit.status).toBe(200)
     const auditHtml = await audit.text()
     expect(auditHtml).toContain('Audit log')

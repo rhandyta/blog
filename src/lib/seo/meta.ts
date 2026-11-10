@@ -18,8 +18,12 @@ export type PageHead = {
   jsonLd?: unknown[]
   siteName: string
   origin: string
+  /** Value for the document's `lang` attribute. */
   lang?: string
+  /** Open Graph locale, e.g. `id_ID`. */
   locale?: string
+  /** Localized alternates advertised through rel="alternate" hreflang. */
+  alternates?: Array<{ hreflang: string; path: string }>
   pagination?: { prev?: string | null; next?: string | null }
 }
 
@@ -92,8 +96,10 @@ export function renderHead(head: PageHead): string {
   }
 
   if (head.ogType === 'article') {
-    if (head.publishedTime) tags.push(`<meta property="article:published_time" content="${escapeAttr(head.publishedTime)}">`)
-    if (head.modifiedTime) tags.push(`<meta property="article:modified_time" content="${escapeAttr(head.modifiedTime)}">`)
+    if (head.publishedTime)
+      tags.push(`<meta property="article:published_time" content="${escapeAttr(head.publishedTime)}">`)
+    if (head.modifiedTime)
+      tags.push(`<meta property="article:modified_time" content="${escapeAttr(head.modifiedTime)}">`)
     if (head.author) tags.push(`<meta property="article:author" content="${escapeAttr(head.author)}">`)
     if (head.section) tags.push(`<meta property="article:section" content="${escapeAttr(head.section)}">`)
     for (const tag of head.tags ?? []) {
@@ -101,7 +107,17 @@ export function renderHead(head: PageHead): string {
     }
   }
 
-  tags.push(`<link rel="alternate" type="application/rss+xml" title="${escapeAttr(head.siteName)} — RSS" href="${escapeAttr(absoluteUrl(origin, '/rss.xml'))}">`)
+  tags.push(
+    `<link rel="alternate" type="application/rss+xml" title="${escapeAttr(head.siteName)} — RSS" href="${escapeAttr(absoluteUrl(origin, '/rss.xml'))}">`,
+  )
+
+  // Every public page exists once per language. The canonical URL names the
+  // current one, and the alternates let crawlers find the equivalent page.
+  for (const alternate of head.alternates ?? []) {
+    tags.push(
+      `<link rel="alternate" hreflang="${escapeAttr(alternate.hreflang)}" href="${escapeAttr(absoluteUrl(origin, alternate.path))}">`,
+    )
+  }
 
   // Paginated listings get explicit prev/next hints so crawlers can follow the
   // sequence instead of treating every page as an unrelated URL.
@@ -120,7 +136,7 @@ export function renderHead(head: PageHead): string {
   return tags.join('\n    ')
 }
 
-export function websiteJsonLd(settings: SiteSettings, origin: string): unknown {
+export function websiteJsonLd(settings: SiteSettings, origin: string, language = 'id'): unknown {
   const person = {
     '@type': 'Person',
     name: 'Rhandyta Briantama',
@@ -132,6 +148,7 @@ export function websiteJsonLd(settings: SiteSettings, origin: string): unknown {
     name: settings.title,
     description: settings.description,
     url: origin,
+    inLanguage: language,
     author: person,
     creator: person,
     potentialAction: {
@@ -194,10 +211,7 @@ export function articleJsonLd(input: {
   }
 }
 
-export function breadcrumbJsonLd(
-  items: Array<{ name: string; path: string }>,
-  origin: string,
-): unknown {
+export function breadcrumbJsonLd(items: Array<{ name: string; path: string }>, origin: string): unknown {
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',

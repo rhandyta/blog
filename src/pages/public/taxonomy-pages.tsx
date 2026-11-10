@@ -1,8 +1,7 @@
 import type { ArticleCard } from '../../lib/db/queries/articles'
 import type { CategoryWithCount, SiteSettings } from '../../lib/db/queries/taxonomy'
 import type { Category, Tag } from '../../lib/db/schema'
-import { formatDate } from '../../lib/content/html'
-import { ui } from '../../lib/content/ui-copy'
+import { useI18n } from '../../lib/i18n'
 import { SiteLayout } from '../../components/layout'
 import { ArticleRow, Cover, Kicker, Pagination, accentClass } from '../../components/ui'
 
@@ -25,6 +24,7 @@ export function CategoryPage({
   page: number
   totalPages: number
 }) {
+  const { t, href, formatDate } = useI18n()
   // When the first page promotes one card into the featured slot it is removed
   // from `items`, so emptiness must be judged against the section total, not
   // against the remaining list.
@@ -36,24 +36,31 @@ export function CategoryPage({
         <div className="shell">
           <div className="category-hero__grid">
             <div>
-              <Kicker>{ui.listing.section}</Kicker>
+              <Kicker>{t('listing.section')}</Kicker>
               <h1 style={{ marginTop: '1rem' }}>{category.name}</h1>
               <div className="category-hero__facts">
                 <div>
-                  {ui.listing.pieces}<strong>{total}</strong>
+                  {t('listing.pieces')}
+                  <strong>{total}</strong>
                 </div>
                 <div>
-                  {ui.listing.latest}<strong>{latest ? formatDate(latest, 'short') : '—'}</strong>
+                  {t('listing.latest')}
+                  <strong>{latest ? formatDate(latest, 'short') : '—'}</strong>
                 </div>
                 <div>
-                  Halaman<strong>{page} / {totalPages}</strong>
+                  {t('listing.pageLabel')}
+                  <strong>
+                    {page} / {totalPages}
+                  </strong>
                 </div>
               </div>
             </div>
             <div>
               <p className="category-hero__intro">{category.intro || category.description}</p>
               <p className="meta" style={{ marginTop: '1.25rem' }}>
-                <a className="text-link" href="/topics">{ui.listing.allTopics} →</a>
+                <a className="text-link" href={href('/topics')}>
+                  {t('listing.allTopics')} →
+                </a>
               </p>
             </div>
           </div>
@@ -66,18 +73,23 @@ export function CategoryPage({
             <div className="hero__grid">
               <div className="hero__text">
                 <div>
-                  <Kicker accent={category.accent}>{ui.home.featured} di {category.name}</Kicker>
+                  <Kicker accent={category.accent}>
+                    {t('listing.featuredIn', { featured: t('home.featured'), name: category.name })}
+                  </Kicker>
                 </div>
                 <h2 className="display-md">
-                  <a href={`/articles/${featured.slug}`} className="link-underline">{featured.title}</a>
+                  <a href={href(`/articles/${featured.slug}`)} className="link-underline">
+                    {featured.title}
+                  </a>
                 </h2>
                 <p className="deck">{featured.subtitle ?? featured.excerpt}</p>
                 <p className="meta">
-                  {featured.author?.displayName} · {formatDate(featured.publishedAt, 'long')} · {ui.common.minuteShort(featured.readingMinutes)}
+                  {featured.author?.displayName} · {formatDate(featured.publishedAt, 'long')} ·{' '}
+                  {t('common.minuteShort', { count: featured.readingMinutes })}
                 </p>
               </div>
               <div className="hero__media">
-                <a href={`/articles/${featured.slug}`} tabIndex={-1} aria-hidden="true">
+                <a href={href(`/articles/${featured.slug}`)} tabIndex={-1} aria-hidden="true">
                   <Cover media={featured.media} aspect="wide" sizes="(min-width: 960px) 40vw, 100vw" />
                 </a>
               </div>
@@ -90,22 +102,22 @@ export function CategoryPage({
         <div className="shell">
           {items.length ? (
             <>
-              <h2 id="category-list-title" className="sr-only">{ui.listing.moreIn(category.name)}</h2>
-              {items.map((card) => <ArticleRow key={card.id} card={card} />)}
+              <h2 id="category-list-title" className="sr-only">
+                {t('listing.moreIn', { name: category.name })}
+              </h2>
+              {items.map((card) => (
+                <ArticleRow key={card.id} card={card} />
+              ))}
             </>
           ) : hasAnyPieces ? null : (
             <div className="empty-state">
-              <h2 id="category-list-title">{ui.listing.noPieces}</h2>
-              <p>{ui.listing.noPiecesNote}</p>
+              <h2 id="category-list-title">{t('listing.noPieces')}</h2>
+              <p>{t('listing.noPiecesNote')}</p>
             </div>
           )}
           {totalPages > 1 ? (
             <div style={{ marginTop: '1.5rem' }}>
-              <Pagination
-                page={page}
-                totalPages={totalPages}
-                basePath={`/category/${category.slug}`}
-              />
+              <Pagination page={page} totalPages={totalPages} basePath={`/category/${category.slug}`} />
             </div>
           ) : null}
         </div>
@@ -131,20 +143,25 @@ export function TagPage({
   page: number
   totalPages: number
 }) {
+  const { t, href } = useI18n()
   return (
     <SiteLayout settings={settings} categories={categories} path={`/tags/${tag.slug}`}>
       <section className="page-hero">
         <div className="shell">
           <div className="page-hero__grid">
             <div>
-              <Kicker plain>Tag</Kicker>
-              <h1 className="display-lg" style={{ marginTop: '1rem' }}>{tag.name}</h1>
+              <Kicker plain>{t('listing.tags')}</Kicker>
+              <h1 className="display-lg" style={{ marginTop: '1rem' }}>
+                {tag.name}
+              </h1>
             </div>
             <div>
-              <p>{tag.description || ui.listing.taggedBlurb(tag.name.toLowerCase())}</p>
+              <p>{tag.description || t('listing.taggedBlurb', { name: tag.name.toLowerCase() })}</p>
               <div className="page-hero__meta">
-                <span className="meta">{ui.home.pieces(total)}</span>
-                <a className="text-link" href="/archive">{ui.footer.archive} →</a>
+                <span className="meta">{t('common.pieceCount', { count: total })}</span>
+                <a className="text-link" href={href('/archive')}>
+                  {t('footer.archive')} →
+                </a>
               </div>
             </div>
           </div>
@@ -153,12 +170,14 @@ export function TagPage({
 
       <section className="latest" aria-labelledby="tag-list-title">
         <div className="shell">
-          <h2 id="tag-list-title" className="sr-only">{ui.listing.piecesTagged(tag.name)}</h2>
+          <h2 id="tag-list-title" className="sr-only">
+            {t('listing.piecesTagged', { name: tag.name })}
+          </h2>
           {items.length ? (
             items.map((card) => <ArticleRow key={card.id} card={card} />)
           ) : (
             <div className="empty-state">
-              <h2>{ui.listing.noTagged}</h2>
+              <h2>{t('listing.noTagged')}</h2>
             </div>
           )}
           <div style={{ marginTop: '1.5rem' }}>

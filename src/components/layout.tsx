@@ -1,8 +1,11 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import type { SiteSettings, CategoryWithCount } from '../lib/db/queries/taxonomy'
 import type { User } from '../lib/db/schema'
-import { roleLabel } from '../lib/auth/permissions'
-import { ui } from '../lib/content/ui-copy'
+import { roleKey } from '../lib/auth/permissions'
+import { useI18n } from '../lib/i18n'
+import { buildClientMessages } from '../lib/i18n/client'
+import { LanguageSwitcher } from './language-switcher'
+import { ClientI18n } from './client-i18n'
 import { Fleuron, accentClass } from './ui'
 
 function isCurrent(path: string, href: string): boolean {
@@ -19,26 +22,37 @@ export function SearchIcon() {
   )
 }
 
-function BookmarkIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
-      <path d="M5 3.5h10v13l-5-3.5-5 3.5v-13Z" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 function SunIcon() {
   return (
-    <svg className="icon-sun" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
+    <svg
+      className="icon-sun"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+      focusable="false"
+    >
       <circle cx="10" cy="10" r="3.4" />
-      <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M15.7 4.3l-1.4 1.4M5.7 14.3l-1.4 1.4" strokeLinecap="round" />
+      <path
+        d="M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M15.7 4.3l-1.4 1.4M5.7 14.3l-1.4 1.4"
+        strokeLinecap="round"
+      />
     </svg>
   )
 }
 
 function MoonIcon() {
   return (
-    <svg className="icon-moon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
+    <svg
+      className="icon-moon"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+      focusable="false"
+    >
       <path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z" strokeLinejoin="round" />
     </svg>
   )
@@ -46,15 +60,25 @@ function MoonIcon() {
 
 function MenuIcon() {
   return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false" width="18" height="18">
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+      focusable="false"
+      width="18"
+      height="18"
+    >
       <path d="M3 6h14M3 10h14M3 14h14" strokeLinecap="round" />
     </svg>
   )
 }
 
 export function ThemeToggle() {
+  const { t } = useI18n()
   return (
-    <button className="icon-button theme-toggle" type="button" data-theme-toggle aria-label={ui.header.themeToggle}>
+    <button className="icon-button theme-toggle" type="button" data-theme-toggle aria-label={t('header.themeToggle')}>
       <SunIcon />
       <MoonIcon />
     </button>
@@ -70,12 +94,8 @@ export function SiteHeader({
   categories: CategoryWithCount[]
   path: string
 }) {
-  const today = new Intl.DateTimeFormat('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date())
+  const { t, href, formatDate } = useI18n()
+  const today = formatDate(new Date(), 'weekday')
 
   return (
     <header className="site-header">
@@ -86,12 +106,13 @@ export function SiteHeader({
           </span>
           <div className="utility-bar__links">
             <span>{today}</span>
-            <a href="/archive">{ui.nav.archive}</a>
-            <a href="/saved" className="saved-link" aria-label={ui.header.savedLabel}>
-              {ui.nav.saved} <span className="saved-count" data-saved-count></span>
+            <a href={href('/archive')}>{t('nav.archive')}</a>
+            <a href={href('/saved')} className="saved-link" aria-label={t('header.savedLabel')}>
+              {t('nav.saved')} <span className="saved-count" data-saved-count></span>
             </a>
+            <LanguageSwitcher />
             <ThemeToggle />
-            <a href="/search" className="icon-button" aria-label={ui.header.searchLabel}>
+            <a href={href('/search')} className="icon-button" aria-label={t('header.searchLabel')}>
               <SearchIcon />
             </a>
           </div>
@@ -99,25 +120,32 @@ export function SiteHeader({
       </div>
 
       <div className="shell masthead">
-        <a href="/" className="wordmark" aria-label={`${settings.title} — beranda`}>
+        <a href={href('/')} className="wordmark" aria-label={t('header.homeLink', { site: settings.title })}>
           <Fleuron size={19} />
           {settings.title}
         </a>
-        <nav className="primary-nav" aria-label={ui.nav.primary}>
-          <a href="/articles" aria-current={isCurrent(path, '/articles') ? 'page' : undefined}>
-            {ui.nav.articles}
+        <nav className="primary-nav" aria-label={t('nav.primary')}>
+          <a href={href('/articles')} aria-current={isCurrent(path, '/articles') ? 'page' : undefined}>
+            {t('nav.articles')}
           </a>
-          <a href="/topics" aria-current={isCurrent(path, '/topics') ? 'page' : undefined}>
-            {ui.nav.topics}
+          <a href={href('/topics')} aria-current={isCurrent(path, '/topics') ? 'page' : undefined}>
+            {t('nav.topics')}
           </a>
-          <a href="/archive" aria-current={isCurrent(path, '/archive') ? 'page' : undefined}>
-            {ui.nav.archive}
+          <a href={href('/archive')} aria-current={isCurrent(path, '/archive') ? 'page' : undefined}>
+            {t('nav.archive')}
           </a>
-          <a href="/about" aria-current={isCurrent(path, '/about') ? 'page' : undefined}>
-            {ui.nav.about}
+          <a href={href('/about')} aria-current={isCurrent(path, '/about') ? 'page' : undefined}>
+            {t('nav.about')}
           </a>
         </nav>
-        <button className="icon-button menu-toggle" type="button" data-menu-open aria-expanded="false" aria-controls="mobile-menu" aria-label={ui.nav.openMenu}>
+        <button
+          className="icon-button menu-toggle"
+          type="button"
+          data-menu-open
+          aria-expanded="false"
+          aria-controls="mobile-menu"
+          aria-label={t('nav.openMenu')}
+        >
           <MenuIcon />
         </button>
       </div>
@@ -127,29 +155,49 @@ export function SiteHeader({
         id="mobile-menu"
         role="dialog"
         aria-modal="true"
-        aria-label={ui.nav.menu}
+        aria-label={t('nav.menu')}
         tabIndex={-1}
         hidden
       >
         <div className="mobile-menu__top">
-          <span>{settings.issue} — {settings.tagline}</span>
-          <button className="icon-button" type="button" data-menu-close aria-label={ui.nav.closeMenu} style={{ color: 'inherit' }}>
-            <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <span>
+            {settings.issue} — {settings.tagline}
+          </span>
+          <button
+            className="icon-button"
+            type="button"
+            data-menu-close
+            aria-label={t('nav.closeMenu')}
+            style={{ color: 'inherit' }}
+          >
+            <svg
+              viewBox="0 0 20 20"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
               <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
             </svg>
           </button>
         </div>
-        <nav aria-label={ui.nav.mobile}>
-          <a href="/articles">{ui.nav.articles}</a>
-          <a href="/topics">{ui.nav.topics}</a>
-          <a href="/archive">{ui.nav.archive}</a>
-          <a href="/saved">{ui.nav.saved}</a>
-          <a href="/about">{ui.nav.about}</a>
-          <a href="/search">{ui.nav.search}</a>
+        <nav aria-label={t('nav.mobile')}>
+          <a href={href('/articles')}>{t('nav.articles')}</a>
+          <a href={href('/topics')}>{t('nav.topics')}</a>
+          <a href={href('/archive')}>{t('nav.archive')}</a>
+          <a href={href('/saved')}>{t('nav.saved')}</a>
+          <a href={href('/about')}>{t('nav.about')}</a>
+          <a href={href('/search')}>{t('nav.search')}</a>
         </nav>
         <p className="meta" style={{ marginTop: '2rem', color: 'rgba(255,255,255,.5)' }}>
           {categories.map((category) => (
-            <a key={category.id} href={`/category/${category.slug}`} style={{ marginRight: '0.9rem', display: 'inline-block', padding: '0.2rem 0' }}>
+            <a
+              key={category.id}
+              href={href(`/category/${category.slug}`)}
+              style={{ marginRight: '0.9rem', display: 'inline-block', padding: '0.2rem 0' }}
+            >
               {category.name}
             </a>
           ))}
@@ -159,69 +207,114 @@ export function SiteHeader({
   )
 }
 
-export function SiteFooter({
-  settings,
-  categories,
-}: {
-  settings: SiteSettings
-  categories: CategoryWithCount[]
-}) {
+export function SiteFooter({ settings, categories }: { settings: SiteSettings; categories: CategoryWithCount[] }) {
+  const { t, href } = useI18n()
+  const year = new Date().getFullYear()
+
   return (
     <footer className="site-footer">
       <div className="shell">
         <div className="footer-grid">
           <div className="footer-brand">
-            <a href="/" className="wordmark" aria-label={`${settings.title} — beranda`}>
+            <a href={href('/')} className="wordmark" aria-label={t('header.homeLink', { site: settings.title })}>
               <Fleuron size={22} />
               {settings.title}
             </a>
             <p>{settings.description}</p>
             <p className="meta" style={{ marginTop: '1.1rem' }}>
-              {settings.issue} · {ui.footer.writtenBy}
+              {settings.issue} · {t('footer.writtenBy')}
             </p>
           </div>
           <div className="footer-col">
-            <h2>{ui.footer.sections}</h2>
+            <h2>{t('footer.sections')}</h2>
             <ul>
               {categories.map((category) => (
                 <li key={category.id}>
-                  <a className={accentClass(category.accent)} href={`/category/${category.slug}`}>
+                  <a className={accentClass(category.accent)} href={href(`/category/${category.slug}`)}>
                     {category.name}
                   </a>
                 </li>
               ))}
-              <li><a href="/topics">{ui.footer.allTopics} →</a></li>
+              <li>
+                <a href={href('/topics')}>{t('footer.allTopics')} →</a>
+              </li>
             </ul>
           </div>
           <div className="footer-col">
-            <h2>{ui.footer.index}</h2>
+            <h2>{t('footer.index')}</h2>
             <ul>
-              <li><a href="/articles">{ui.footer.allArticles}</a></li>
-              <li><a href="/topics">{ui.footer.topics}</a></li>
-              <li><a href="/archive">{ui.footer.archive}</a></li>
-              <li><a href="/search">{ui.footer.search}</a></li>
-              <li><a href="/saved">{ui.footer.saved}</a></li>
-              <li><a href="/about">{ui.footer.about}</a></li>
-              <li><a href="/privacy">{ui.footer.privacy}</a></li>
-              <li><a href="/terms">{ui.footer.terms}</a></li>
+              <li>
+                <a href={href('/articles')}>{t('footer.allArticles')}</a>
+              </li>
+              <li>
+                <a href={href('/topics')}>{t('footer.topics')}</a>
+              </li>
+              <li>
+                <a href={href('/archive')}>{t('footer.archive')}</a>
+              </li>
+              <li>
+                <a href={href('/search')}>{t('footer.search')}</a>
+              </li>
+              <li>
+                <a href={href('/saved')}>{t('footer.saved')}</a>
+              </li>
+              <li>
+                <a href={href('/about')}>{t('footer.about')}</a>
+              </li>
+              <li>
+                <a href={href('/privacy')}>{t('footer.privacy')}</a>
+              </li>
+              <li>
+                <a href={href('/terms')}>{t('footer.terms')}</a>
+              </li>
             </ul>
           </div>
           <div className="footer-col">
-            <h2>{ui.footer.elsewhere}</h2>
+            <h2>{t('footer.elsewhere')}</h2>
             <ul>
-              <li><a href="/rss.xml">{ui.footer.rss}</a></li>
-              <li><a href="/subscribe">{ui.footer.newsletter}</a></li>
-              {settings.email ? <li><a href={`mailto:${settings.email}`}>{ui.footer.email}</a></li> : null}
-              {settings.x ? <li><a href={settings.x} rel="noopener noreferrer" target="_blank">X ↗</a></li> : null}
-              {settings.github ? <li><a href={settings.github} rel="noopener noreferrer" target="_blank">GitHub ↗</a></li> : null}
-              {settings.linkedin ? <li><a href={settings.linkedin} rel="noopener noreferrer" target="_blank">LinkedIn ↗</a></li> : null}
-              <li><a href="/admin">{ui.footer.editorialDesk}</a></li>
+              <li>
+                <a href="/rss.xml">{t('footer.rss')}</a>
+              </li>
+              <li>
+                <a href={href('/subscribe')}>{t('footer.newsletter')}</a>
+              </li>
+              {settings.email ? (
+                <li>
+                  <a href={`mailto:${settings.email}`}>{t('footer.email')}</a>
+                </li>
+              ) : null}
+              {settings.x ? (
+                <li>
+                  <a href={settings.x} rel="noopener noreferrer" target="_blank">
+                    X ↗
+                  </a>
+                </li>
+              ) : null}
+              {settings.github ? (
+                <li>
+                  <a href={settings.github} rel="noopener noreferrer" target="_blank">
+                    GitHub ↗
+                  </a>
+                </li>
+              ) : null}
+              {settings.linkedin ? (
+                <li>
+                  <a href={settings.linkedin} rel="noopener noreferrer" target="_blank">
+                    LinkedIn ↗
+                  </a>
+                </li>
+              ) : null}
+              <li>
+                <a href="/admin">{t('footer.editorialDesk')}</a>
+              </li>
             </ul>
           </div>
         </div>
         <div className="footer-folio">
-          <span>© {new Date().getFullYear()} Rhandyta Briantama. {ui.footer.publishedAs} {settings.title}.</span>
-          <span>{ui.footer.typeset}</span>
+          <span>
+            © {year} Rhandyta Briantama. {t('footer.publishedAs')} {settings.title}.
+          </span>
+          <span>{t('footer.typeset')}</span>
         </div>
       </div>
     </footer>
@@ -239,28 +332,31 @@ export function SiteLayout({
   path: string
   children: ReactNode
 }) {
+  const { t, locale } = useI18n()
   return (
     <>
       <a className="skip-link" href="#main">
-        {ui.header.skipToContent}
+        {t('header.skipToContent')}
       </a>
       <SiteHeader settings={settings} categories={categories} path={path} />
       <main id="main" tabIndex={-1}>
         {children}
       </main>
       <SiteFooter settings={settings} categories={categories} />
+      <ClientI18n data={buildClientMessages(t, locale, `/${locale}`)} />
     </>
   )
 }
 
 export function NewsletterBand({ settings }: { settings: SiteSettings }) {
+  const { t } = useI18n()
   return (
     <section className="newsletter-band" aria-labelledby="newsletter-title">
       <div className="shell">
         <div className="newsletter-band__grid">
           <div>
             <span className="kicker kicker--plain" style={{ color: 'inherit', opacity: 0.6 }}>
-              Surat kabar
+              {t('footer.newsletterKicker')}
             </span>
             <h2 id="newsletter-title">{settings.newsletterTitle}</h2>
             <p>{settings.newsletterBlurb}</p>
@@ -274,23 +370,21 @@ export function NewsletterBand({ settings }: { settings: SiteSettings }) {
               </label>
             </div>
             <label className="sr-only" htmlFor="newsletter-email">
-              {ui.subscribe.emailLabel}
+              {t('subscribe.emailLabel')}
             </label>
             <input
               className="input"
               id="newsletter-email"
               type="email"
               name="email"
-              placeholder={ui.subscribe.emailPlaceholder}
+              placeholder={t('subscribe.emailPlaceholder')}
               autoComplete="email"
               required
             />
             <button className="btn" type="submit">
-              {ui.subscribe.submit}
+              {t('subscribe.submit')}
             </button>
-            <p className="newsletter-note">
-              {ui.subscribe.note}
-            </p>
+            <p className="newsletter-note">{t('subscribe.note')}</p>
             <p className="form-message" data-message role="status" aria-live="polite"></p>
           </form>
         </div>
@@ -307,21 +401,31 @@ export type AdminNavStats = { drafts: number; scheduled: number }
 
 const AdminNavStatsContext = createContext<AdminNavStats | undefined>(undefined)
 
-export function AdminNavStatsProvider({
-  stats,
-  children,
-}: {
-  stats: AdminNavStats | undefined
-  children: ReactNode
-}) {
+export function AdminNavStatsProvider({ stats, children }: { stats: AdminNavStats | undefined; children: ReactNode }) {
   return <AdminNavStatsContext.Provider value={stats}>{children}</AdminNavStatsContext.Provider>
 }
 
-function adminLink(path: string, href: string, label: string, badge?: number, badgeTitle?: string) {
+function AdminLink({
+  path,
+  href,
+  label,
+  badge,
+  badgeTitle,
+}: {
+  path: string
+  href: string
+  label: string
+  badge?: number
+  badgeTitle?: string
+}) {
   return (
-    <a key={href} href={href} aria-current={path === href || (href !== '/admin' && path.startsWith(href)) ? 'page' : undefined}>
+    <a href={href} aria-current={path === href || (href !== '/admin' && path.startsWith(href)) ? 'page' : undefined}>
       <span>{label}</span>
-      {badge !== undefined ? <span className="count" title={badgeTitle}>{badge}</span> : null}
+      {badge !== undefined ? (
+        <span className="count" title={badgeTitle}>
+          {badge}
+        </span>
+      ) : null}
     </a>
   )
 }
@@ -347,8 +451,10 @@ export function AdminLayout({
   stats?: AdminNavStats
   csrfToken?: string
 }) {
+  const { t } = useI18n()
   const contextStats = useContext(AdminNavStatsContext)
   const navStats = stats ?? contextStats
+  const role = t(roleKey(user.role))
   return (
     <div className="admin-shell">
       <aside className="admin-side">
@@ -356,44 +462,47 @@ export function AdminLayout({
           <Fleuron size={18} />
           {`RhandytaVERSE`}
         </a>
-        <div className="admin-side__context">Editorial desk</div>
-        <nav className="admin-nav" aria-label="Admin">
-          {adminLink(path, '/admin', 'Overview')}
-          {adminLink(
-            path,
-            '/admin/articles',
-            'Articles',
-            navStats?.drafts,
-            navStats ? `${navStats.drafts} draft${navStats.drafts === 1 ? '' : 's'}` : undefined,
-          )}
-          {adminLink(path, '/admin/media', 'Media')}
+        <div className="admin-side__context">{t('admin.desk')}</div>
+        <nav className="admin-nav" aria-label={t('admin.navLabel')}>
+          <AdminLink path={path} href="/admin" label={t('admin.overview')} />
+          <AdminLink
+            path={path}
+            href="/admin/articles"
+            label={t('admin.articles')}
+            badge={navStats?.drafts}
+            badgeTitle={navStats ? t('admin.draftsBadge', { count: navStats.drafts }) : undefined}
+          />
+          <AdminLink path={path} href="/admin/media" label={t('admin.media')} />
           {user.role !== 'author' ? (
             <>
-              {adminLink(path, '/admin/automation', 'Automation')}
-              <div className="admin-nav__group">Organise</div>
-              {adminLink(path, '/admin/categories', 'Categories')}
-              {adminLink(path, '/admin/tags', 'Tags')}
-              {adminLink(path, '/admin/authors', 'Authors')}
-              <div className="admin-nav__group">Audience</div>
-              {adminLink(path, '/admin/analytics', 'Analytics')}
-              {adminLink(path, '/admin/subscribers', 'Subscribers')}
-              {adminLink(path, '/admin/newsletter', 'Newsletter')}
-              <div className="admin-nav__group">Settings</div>
-              {adminLink(path, '/admin/settings', 'Settings')}
-              {user.role === 'admin' ? adminLink(path, '/admin/users', 'Users') : null}
-              {user.role === 'admin' ? adminLink(path, '/admin/audit', 'Audit log') : null}
-              {user.role === 'admin' ? adminLink(path, '/admin/system', 'System') : null}
+              <AdminLink path={path} href="/admin/automation" label={t('admin.automation')} />
+              <div className="admin-nav__group">{t('admin.organise')}</div>
+              <AdminLink path={path} href="/admin/categories" label={t('admin.categories')} />
+              <AdminLink path={path} href="/admin/tags" label={t('admin.tags')} />
+              <AdminLink path={path} href="/admin/authors" label={t('admin.authors')} />
+              <div className="admin-nav__group">{t('admin.audience')}</div>
+              <AdminLink path={path} href="/admin/analytics" label={t('admin.analytics')} />
+              <AdminLink path={path} href="/admin/subscribers" label={t('admin.subscribers')} />
+              <AdminLink path={path} href="/admin/newsletter" label={t('admin.newsletter')} />
+              <div className="admin-nav__group">{t('admin.settings')}</div>
+              <AdminLink path={path} href="/admin/settings" label={t('admin.settings')} />
+              {user.role === 'admin' ? <AdminLink path={path} href="/admin/users" label={t('admin.users')} /> : null}
+              {user.role === 'admin' ? <AdminLink path={path} href="/admin/audit" label={t('admin.auditLog')} /> : null}
+              {user.role === 'admin' ? <AdminLink path={path} href="/admin/system" label={t('admin.system')} /> : null}
             </>
           ) : null}
-          <div className="admin-nav__group">Account</div>
-          {adminLink(path, '/admin/account', 'Account')}
+          <div className="admin-nav__group">{t('admin.account')}</div>
+          <AdminLink path={path} href="/admin/account" label={t('admin.account')} />
         </nav>
         <div className="admin-side__foot">
-          <a href="/" target="_blank" rel="noopener">View site ↗</a>
-          <span>{user.name} · {roleLabel(user.role)}</span>
+          <a href="/" target="_blank" rel="noopener">
+            {t('admin.viewSite')} ↗
+          </a>
+          <span>{t('admin.signedInAs', { name: user.name, role })}</span>
+          <LanguageSwitcher variant="admin" />
           <form method="post" action="/admin/logout">
             {csrfToken ? <input type="hidden" name="_csrf" value={csrfToken} /> : null}
-            <button type="submit">Sign out</button>
+            <button type="submit">{t('admin.signOut')}</button>
           </form>
         </div>
       </aside>
@@ -405,7 +514,11 @@ export function AdminLayout({
           </div>
           {actions ? <div className="admin-topbar__actions">{actions}</div> : null}
         </div>
-        {flash ? <div className="flash" data-tone={flash.tone} role="status">{flash.message}</div> : null}
+        {flash ? (
+          <div className="flash" data-tone={flash.tone} role="status">
+            {flash.message}
+          </div>
+        ) : null}
         {children}
       </div>
     </div>

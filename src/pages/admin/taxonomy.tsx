@@ -1,10 +1,22 @@
-import type { AuthorWithCount, CategoryWithCount, SiteSettings, TagWithCount } from '../../lib/db/queries/taxonomy'
+import type { AuthorWithCount, CategoryWithCount, TagWithCount } from '../../lib/db/queries/taxonomy'
 import { ACCENTS } from '../../lib/db/queries/taxonomy'
 import type { Author, Category, Tag, User } from '../../lib/db/schema'
+import { useI18n, type TranslationKey } from '../../lib/i18n'
 import { AdminLayout } from '../../components/layout'
-import { CsrfField, ErrorList, Flash } from './shared'
+import { CsrfField, ErrorList, type Flash } from './shared'
 
 const accentOptions = ACCENTS
+
+const accentLabelKeys: Record<string, TranslationKey> = {
+  vermilion: 'adminContent.accents.vermilion',
+  indigo: 'adminContent.accents.indigo',
+  ultramarine: 'adminContent.accents.ultramarine',
+  ochre: 'adminContent.accents.ochre',
+  teal: 'adminContent.accents.teal',
+  plum: 'adminContent.accents.plum',
+  moss: 'adminContent.accents.moss',
+  clay: 'adminContent.accents.clay',
+}
 
 export function CategoriesPage({
   user,
@@ -19,15 +31,29 @@ export function CategoriesPage({
   flash: Flash
   errors?: string[]
 }) {
+  const { t } = useI18n()
   return (
-    <AdminLayout user={user} path="/admin/categories" title="Categories" subtitle={`${categories.length} sections`} flash={flash} csrfToken={session.csrfToken}>
+    <AdminLayout
+      user={user}
+      path="/admin/categories"
+      title={t('adminContent.categories.title')}
+      subtitle={t('adminContent.categories.subtitle', { count: categories.length })}
+      flash={flash}
+      csrfToken={session.csrfToken}
+    >
       <ErrorList errors={errors ?? []} />
       <div className="admin-grid">
         <section className="admin-card" style={{ gridColumn: 'span 7' }}>
           <div className="admin-table-wrap" style={{ border: 0 }}>
             <table className="admin-table">
               <thead>
-                <tr><th>Name</th><th>Slug</th><th>Accent</th><th className="num">Pieces</th><th /></tr>
+                <tr>
+                  <th>{t('adminContent.common.name')}</th>
+                  <th>{t('adminContent.common.slug')}</th>
+                  <th>{t('adminContent.common.accent')}</th>
+                  <th className="num">{t('adminContent.common.pieces')}</th>
+                  <th />
+                </tr>
               </thead>
               <tbody>
                 {categories.map((category) => (
@@ -36,7 +62,11 @@ export function CategoriesPage({
                     <td className="muted-cell">/{category.slug}</td>
                     <td className="muted-cell">{category.accent}</td>
                     <td className="num">{category.articleCount}</td>
-                    <td><a className="btn btn--ghost btn--small" href={`/admin/categories/${category.id}`}>Edit</a></td>
+                    <td>
+                      <a className="btn btn--ghost btn--small" href={`/admin/categories/${category.id}`}>
+                        {t('adminContent.common.edit')}
+                      </a>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -45,41 +75,53 @@ export function CategoriesPage({
         </section>
 
         <section className="admin-card" style={{ gridColumn: 'span 5' }}>
-          <h2>New section</h2>
+          <h2>{t('adminContent.categories.newTitle')}</h2>
           <form method="post" action="/admin/categories" className="admin-form">
             <CsrfField token={session.csrfToken} />
             <div className="field">
-              <label htmlFor="name">Name</label>
+              <label htmlFor="name">{t('adminContent.common.name')}</label>
               <input className="input" id="name" name="name" required maxLength={60} />
             </div>
             <div className="field">
-              <label htmlFor="slug">Slug (optional)</label>
-              <input className="input" id="slug" name="slug" placeholder="generated from the name" />
+              <label htmlFor="slug">{t('adminContent.common.slugOptional')}</label>
+              <input className="input" id="slug" name="slug" placeholder={t('adminContent.common.generatedSlug')} />
             </div>
             <div className="field">
-              <label htmlFor="description">Description</label>
+              <label htmlFor="description">{t('adminContent.common.description')}</label>
               <textarea className="textarea" id="description" name="description" rows={2} maxLength={200} />
             </div>
             <div className="field">
-              <label htmlFor="intro">Introduction</label>
+              <label htmlFor="intro">{t('adminContent.common.intro')}</label>
               <textarea className="textarea" id="intro" name="intro" rows={3} maxLength={400} />
             </div>
             <div className="form-row">
               <div className="field">
-                <label htmlFor="accent">Accent</label>
+                <label htmlFor="accent">{t('adminContent.common.accent')}</label>
                 <select className="select" id="accent" name="accent" defaultValue="vermilion">
                   {accentOptions.map((accent) => (
-                    <option key={accent.token} value={accent.token}>{accent.label}</option>
+                    <option key={accent.token} value={accent.token}>
+                      {t(accentLabelKeys[accent.token])}
+                    </option>
                   ))}
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="sortOrder">Sort order</label>
-                <input className="input" id="sortOrder" name="sortOrder" type="number" defaultValue={0} min={0} max={99} />
+                <label htmlFor="sortOrder">{t('adminContent.common.sortOrder')}</label>
+                <input
+                  className="input"
+                  id="sortOrder"
+                  name="sortOrder"
+                  type="number"
+                  defaultValue={0}
+                  min={0}
+                  max={99}
+                />
               </div>
             </div>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Create section</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminContent.categories.create')}
+              </button>
             </div>
           </form>
         </section>
@@ -101,13 +143,18 @@ export function CategoryEditPage({
   flash: Flash
   errors?: string[]
 }) {
+  const { t } = useI18n()
   return (
     <AdminLayout
       user={user}
       path="/admin/categories"
       title={category.name}
-      subtitle={`Section · /category/${category.slug}`}
-      actions={<a className="btn btn--ghost" href={`/category/${category.slug}`} target="_blank" rel="noopener">View section ↗</a>}
+      subtitle={t('adminContent.categories.editTitle', { slug: category.slug })}
+      actions={
+        <a className="btn btn--ghost" href={`/category/${category.slug}`} target="_blank" rel="noopener">
+          {t('adminContent.categories.view')}
+        </a>
+      }
       flash={flash}
       csrfToken={session.csrfToken}
     >
@@ -117,51 +164,82 @@ export function CategoryEditPage({
           <form method="post" action={`/admin/categories/${category.id}`} className="admin-form">
             <CsrfField token={session.csrfToken} />
             <div className="field">
-              <label htmlFor="name">Name</label>
+              <label htmlFor="name">{t('adminContent.common.name')}</label>
               <input className="input" id="name" name="name" defaultValue={category.name} required maxLength={60} />
             </div>
             <div className="field">
-              <label htmlFor="slug">Slug</label>
+              <label htmlFor="slug">{t('adminContent.common.slug')}</label>
               <input className="input" id="slug" name="slug" defaultValue={category.slug} required />
-              <p className="hint">Changing the slug changes the public URL.</p>
+              <p className="hint">{t('adminContent.common.slugHint')}</p>
             </div>
             <div className="field">
-              <label htmlFor="description">Description</label>
-              <textarea className="textarea" id="description" name="description" rows={2} defaultValue={category.description} maxLength={200} />
+              <label htmlFor="description">{t('adminContent.common.description')}</label>
+              <textarea
+                className="textarea"
+                id="description"
+                name="description"
+                rows={2}
+                defaultValue={category.description}
+                maxLength={200}
+              />
             </div>
             <div className="field">
-              <label htmlFor="intro">Introduction</label>
-              <textarea className="textarea" id="intro" name="intro" rows={4} defaultValue={category.intro} maxLength={400} />
+              <label htmlFor="intro">{t('adminContent.common.intro')}</label>
+              <textarea
+                className="textarea"
+                id="intro"
+                name="intro"
+                rows={4}
+                defaultValue={category.intro}
+                maxLength={400}
+              />
             </div>
             <div className="form-row">
               <div className="field">
-                <label htmlFor="accent">Accent</label>
+                <label htmlFor="accent">{t('adminContent.common.accent')}</label>
                 <select className="select" id="accent" name="accent" defaultValue={category.accent}>
                   {accentOptions.map((accent) => (
-                    <option key={accent.token} value={accent.token}>{accent.label}</option>
+                    <option key={accent.token} value={accent.token}>
+                      {t(accentLabelKeys[accent.token])}
+                    </option>
                   ))}
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="sortOrder">Sort order</label>
-                <input className="input" id="sortOrder" name="sortOrder" type="number" defaultValue={category.sortOrder} min={0} max={99} />
+                <label htmlFor="sortOrder">{t('adminContent.common.sortOrder')}</label>
+                <input
+                  className="input"
+                  id="sortOrder"
+                  name="sortOrder"
+                  type="number"
+                  defaultValue={category.sortOrder}
+                  min={0}
+                  max={99}
+                />
               </div>
             </div>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Save section</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminContent.categories.save')}
+              </button>
             </div>
           </form>
         </section>
 
         <aside className="admin-card" style={{ gridColumn: 'span 5' }}>
-          <h2>Danger zone</h2>
+          <h2>{t('adminContent.common.dangerZone')}</h2>
           <p className="hint" style={{ marginBottom: '1rem' }}>
-            Deleting a section does not delete its articles. They become uncategorised, so decide where they belong
-            before removing a section.
+            {t('adminContent.categories.deleteNote')}
           </p>
-          <form method="post" action={`/admin/categories/${category.id}/delete`} data-confirm="Delete this section? Articles will become uncategorised.">
+          <form
+            method="post"
+            action={`/admin/categories/${category.id}/delete`}
+            data-confirm={t('adminContent.categories.deleteConfirm')}
+          >
             <CsrfField token={session.csrfToken} />
-            <button className="btn btn--danger" type="submit">Delete section</button>
+            <button className="btn btn--danger" type="submit">
+              {t('adminContent.categories.delete')}
+            </button>
           </form>
         </aside>
       </div>
@@ -182,47 +260,74 @@ export function TagsPage({
   flash: Flash
   errors?: string[]
 }) {
+  const { t } = useI18n()
   return (
-    <AdminLayout user={user} path="/admin/tags" title="Tags" subtitle={`${tags.length} tags`} flash={flash} csrfToken={session.csrfToken}>
+    <AdminLayout
+      user={user}
+      path="/admin/tags"
+      title={t('adminContent.tags.title')}
+      subtitle={t('adminContent.tags.subtitle', { count: tags.length })}
+      flash={flash}
+      csrfToken={session.csrfToken}
+    >
       <ErrorList errors={errors ?? []} />
       <div className="admin-grid">
         <section className="admin-card" style={{ gridColumn: 'span 7' }}>
           <div className="admin-table-wrap" style={{ border: 0 }}>
             <table className="admin-table">
-              <thead><tr><th>Name</th><th>Slug</th><th className="num">Uses</th><th /></tr></thead>
+              <thead>
+                <tr>
+                  <th>{t('adminContent.common.name')}</th>
+                  <th>{t('adminContent.common.slug')}</th>
+                  <th className="num">{t('adminContent.tags.uses')}</th>
+                  <th />
+                </tr>
+              </thead>
               <tbody>
                 {tags.map((tag) => (
                   <tr key={tag.id}>
                     <td className="title-cell">{tag.name}</td>
                     <td className="muted-cell">/{tag.slug}</td>
                     <td className="num">{tag.articleCount}</td>
-                    <td><a className="btn btn--ghost btn--small" href={`/admin/tags/${tag.id}`}>Edit</a></td>
+                    <td>
+                      <a className="btn btn--ghost btn--small" href={`/admin/tags/${tag.id}`}>
+                        {t('adminContent.common.edit')}
+                      </a>
+                    </td>
                   </tr>
                 ))}
-                {!tags.length ? <tr><td colSpan={4} className="hint" style={{ padding: '1.5rem' }}>No tags yet.</td></tr> : null}
+                {!tags.length ? (
+                  <tr>
+                    <td colSpan={4} className="hint" style={{ padding: '1.5rem' }}>
+                      {t('adminContent.tags.empty')}
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
         </section>
 
         <section className="admin-card" style={{ gridColumn: 'span 5' }}>
-          <h2>New tag</h2>
+          <h2>{t('adminContent.tags.newTitle')}</h2>
           <form method="post" action="/admin/tags" className="admin-form">
             <CsrfField token={session.csrfToken} />
             <div className="field">
-              <label htmlFor="name">Name</label>
+              <label htmlFor="name">{t('adminContent.common.name')}</label>
               <input className="input" id="name" name="name" required maxLength={40} />
             </div>
             <div className="field">
-              <label htmlFor="slug">Slug (optional)</label>
-              <input className="input" id="slug" name="slug" placeholder="generated from the name" />
+              <label htmlFor="slug">{t('adminContent.common.slugOptional')}</label>
+              <input className="input" id="slug" name="slug" placeholder={t('adminContent.common.generatedSlug')} />
             </div>
             <div className="field">
-              <label htmlFor="description">Description</label>
+              <label htmlFor="description">{t('adminContent.common.description')}</label>
               <textarea className="textarea" id="description" name="description" rows={2} maxLength={200} />
             </div>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Create tag</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminContent.tags.create')}
+              </button>
             </div>
           </form>
         </section>
@@ -244,13 +349,18 @@ export function TagEditPage({
   flash: Flash
   errors?: string[]
 }) {
+  const { t } = useI18n()
   return (
     <AdminLayout
       user={user}
       path="/admin/tags"
       title={tag.name}
-      subtitle={`Tag · /tags/${tag.slug}`}
-      actions={<a className="btn btn--ghost" href={`/tags/${tag.slug}`} target="_blank" rel="noopener">View tag ↗</a>}
+      subtitle={t('adminContent.tags.editTitle', { slug: tag.slug })}
+      actions={
+        <a className="btn btn--ghost" href={`/tags/${tag.slug}`} target="_blank" rel="noopener">
+          {t('adminContent.tags.view')}
+        </a>
+      }
       flash={flash}
       csrfToken={session.csrfToken}
     >
@@ -260,28 +370,45 @@ export function TagEditPage({
           <form method="post" action={`/admin/tags/${tag.id}`} className="admin-form">
             <CsrfField token={session.csrfToken} />
             <div className="field">
-              <label htmlFor="name">Name</label>
+              <label htmlFor="name">{t('adminContent.common.name')}</label>
               <input className="input" id="name" name="name" defaultValue={tag.name} required maxLength={40} />
             </div>
             <div className="field">
-              <label htmlFor="slug">Slug</label>
+              <label htmlFor="slug">{t('adminContent.common.slug')}</label>
               <input className="input" id="slug" name="slug" defaultValue={tag.slug} required />
             </div>
             <div className="field">
-              <label htmlFor="description">Description</label>
-              <textarea className="textarea" id="description" name="description" rows={3} defaultValue={tag.description} maxLength={200} />
+              <label htmlFor="description">{t('adminContent.common.description')}</label>
+              <textarea
+                className="textarea"
+                id="description"
+                name="description"
+                rows={3}
+                defaultValue={tag.description}
+                maxLength={200}
+              />
             </div>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Save tag</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminContent.tags.save')}
+              </button>
             </div>
           </form>
         </section>
         <aside className="admin-card" style={{ gridColumn: 'span 5' }}>
-          <h2>Danger zone</h2>
-          <p className="hint" style={{ marginBottom: '1rem' }}>Deleting a tag removes it from every article. The articles remain published.</p>
-          <form method="post" action={`/admin/tags/${tag.id}/delete`} data-confirm="Delete this tag from every article?">
+          <h2>{t('adminContent.common.dangerZone')}</h2>
+          <p className="hint" style={{ marginBottom: '1rem' }}>
+            {t('adminContent.tags.deleteNote')}
+          </p>
+          <form
+            method="post"
+            action={`/admin/tags/${tag.id}/delete`}
+            data-confirm={t('adminContent.tags.deleteConfirm')}
+          >
             <CsrfField token={session.csrfToken} />
-            <button className="btn btn--danger" type="submit">Delete tag</button>
+            <button className="btn btn--danger" type="submit">
+              {t('adminContent.tags.delete')}
+            </button>
           </form>
         </aside>
       </div>
@@ -302,21 +429,45 @@ export function AuthorsPage({
   flash: Flash
   errors?: string[]
 }) {
+  const { t } = useI18n()
   return (
-    <AdminLayout user={user} path="/admin/authors" title="Authors" subtitle={`${authors.length} profiles`} flash={flash} csrfToken={session.csrfToken}>
+    <AdminLayout
+      user={user}
+      path="/admin/authors"
+      title={t('adminContent.authors.title')}
+      subtitle={t('adminContent.authors.subtitle', { count: authors.length })}
+      flash={flash}
+      csrfToken={session.csrfToken}
+    >
       <ErrorList errors={errors ?? []} />
       <div className="admin-grid">
         <section className="admin-card" style={{ gridColumn: 'span 7' }}>
           <div className="admin-table-wrap" style={{ border: 0 }}>
             <table className="admin-table">
-              <thead><tr><th>Name</th><th>Role</th><th className="num">Pieces</th><th /></tr></thead>
+              <thead>
+                <tr>
+                  <th>{t('adminContent.common.name')}</th>
+                  <th>{t('adminContent.common.role')}</th>
+                  <th className="num">{t('adminContent.common.pieces')}</th>
+                  <th />
+                </tr>
+              </thead>
               <tbody>
                 {authors.map((author) => (
                   <tr key={author.id}>
-                    <td className="title-cell">{author.displayName}<div className="meta" style={{ marginTop: '0.2rem' }}>/{author.slug}</div></td>
+                    <td className="title-cell">
+                      {author.displayName}
+                      <div className="meta" style={{ marginTop: '0.2rem' }}>
+                        /{author.slug}
+                      </div>
+                    </td>
                     <td className="muted-cell">{author.roleTitle ?? '—'}</td>
                     <td className="num">{author.articleCount}</td>
-                    <td><a className="btn btn--ghost btn--small" href={`/admin/authors/${author.id}`}>Edit</a></td>
+                    <td>
+                      <a className="btn btn--ghost btn--small" href={`/admin/authors/${author.id}`}>
+                        {t('adminContent.common.edit')}
+                      </a>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -325,23 +476,31 @@ export function AuthorsPage({
         </section>
 
         <section className="admin-card" style={{ gridColumn: 'span 5' }}>
-          <h2>New author</h2>
+          <h2>{t('adminContent.authors.newTitle')}</h2>
           <form method="post" action="/admin/authors" className="admin-form">
             <CsrfField token={session.csrfToken} />
             <div className="field">
-              <label htmlFor="displayName">Display name</label>
+              <label htmlFor="displayName">{t('adminContent.common.displayName')}</label>
               <input className="input" id="displayName" name="displayName" required maxLength={80} />
             </div>
             <div className="field">
-              <label htmlFor="roleTitle">Role</label>
-              <input className="input" id="roleTitle" name="roleTitle" placeholder="Contributing editor" maxLength={60} />
+              <label htmlFor="roleTitle">{t('adminContent.common.role')}</label>
+              <input
+                className="input"
+                id="roleTitle"
+                name="roleTitle"
+                placeholder={t('adminContent.authors.rolePlaceholder')}
+                maxLength={60}
+              />
             </div>
             <div className="field">
-              <label htmlFor="bio">Short biography</label>
+              <label htmlFor="bio">{t('adminContent.common.shortBio')}</label>
               <textarea className="textarea" id="bio" name="bio" rows={2} maxLength={300} />
             </div>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Create author</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminContent.authors.create')}
+              </button>
             </div>
           </form>
         </section>
@@ -363,6 +522,7 @@ export function AuthorEditPage({
   flash: Flash
   errors?: string[]
 }) {
+  const { t } = useI18n()
   let expertise: string[] = []
   try {
     const parsed = JSON.parse(author.expertise)
@@ -374,7 +534,9 @@ export function AuthorEditPage({
   try {
     const parsed = JSON.parse(author.socialLinks)
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      socials = Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+      socials = Object.fromEntries(
+        Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+      )
     }
   } catch {
     socials = {}
@@ -385,8 +547,12 @@ export function AuthorEditPage({
       user={user}
       path="/admin/authors"
       title={author.displayName}
-      subtitle={`Author · /author/${author.slug}`}
-      actions={<a className="btn btn--ghost" href={`/author/${author.slug}`} target="_blank" rel="noopener">View profile ↗</a>}
+      subtitle={t('adminContent.authors.editTitle', { slug: author.slug })}
+      actions={
+        <a className="btn btn--ghost" href={`/author/${author.slug}`} target="_blank" rel="noopener">
+          {t('adminContent.authors.view')}
+        </a>
+      }
       flash={flash}
       csrfToken={session.csrfToken}
     >
@@ -397,48 +563,74 @@ export function AuthorEditPage({
             <CsrfField token={session.csrfToken} />
             <div className="form-row">
               <div className="field">
-                <label htmlFor="displayName">Display name</label>
-                <input className="input" id="displayName" name="displayName" defaultValue={author.displayName} required />
+                <label htmlFor="displayName">{t('adminContent.common.displayName')}</label>
+                <input
+                  className="input"
+                  id="displayName"
+                  name="displayName"
+                  defaultValue={author.displayName}
+                  required
+                />
               </div>
               <div className="field">
-                <label htmlFor="roleTitle">Role</label>
+                <label htmlFor="roleTitle">{t('adminContent.common.role')}</label>
                 <input className="input" id="roleTitle" name="roleTitle" defaultValue={author.roleTitle ?? ''} />
               </div>
             </div>
             <div className="field">
-              <label htmlFor="slug">Slug</label>
+              <label htmlFor="slug">{t('adminContent.common.slug')}</label>
               <input className="input" id="slug" name="slug" defaultValue={author.slug} required />
             </div>
             <div className="field">
-              <label htmlFor="bio">Short biography</label>
+              <label htmlFor="bio">{t('adminContent.common.shortBio')}</label>
               <textarea className="textarea" id="bio" name="bio" rows={2} defaultValue={author.bio} maxLength={300} />
             </div>
             <div className="field">
-              <label htmlFor="longBio">Long biography</label>
-              <textarea className="textarea" id="longBio" name="longBio" rows={5} defaultValue={author.longBio ?? ''} maxLength={2000} />
+              <label htmlFor="longBio">{t('adminContent.common.longBio')}</label>
+              <textarea
+                className="textarea"
+                id="longBio"
+                name="longBio"
+                rows={5}
+                defaultValue={author.longBio ?? ''}
+                maxLength={2000}
+              />
             </div>
             <div className="field">
-              <label htmlFor="expertise">Expertise (comma separated)</label>
+              <label htmlFor="expertise">{t('adminContent.common.expertise')}</label>
               <input className="input" id="expertise" name="expertise" defaultValue={expertise.join(', ')} />
             </div>
             <div className="field">
-              <label htmlFor="website">Website</label>
-              <input className="input" id="website" name="website" type="url" defaultValue={socials.website ?? ''} placeholder="https://" />
+              <label htmlFor="website">{t('adminContent.common.website')}</label>
+              <input
+                className="input"
+                id="website"
+                name="website"
+                type="url"
+                defaultValue={socials.website ?? ''}
+                placeholder="https://"
+              />
             </div>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Save author</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminContent.authors.save')}
+              </button>
             </div>
           </form>
         </section>
         <aside className="admin-card" style={{ gridColumn: 'span 4' }}>
-          <h2>Notes</h2>
-          <p className="hint">
-            Profiles are independent of login accounts. Removing an author requires reassigning their articles first.
-          </p>
-          <h2 style={{ marginTop: '1.5rem' }}>Danger zone</h2>
-          <form method="post" action={`/admin/authors/${author.id}/delete`} data-confirm="Delete this author? Authors with articles cannot be deleted.">
+          <h2>{t('adminContent.authors.notes')}</h2>
+          <p className="hint">{t('adminContent.authors.notesText')}</p>
+          <h2 style={{ marginTop: '1.5rem' }}>{t('adminContent.common.dangerZone')}</h2>
+          <form
+            method="post"
+            action={`/admin/authors/${author.id}/delete`}
+            data-confirm={t('adminContent.authors.deleteConfirm')}
+          >
             <CsrfField token={session.csrfToken} />
-            <button className="btn btn--danger" type="submit">Delete author</button>
+            <button className="btn btn--danger" type="submit">
+              {t('adminContent.authors.delete')}
+            </button>
           </form>
         </aside>
       </div>

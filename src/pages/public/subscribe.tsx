@@ -1,6 +1,9 @@
 import type { CategoryWithCount, SiteSettings } from '../../lib/db/queries/taxonomy'
+import { useI18n } from '../../lib/i18n'
 import { NewsletterBand, SiteLayout } from '../../components/layout'
 import { Kicker } from '../../components/ui'
+
+type SubscribeStatus = 'ok' | 'pending' | 'exists' | 'invalid' | 'error' | null
 
 export function SubscribePage({
   settings,
@@ -9,19 +12,20 @@ export function SubscribePage({
 }: {
   settings: SiteSettings
   categories: CategoryWithCount[]
-  status?: 'ok' | 'pending' | 'exists' | 'invalid' | 'error' | null
+  status?: SubscribeStatus
 }) {
+  const { t, href } = useI18n()
   const message =
     status === 'ok'
-      ? 'Kamu sudah masuk daftar. Terima kasih sudah berlangganan.'
+      ? t('subscribe.statusOk')
       : status === 'pending'
-        ? 'Cek kotak masukmu dan klik tautan konfirmasi untuk bergabung.'
+        ? t('subscribe.statusPending')
         : status === 'exists'
-          ? 'Alamat itu sudah berlangganan.'
+          ? t('subscribe.statusExists')
           : status === 'invalid'
-            ? 'Alamat surel itu sepertinya tidak tepat. Mohon diperiksa dan coba lagi.'
+            ? t('subscribe.statusInvalid')
             : status === 'error'
-              ? 'Ada yang gagal saat menyimpan alamatmu. Coba lagi sebentar lagi.'
+              ? t('subscribe.statusError')
               : null
 
   return (
@@ -30,16 +34,17 @@ export function SubscribePage({
         <div className="shell">
           <div className="page-hero__grid">
             <div>
-              <Kicker plain>Surat kabar</Kicker>
-              <h1 className="display-lg" style={{ marginTop: '1rem' }}>Berlangganan</h1>
+              <Kicker plain>{t('subscribe.kicker')}</Kicker>
+              <h1 className="display-lg" style={{ marginTop: '1rem' }}>
+                {t('subscribe.title')}
+              </h1>
             </div>
             <div>
-              <p>
-                Sebuah catatan ketika ada sesuatu yang layak dikirim. Esai baru, serpihan sesekali, tanpa jadwal yang
-                harus dikejar.
-              </p>
+              <p>{t('subscribe.intro')}</p>
               <div className="page-hero__meta">
-                <a className="text-link" href="/rss.xml">Lebih suka RSS? →</a>
+                <a className="text-link" href="/rss.xml">
+                  {t('subscribe.preferRss')} →
+                </a>
               </div>
             </div>
           </div>
@@ -48,7 +53,11 @@ export function SubscribePage({
 
       {message ? (
         <div className="shell" style={{ paddingTop: '1.5rem' }}>
-          <div className="flash" data-tone={status === 'ok' || status === 'pending' || status === 'exists' ? 'success' : 'error'} role="status">
+          <div
+            className="flash"
+            data-tone={status === 'ok' || status === 'pending' || status === 'exists' ? 'success' : 'error'}
+            role="status"
+          >
             {message}
           </div>
         </div>
@@ -59,25 +68,23 @@ export function SubscribePage({
       <div className="shell">
         <div className="about-layout" style={{ paddingTop: 'clamp(2rem, 4vw, 3rem)' }}>
           <div className="about-copy">
-            <h2 style={{ marginTop: 0 }}>Apa yang terjadi saat kamu berlangganan</h2>
-            <p>
-              Alamatmu diperiksa dan disimpan dengan aman di basis data situs ini sendiri. Kamu akan menerima surel
-              konfirmasi; klik tautan di pesan itu untuk bergabung. Alamat hanya dipakai untuk surat kabar ini dan
-              tidak pernah dibagikan atau dijual. Kamu bisa berhenti kapan saja lewat tautan berhenti berlangganan di
-              setiap surat, atau dengan menghubungi Rhandyta Briantama.
-            </p>
-            <h2>Privasi</h2>
-            <p>
-              Alamatmu hanya dipakai untuk mengirim surat kabar. Tidak pernah dijual atau dibagikan. Untuk meminta
-              penghapusan, gunakan tautan berhenti berlangganan di setiap surat atau hubungi Rhandyta Briantama.
-            </p>
+            <h2 style={{ marginTop: 0 }}>{t('subscribe.whatHappensTitle')}</h2>
+            <p>{t('subscribe.whatHappensBody')}</p>
+            <h2>{t('subscribe.privacyTitle')}</h2>
+            <p>{t('subscribe.privacyBody')}</p>
           </div>
           <aside className="about-aside">
-            <h2>Jalur lain</h2>
+            <h2>{t('subscribe.otherPaths')}</h2>
             <ul>
-              <li><a href="/rss.xml">Umpan RSS</a></li>
-              <li><a href="/articles">Semua artikel</a></li>
-              <li><a href="/about">Tentang publikasi</a></li>
+              <li>
+                <a href="/rss.xml">{t('subscribe.rssFeed')}</a>
+              </li>
+              <li>
+                <a href={href('/articles')}>{t('subscribe.allArticles')}</a>
+              </li>
+              <li>
+                <a href={href('/about')}>{t('subscribe.aboutPublication')}</a>
+              </li>
             </ul>
           </aside>
         </div>
@@ -95,21 +102,22 @@ export function ConfirmPage({
   categories: CategoryWithCount[]
   status: 'done' | 'invalid'
 }) {
+  const { t, href } = useI18n()
   return (
     <SiteLayout settings={settings} categories={categories} path="/confirm">
       <section className="page-hero">
         <div className="shell">
-          <Kicker plain>Surat kabar</Kicker>
+          <Kicker plain>{t('subscribe.kicker')}</Kicker>
           <h1 className="display-lg" style={{ marginTop: '1rem' }}>
-            {status === 'done' ? 'Langganan terkonfirmasi.' : 'Tautan ini tidak valid atau sudah kedaluwarsa.'}
+            {status === 'done' ? t('subscribe.confirmDoneTitle') : t('subscribe.confirmInvalidTitle')}
           </h1>
           <p className="lede" style={{ marginTop: '1.5rem', maxWidth: '46ch' }}>
-            {status === 'done'
-              ? 'Kamu sudah masuk daftar. Halaman ini boleh ditutup.'
-              : 'Token konfirmasi tidak dapat diverifikasi. Berlangganan lagi untuk menerima tautan baru.'}
+            {status === 'done' ? t('subscribe.confirmDoneBody') : t('subscribe.confirmInvalidBody')}
           </p>
           <p style={{ marginTop: '1.75rem' }}>
-            <a className="btn btn--ghost" href="/">Kembali ke beranda</a>
+            <a className="btn btn--ghost" href={href('/')}>
+              {t('errors.backHome')}
+            </a>
           </p>
         </div>
       </section>
@@ -126,21 +134,22 @@ export function UnsubscribePage({
   categories: CategoryWithCount[]
   status: 'done' | 'invalid'
 }) {
+  const { t, href } = useI18n()
   return (
     <SiteLayout settings={settings} categories={categories} path="/unsubscribe">
       <section className="page-hero">
         <div className="shell">
-          <Kicker plain>Surat kabar</Kicker>
+          <Kicker plain>{t('subscribe.kicker')}</Kicker>
           <h1 className="display-lg" style={{ marginTop: '1rem' }}>
-            {status === 'done' ? 'Kamu sudah berhenti berlangganan.' : 'Tautan ini tidak valid.'}
+            {status === 'done' ? t('subscribe.unsubscribeDoneTitle') : t('subscribe.unsubscribeInvalidTitle')}
           </h1>
           <p className="lede" style={{ marginTop: '1.5rem', maxWidth: '46ch' }}>
-            {status === 'done'
-              ? 'Alamatmu sudah dihapus dari daftar surat kabar. Kamu tidak akan menerima surat berikutnya.'
-              : 'Token berhenti berlangganan tidak dapat diverifikasi. Jika menurutmu ini keliru, gunakan alamat kontak di halaman tentang.'}
+            {status === 'done' ? t('subscribe.unsubscribeDoneBody') : t('subscribe.unsubscribeInvalidBody')}
           </p>
           <p style={{ marginTop: '1.75rem' }}>
-            <a className="btn btn--ghost" href="/">Kembali ke beranda</a>
+            <a className="btn btn--ghost" href={href('/')}>
+              {t('errors.backHome')}
+            </a>
           </p>
         </div>
       </section>

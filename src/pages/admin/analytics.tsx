@@ -5,26 +5,21 @@ import type {
   DailyAnalytics,
   TopArticleAnalytics,
 } from '../../lib/db/queries/analytics'
+import { LOCALE_META, useI18n, type Locale } from '../../lib/i18n'
 import { AdminLayout } from '../../components/layout'
 
-const numberFormat = new Intl.NumberFormat('en-US')
-
-export function formatNumber(value: number): string {
-  return numberFormat.format(value)
-}
-
-function formatDay(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
+function formatDay(day: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(LOCALE_META[locale].dateLocale, {
     day: 'numeric',
     month: 'short',
     timeZone: 'UTC',
   }).format(new Date(`${day}T00:00:00Z`))
 }
 
-export function regionName(code: string): string {
+export function regionName(code: string, locale: Locale = 'en'): string {
   if (code === 'Unknown' || code === 'Direct') return code
   try {
-    return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) ?? code
+    return new Intl.DisplayNames([LOCALE_META[locale].dateLocale], { type: 'region' }).of(code) ?? code
   } catch {
     return code
   }
@@ -35,19 +30,28 @@ export function labelCase(value: string): string {
 }
 
 export function ReadershipChart({ data }: { data: DailyAnalytics[] }) {
+  const { t, locale, formatNumber } = useI18n()
   const max = Math.max(1, ...data.map((point) => Math.max(point.views, point.readers)))
   return (
     <div>
       <div className="analytics-legend">
-        <span><i className="analytics-dot" /> Views</span>
-        <span><i className="analytics-dot analytics-dot--readers" /> Unique readers</span>
+        <span>
+          <i className="analytics-dot" /> {t('adminAudience.common.views')}
+        </span>
+        <span>
+          <i className="analytics-dot analytics-dot--readers" /> {t('adminAudience.common.uniqueReaders')}
+        </span>
       </div>
-      <div className="analytics-chart" role="img" aria-label="Daily article views and unique readers">
+      <div className="analytics-chart" role="img" aria-label={t('adminAudience.analytics.chartAria')}>
         {data.map((point) => (
           <div
             className="analytics-chart__col"
             key={point.day}
-            title={`${formatDay(point.day)} — ${formatNumber(point.views)} views, ${formatNumber(point.readers)} readers`}
+            title={t('adminAudience.analytics.chartPointTitle', {
+              day: formatDay(point.day, locale),
+              views: formatNumber(point.views),
+              readers: formatNumber(point.readers),
+            })}
           >
             <div className="analytics-chart__bars">
               <span className="analytics-chart__bar" style={{ height: `${(point.views / max) * 100}%` }} />
@@ -56,7 +60,7 @@ export function ReadershipChart({ data }: { data: DailyAnalytics[] }) {
                 style={{ height: `${(point.readers / max) * 100}%` }}
               />
             </div>
-            <span className="analytics-chart__label">{formatDay(point.day)}</span>
+            <span className="analytics-chart__label">{formatDay(point.day, locale)}</span>
           </div>
         ))}
       </div>
@@ -73,6 +77,7 @@ export function BreakdownCard({
   rows: BreakdownRow[]
   formatLabel?: (label: string) => string
 }) {
+  const { t, formatNumber } = useI18n()
   return (
     <section className="admin-card">
       <h2>{title}</h2>
@@ -81,12 +86,17 @@ export function BreakdownCard({
           {rows.map((row) => (
             <li key={row.label}>
               <span>{formatLabel ? formatLabel(row.label) : row.label}</span>
-              <span>{formatNumber(row.visits)} views · {formatNumber(row.readers)} readers</span>
+              <span>
+                {t('adminAudience.analytics.breakdownRow', {
+                  views: formatNumber(row.visits),
+                  readers: formatNumber(row.readers),
+                })}
+              </span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="hint">No data yet.</p>
+        <p className="hint">{t('adminAudience.analytics.noData')}</p>
       )}
     </section>
   )
@@ -113,50 +123,63 @@ export function AnalyticsPage({
   devices: BreakdownRow[]
   browsers: BreakdownRow[]
 }) {
+  const { t, locale, formatNumber, href } = useI18n()
   return (
     <AdminLayout
       user={user}
       path="/admin/analytics"
-      title="Audience"
-      subtitle="Privacy-first readership and visitor data"
-      actions={<a className="btn btn--ghost" href="/admin/articles">All articles →</a>}
+      title={t('adminAudience.analytics.title')}
+      subtitle={t('adminAudience.analytics.subtitle')}
+      actions={
+        <a className="btn btn--ghost" href={href('/admin/articles')}>
+          {t('adminAudience.analytics.allArticles')} →
+        </a>
+      }
       csrfToken={csrfToken}
     >
       <div className="admin-grid" style={{ marginBottom: '1.25rem' }}>
         <div className="admin-card" style={{ gridColumn: 'span 3' }}>
           <div className="stat">
             <span className="stat__value">{formatNumber(overview.readers)}</span>
-            <span className="stat__label">Unique readers</span>
-            <span className="stat__delta">{formatNumber(overview.readers30d)} in the last 30 days</span>
+            <span className="stat__label">{t('adminAudience.common.uniqueReaders')}</span>
+            <span className="stat__delta">
+              {t('adminAudience.analytics.last30DaysDelta', { count: formatNumber(overview.readers30d) })}
+            </span>
           </div>
         </div>
         <div className="admin-card" style={{ gridColumn: 'span 3' }}>
           <div className="stat">
             <span className="stat__value">{formatNumber(overview.views)}</span>
-            <span className="stat__label">Article views</span>
-            <span className="stat__delta">{formatNumber(overview.views30d)} in the last 30 days</span>
+            <span className="stat__label">{t('adminAudience.analytics.statArticleViews')}</span>
+            <span className="stat__delta">
+              {t('adminAudience.analytics.last30DaysDelta', { count: formatNumber(overview.views30d) })}
+            </span>
           </div>
         </div>
         <div className="admin-card" style={{ gridColumn: 'span 3' }}>
           <div className="stat">
             <span className="stat__value">{formatNumber(overview.readersToday)}</span>
-            <span className="stat__label">Readers today</span>
-            <span className="stat__delta">{formatNumber(overview.viewsToday)} views today</span>
+            <span className="stat__label">{t('adminAudience.analytics.statReadersToday')}</span>
+            <span className="stat__delta">
+              {t('adminAudience.analytics.viewsTodayDelta', { count: formatNumber(overview.viewsToday) })}
+            </span>
           </div>
         </div>
         <div className="admin-card" style={{ gridColumn: 'span 3' }}>
           <div className="stat">
             <span className="stat__value">{formatNumber(overview.viewsToday)}</span>
-            <span className="stat__label">Views today</span>
-            <span className="stat__delta">{formatNumber(overview.readersToday)} unique readers</span>
+            <span className="stat__label">{t('adminAudience.analytics.statViewsToday')}</span>
+            <span className="stat__delta">
+              {t('adminAudience.analytics.readersTodayDelta', { count: formatNumber(overview.readersToday) })}
+            </span>
           </div>
         </div>
       </div>
 
       <section className="admin-card">
         <div className="admin-card__head">
-          <h2>Last 14 days</h2>
-          <span className="meta">Views / unique readers</span>
+          <h2>{t('adminAudience.analytics.last14Days')}</h2>
+          <span className="meta">{t('adminAudience.analytics.viewsPerUniqueReaders')}</span>
         </div>
         <ReadershipChart data={daily} />
       </section>
@@ -164,16 +187,16 @@ export function AnalyticsPage({
       <div className="admin-grid" style={{ marginTop: '1.25rem' }}>
         <section className="admin-card" style={{ gridColumn: 'span 8' }}>
           <div className="admin-card__head">
-            <h2>Top articles</h2>
-            <span className="meta">All time</span>
+            <h2>{t('adminAudience.analytics.topArticles')}</h2>
+            <span className="meta">{t('adminAudience.analytics.allTime')}</span>
           </div>
           <div className="admin-table-wrap" style={{ border: 0 }}>
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Article</th>
-                  <th className="num">Readers</th>
-                  <th className="num">Views</th>
+                  <th>{t('adminAudience.common.article')}</th>
+                  <th className="num">{t('adminAudience.common.readers')}</th>
+                  <th className="num">{t('adminAudience.common.views')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -182,7 +205,8 @@ export function AnalyticsPage({
                     <td className="title-cell">
                       <a href={`/admin/articles/${article.id}/edit`}>{article.title}</a>
                       <div className="meta" style={{ marginTop: '0.2rem' }}>
-                        /{article.slug} · <a href={`/admin/analytics/${article.id}`}>Readership</a>
+                        /{article.slug} ·{' '}
+                        <a href={`/admin/analytics/${article.id}`}>{t('adminAudience.analytics.readership')}</a>
                       </div>
                     </td>
                     <td className="num">{formatNumber(article.readers)}</td>
@@ -192,7 +216,7 @@ export function AnalyticsPage({
                 {!topArticles.length ? (
                   <tr>
                     <td colSpan={3} className="hint" style={{ padding: '1.5rem' }}>
-                      No published articles yet.
+                      {t('adminAudience.analytics.noPublishedArticles')}
                     </td>
                   </tr>
                 ) : null}
@@ -202,32 +226,30 @@ export function AnalyticsPage({
         </section>
 
         <aside className="admin-card" style={{ gridColumn: 'span 4' }}>
-          <h2>How this is measured</h2>
-          <p className="hint">
-            Readers are unique visitors. Views are counted once per reader, per article, per hour.
-            Internal/admin visits and DNT/GPC requests are excluded.
+          <h2>{t('adminAudience.analytics.howMeasuredTitle')}</h2>
+          <p className="hint">{t('adminAudience.analytics.howMeasuredBody1')}</p>
+          <p className="hint" style={{ marginTop: '0.85rem' }}>
+            {t('adminAudience.analytics.howMeasuredBody2')}
           </p>
           <p className="hint" style={{ marginTop: '0.85rem' }}>
-            No cookies, no raw IP addresses, and no raw user-agent strings are stored. Visitor IDs are
-            salted hashes used only for deduplication. Event rows are retained for 180 days; aggregate
-            reader counts remain.
-          </p>
-          <p className="hint" style={{ marginTop: '0.85rem' }}>
-            This page is visible only in the editorial desk and is never exposed on the public site.
+            {t('adminAudience.analytics.howMeasuredBody3')}
           </p>
         </aside>
       </div>
 
       <div className="analytics-breakdown" style={{ marginTop: '1.25rem' }}>
-        <BreakdownCard title="Traffic sources" rows={referrers} />
-        <BreakdownCard title="Countries" rows={countries} formatLabel={regionName} />
-        <BreakdownCard title="Devices" rows={devices} formatLabel={labelCase} />
-        <BreakdownCard title="Browsers" rows={browsers} formatLabel={labelCase} />
+        <BreakdownCard title={t('adminAudience.analytics.trafficSources')} rows={referrers} />
+        <BreakdownCard
+          title={t('adminAudience.analytics.countries')}
+          rows={countries}
+          formatLabel={(code) => regionName(code, locale)}
+        />
+        <BreakdownCard title={t('adminAudience.analytics.devices')} rows={devices} formatLabel={labelCase} />
+        <BreakdownCard title={t('adminAudience.analytics.browsers')} rows={browsers} formatLabel={labelCase} />
       </div>
 
       <p className="hint" style={{ marginTop: '1rem' }}>
-        Traffic sources, countries, devices, and browsers cover the last 30 days. Totals are all-time.
-        Unique readers are counted from the moment analytics was enabled.
+        {t('adminAudience.analytics.breakdownNote')}
       </p>
     </AdminLayout>
   )

@@ -1,12 +1,12 @@
-import type { User } from '../../lib/db/schema'
-import type { AuthorWithCount } from '../../lib/db/queries/taxonomy'
+import { AdminLayout } from '../../components/layout'
 import type {
   AutomationActivityWithMedia,
   AutomationRunWithArticle,
   AutomationSettings,
 } from '../../lib/db/queries/automation'
-import { formatDate } from '../../lib/content/html'
-import { AdminLayout } from '../../components/layout'
+import type { AuthorWithCount } from '../../lib/db/queries/taxonomy'
+import type { User } from '../../lib/db/schema'
+import { useI18n } from '../../lib/i18n'
 import { CsrfField, type Flash } from './shared'
 
 export function AutomationPage({
@@ -34,75 +34,81 @@ export function AutomationPage({
   session: { csrfToken: string }
   flash: Flash
 }) {
+  const { t, formatDate, formatNumber, href } = useI18n()
+  const generatedCount = formatNumber(generatedToday)
+  const generationLimit = formatNumber(settings.dailyLimit)
+  const aiCoverCount = formatNumber(aiCoversToday)
+  const aiCoverLimit = formatNumber(settings.aiImageDailyLimit)
+  const usageSuffix = t('adminAutomation.settings.usageSuffix')
+  const aiUsageSuffix = t('adminAutomation.settings.aiUsageSuffix')
   return (
     <AdminLayout
       user={user}
       path="/admin/automation"
-      title="Automation"
-      subtitle="AI-assisted drafts from daily activity"
+      title={t('adminAutomation.header.title')}
+      subtitle={t('adminAutomation.header.subtitle')}
       flash={flash}
       csrfToken={session.csrfToken}
     >
       {!hasKey ? (
         <div className="flash" data-tone="error" role="alert">
           <div>
-            <strong>GEMINI_API_KEY belum diset.</strong> Tambahkan API key Gemini di environment Vercel sebelum
-            menjalankan automasi.
+            <strong>{t('adminAutomation.keyAlert.title')}</strong> {t('adminAutomation.keyAlert.body')}
           </div>
         </div>
       ) : null}
 
       <div className="admin-grid">
         <section className="admin-card" style={{ gridColumn: 'span 7' }}>
-          <h2>Aktivitas hari ini</h2>
+          <h2>{t('adminAutomation.activity.title')}</h2>
           <p className="hint" style={{ marginBottom: '1rem' }}>
-            Tulis kejadian, pengamatan, atau konteks pribadi. Lampirkan foto jika ada. AI hanya memakai detail yang
-            kamu berikan.
+            {t('adminAutomation.activity.intro')}
           </p>
           <form method="post" action="/admin/automation/activity" encType="multipart/form-data" className="admin-form">
             <CsrfField token={session.csrfToken} />
             <div className="field">
-              <label htmlFor="context">Konteks / kejadian</label>
+              <label htmlFor="context">{t('adminAutomation.activity.contextLabel')}</label>
               <textarea
                 className="textarea"
                 id="context"
                 name="context"
                 rows={5}
                 maxLength={2000}
-                placeholder="Contoh: pagi ini hujan, saya menunda berangkat dan membaca ulang catatan lama..."
+                placeholder={t('adminAutomation.activity.contextPlaceholder')}
               />
             </div>
             <div className="field">
-              <label htmlFor="image">Foto (opsional)</label>
+              <label htmlFor="image">{t('adminAutomation.activity.photoLabel')}</label>
               <input className="input" id="image" name="image" type="file" accept="image/*" />
             </div>
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Simpan aktivitas</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminAutomation.activity.submit')}
+              </button>
             </div>
           </form>
 
-          <h2 style={{ marginTop: '2rem' }}>Generate draft</h2>
+          <h2 style={{ marginTop: '2rem' }}>{t('adminAutomation.generate.title')}</h2>
           <p className="hint" style={{ marginBottom: '1rem' }}>
-            Memakai aktivitas terbaru yang belum diproses. Jika tidak ada, AI menulis dari initiative brief di panel
-            pengaturan. Draft bisa diedit atau dipublish manual sebelum jadwal auto-publish.
+            {t('adminAutomation.generate.intro')}
           </p>
           <form method="post" action="/admin/automation/generate">
             <CsrfField token={session.csrfToken} />
             <button className="btn btn--solid" type="submit" disabled={!hasKey}>
-              Generate draft sekarang
+              {t('adminAutomation.generate.submit')}
             </button>
           </form>
 
-          <h2 style={{ marginTop: '2.5rem' }}>Aktivitas terbaru</h2>
+          <h2 style={{ marginTop: '2.5rem' }}>{t('adminAutomation.activity.recentTitle')}</h2>
           {activities.length ? (
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Gambar</th>
-                    <th>Konteks</th>
-                    <th>Status</th>
-                    <th>Waktu</th>
+                    <th>{t('adminAutomation.activity.imageHeader')}</th>
+                    <th>{t('adminAutomation.activity.contextHeader')}</th>
+                    <th>{t('adminAutomation.activity.statusHeader')}</th>
+                    <th>{t('adminAutomation.activity.timeHeader')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -123,14 +129,18 @@ export function AutomationPage({
                       </td>
                       <td className="muted-cell">
                         {activity.text ? (
-                          activity.text.length > 160 ? `${activity.text.slice(0, 160)}…` : activity.text
+                          activity.text.length > 160 ? (
+                            `${activity.text.slice(0, 160)}…`
+                          ) : (
+                            activity.text
+                          )
                         ) : (
-                          <span className="meta">Hanya gambar</span>
+                          <span className="meta">{t('adminAutomation.activity.imageOnly')}</span>
                         )}
                       </td>
                       <td>
                         <span className="status" data-status={activity.consumedAt ? 'published' : 'draft'}>
-                          {activity.consumedAt ? 'used' : 'new'}
+                          {t(`adminAutomation.status.${activity.consumedAt ? 'used' : 'new'}`)}
                         </span>
                       </td>
                       <td className="muted-cell">{formatDate(activity.createdAt, 'short')}</td>
@@ -140,32 +150,34 @@ export function AutomationPage({
               </table>
             </div>
           ) : (
-            <p className="hint">Belum ada aktivitas.</p>
+            <p className="hint">{t('adminAutomation.activity.empty')}</p>
           )}
         </section>
 
         <section className="admin-card" style={{ gridColumn: 'span 5' }}>
-          <h2>Pengaturan automasi</h2>
+          <h2>{t('adminAutomation.settings.title')}</h2>
           <form method="post" action="/admin/automation/settings" className="admin-form">
             <CsrfField token={session.csrfToken} />
             <label className="field" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
               <input type="checkbox" name="enabled" defaultChecked={settings.enabled} />
-              <span>Aktifkan automasi</span>
+              <span>{t('adminAutomation.settings.enable')}</span>
             </label>
 
             <div className="field">
-              <label htmlFor="authorId">Author</label>
+              <label htmlFor="authorId">{t('adminAutomation.settings.authorLabel')}</label>
               <select className="select" id="authorId" name="authorId" defaultValue={settings.authorId ?? ''}>
-                <option value="">Otomatis — buat author default jika kosong</option>
+                <option value="">{t('adminAutomation.settings.authorAuto')}</option>
                 {authors.map((author) => (
-                  <option key={author.id} value={author.id}>{author.displayName}</option>
+                  <option key={author.id} value={author.id}>
+                    {author.displayName}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div className="form-row">
               <div className="field">
-                <label htmlFor="language">Bahasa</label>
+                <label htmlFor="language">{t('adminAutomation.settings.languageLabel')}</label>
                 <input
                   className="input"
                   id="language"
@@ -184,14 +196,14 @@ export function AutomationPage({
                 </datalist>
               </div>
               <div className="field">
-                <label htmlFor="model">Model Gemini</label>
+                <label htmlFor="model">{t('adminAutomation.settings.modelLabel')}</label>
                 <input className="input" id="model" name="model" defaultValue={settings.model} required />
               </div>
             </div>
 
             <div className="form-row">
               <div className="field">
-                <label htmlFor="autoPublishDelayHours">Auto-publish setelah (jam)</label>
+                <label htmlFor="autoPublishDelayHours">{t('adminAutomation.settings.autoPublishAfter')}</label>
                 <input
                   className="input"
                   id="autoPublishDelayHours"
@@ -204,7 +216,7 @@ export function AutomationPage({
                 />
               </div>
               <div className="field">
-                <label htmlFor="dailyLimit">Artikel per 24 jam</label>
+                <label htmlFor="dailyLimit">{t('adminAutomation.settings.dailyLimit')}</label>
                 <input
                   className="input"
                   id="dailyLimit"
@@ -217,34 +229,39 @@ export function AutomationPage({
                 />
               </div>
             </div>
+            {/* biome-ignore format: the suffix must sit flush against the strong element */}
             <p className="hint" style={{ marginTop: '-0.3rem' }}>
-              Terpakai dalam 24 jam terakhir: <strong>{generatedToday} / {settings.dailyLimit}</strong>. Cron akan
-              membuat hingga batas ini, bisa beberapa artikel sekaligus dalam satu slot. Jika durasi fungsi habis, sisa
-              kuota dilanjutkan pada cron berikutnya.
+              {t('adminAutomation.settings.usagePrefix')}{' '}
+              <strong>{generatedCount} / {generationLimit}</strong>{usageSuffix}
             </p>
 
             <label className="field" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
               <input type="checkbox" name="autoPublish" defaultChecked={settings.autoPublish} />
-              <span>Publish otomatis jika tidak diedit</span>
+              <span>{t('adminAutomation.settings.autoPublish')}</span>
             </label>
 
             <div className="field">
-              <label htmlFor="coverMode">Cover image</label>
+              <label htmlFor="coverMode">{t('adminAutomation.settings.coverLabel')}</label>
               <select className="select" id="coverMode" name="coverMode" defaultValue={settings.coverMode}>
-                <option value="procedural">Prosedural — gratis, tanpa AI image</option>
-                <option value="ai">AI — pakai provider di bawah</option>
+                <option value="procedural">{t('adminAutomation.settings.coverProcedural')}</option>
+                <option value="ai">{t('adminAutomation.settings.coverAi')}</option>
               </select>
             </div>
             <div className="form-row">
               <div className="field">
-                <label htmlFor="aiImageProvider">Provider image</label>
-                <select className="select" id="aiImageProvider" name="aiImageProvider" defaultValue={settings.aiImageProvider}>
+                <label htmlFor="aiImageProvider">{t('adminAutomation.settings.providerLabel')}</label>
+                <select
+                  className="select"
+                  id="aiImageProvider"
+                  name="aiImageProvider"
+                  defaultValue={settings.aiImageProvider}
+                >
                   <option value="cloudflare">Cloudflare Workers AI</option>
                   <option value="gemini">Gemini</option>
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="aiImageModel">Model image</label>
+                <label htmlFor="aiImageModel">{t('adminAutomation.settings.imageModelLabel')}</label>
                 <input className="input" id="aiImageModel" name="aiImageModel" defaultValue={settings.aiImageModel} />
               </div>
             </div>
@@ -253,7 +270,7 @@ export function AutomationPage({
               <code>gemini-2.5-flash-image</code>
             </p>
             <div className="field">
-              <label htmlFor="aiImageDailyLimit">Batas AI cover / 24 jam</label>
+              <label htmlFor="aiImageDailyLimit">{t('adminAutomation.settings.aiCoverLimit')}</label>
               <input
                 className="input"
                 id="aiImageDailyLimit"
@@ -266,19 +283,19 @@ export function AutomationPage({
             </div>
             {settings.coverMode === 'ai' && !coverReady ? (
               <div className="flash" data-tone="error" role="alert">
-                Provider AI cover belum dikonfigurasi. Set <code>CLOUDFLARE_ACCOUNT_ID</code> +{' '}
-                <code>CLOUDFLARE_API_TOKEN</code> untuk Cloudflare, atau <code>GEMINI_API_KEY</code> untuk Gemini.
+                {t('adminAutomation.settings.coverMissing')} <code>CLOUDFLARE_ACCOUNT_ID</code> +{' '}
+                <code>CLOUDFLARE_API_TOKEN</code> {t('adminAutomation.settings.coverMissingCloudflare')}{' '}
+                <code>GEMINI_API_KEY</code> {t('adminAutomation.settings.coverMissingGemini')}
               </div>
             ) : null}
+            {/* biome-ignore format: the suffix must sit flush against the strong element */}
             <p className="hint" style={{ marginTop: '-0.3rem' }}>
-              AI cover hanya dipakai jika aktivitas tidak punya foto. Terpakai:{' '}
-              <strong>{aiCoversToday} / {settings.aiImageDailyLimit}</strong> dalam 24 jam. Jika kuota habis atau
-              generate gagal, otomatis fallback ke cover prosedural. Generate gambar memakai kuota/biaya terpisah dari
-              teks; pada free tier Gemini, kuota image generation sering 0.
+              {t('adminAutomation.settings.aiUsagePrefix')}{' '}
+              <strong>{aiCoverCount} / {aiCoverLimit}</strong>{aiUsageSuffix}
             </p>
 
             <div className="field">
-              <label htmlFor="initiativeBrief">Initiative brief (saat tidak ada aktivitas)</label>
+              <label htmlFor="initiativeBrief">{t('adminAutomation.settings.briefLabel')}</label>
               <textarea
                 className="textarea"
                 id="initiativeBrief"
@@ -290,39 +307,51 @@ export function AutomationPage({
             </div>
 
             <div className="form-actions">
-              <button className="btn btn--solid" type="submit">Simpan pengaturan</button>
+              <button className="btn btn--solid" type="submit">
+                {t('adminAutomation.settings.save')}
+              </button>
             </div>
           </form>
 
-          <h2 style={{ marginTop: '2rem' }}>Riwayat automasi</h2>
+          <h2 style={{ marginTop: '2rem' }}>{t('adminAutomation.history.title')}</h2>
           {runs.length ? (
             <ul className="automation-runs">
               {runs.map((run) => (
                 <li key={run.id} style={{ borderTop: '1px solid var(--rule)', padding: '0.7rem 0' }}>
                   <div className="meta">
-                    {formatDate(run.createdAt, 'short')} · {run.source} · {run.kind}
+                    {formatDate(run.createdAt, 'short')} · {t(`adminAutomation.status.${run.source}`)} ·{' '}
+                    {t(`adminAutomation.status.${run.kind}`)}
                   </div>
                   <div>
                     {run.articleId && run.articleTitle ? (
-                      <a className="text-link" href={`/admin/articles/${run.articleId}/edit`}>{run.articleTitle}</a>
+                      <a className="text-link" href={href(`/admin/articles/${run.articleId}/edit`)}>
+                        {run.articleTitle}
+                      </a>
                     ) : (
-                      <span>{run.error ?? 'No article'}</span>
+                      <span>{run.error ?? t('adminAutomation.run.noArticle')}</span>
                     )}
                   </div>
                   <div className="meta">
-                    Status: {run.status} · cover: {run.coverSource ?? '—'}
-                    {run.autoPublishAt ? ` · auto-publish ${formatDate(run.autoPublishAt, 'short')}` : ''}
+                    {t('adminAutomation.run.statusLine', {
+                      status: t(`adminAutomation.status.${run.status}`),
+                      cover: run.coverSource ? t(`adminAutomation.status.${run.coverSource}`) : '—',
+                    })}
+                    {run.autoPublishAt
+                      ? ` · ${t('adminAutomation.run.autoPublish', { date: formatDate(run.autoPublishAt, 'short') })}`
+                      : ''}
                   </div>
-                  {run.coverError ? <div className="hint">Cover fallback: {run.coverError}</div> : null}
+                  {run.coverError ? (
+                    <div className="hint">{t('adminAutomation.run.coverFallback', { error: run.coverError })}</div>
+                  ) : null}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="hint">Belum ada riwayat.</p>
+            <p className="hint">{t('adminAutomation.history.empty')}</p>
           )}
           {settings.lastRunAt ? (
             <p className="hint" style={{ marginTop: '1rem' }}>
-              Generate terakhir: {formatDate(settings.lastRunAt, 'long')}
+              {t('adminAutomation.history.lastRun', { date: formatDate(settings.lastRunAt, 'long') })}
             </p>
           ) : null}
         </section>

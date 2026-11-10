@@ -1,15 +1,6 @@
 import { z } from 'zod'
 
-export const ACCENT_TOKENS = [
-  'vermilion',
-  'indigo',
-  'ultramarine',
-  'ochre',
-  'teal',
-  'plum',
-  'moss',
-  'clay',
-] as const
+export const ACCENT_TOKENS = ['vermilion', 'indigo', 'ultramarine', 'ochre', 'teal', 'plum', 'moss', 'clay'] as const
 
 export const loginSchema = z.object({
   email: z.string().trim().email(),
@@ -17,7 +8,7 @@ export const loginSchema = z.object({
 })
 
 export const categoryInputSchema = z.object({
-  name: z.string().trim().min(1, 'A name is required').max(60),
+  name: z.string().trim().min(1).max(60),
   slug: z.string().trim().max(80).optional(),
   description: z.string().trim().max(200).optional(),
   intro: z.string().trim().max(400).optional(),
@@ -26,13 +17,13 @@ export const categoryInputSchema = z.object({
 })
 
 export const tagInputSchema = z.object({
-  name: z.string().trim().min(1, 'A name is required').max(40),
+  name: z.string().trim().min(1).max(40),
   slug: z.string().trim().max(80).optional(),
   description: z.string().trim().max(200).optional(),
 })
 
 export const authorInputSchema = z.object({
-  displayName: z.string().trim().min(1, 'A name is required').max(80),
+  displayName: z.string().trim().min(1).max(80),
   slug: z.string().trim().max(80).optional(),
   roleTitle: z.string().trim().max(60).optional(),
   bio: z.string().trim().max(300).optional(),
@@ -60,7 +51,7 @@ export const settingsInputSchema = z.object({
 })
 
 export const articlePayloadSchema = z.object({
-  title: z.string().trim().min(1, 'A title is required').max(200),
+  title: z.string().trim().min(1).max(200),
   subtitle: z.string().trim().max(300).nullable().optional(),
   excerpt: z.string().trim().max(600).nullable().optional(),
   slug: z.string().trim().max(120).nullable().optional(),
@@ -111,32 +102,31 @@ export const mediaPatchSchema = z.object({
 export const USER_ROLES = ['admin', 'editor', 'author'] as const
 
 export const accountProfileSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(80),
+  name: z.string().trim().min(1).max(80),
 })
 
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1, 'Current password is required'),
-    newPassword: z.string().min(8, 'Password must be at least 8 characters').max(200),
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(8).max(200),
     confirmPassword: z.string().min(1),
     revokeOthers: z.boolean().optional(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'Passwords do not match',
     path: ['confirmPassword'],
   })
 
 export const createUserSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(80),
-  email: z.string().trim().email('Valid email is required').max(200),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
+  name: z.string().trim().min(1).max(80),
+  email: z.string().trim().email().max(200),
+  password: z.string().min(8).max(200),
   role: z.enum(USER_ROLES),
   createAuthor: z.boolean().optional(),
 })
 
 export const updateUserSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(80),
-  email: z.string().trim().email('Valid email is required').max(200),
+  name: z.string().trim().min(1).max(80),
+  email: z.string().trim().email().max(200),
   role: z.enum(USER_ROLES),
   active: z.boolean(),
   authorId: z.string().trim().max(80).nullable().optional(),
@@ -144,11 +134,10 @@ export const updateUserSchema = z.object({
 
 export const adminResetPasswordSchema = z
   .object({
-    newPassword: z.string().min(8, 'Password must be at least 8 characters').max(200),
+    newPassword: z.string().min(8).max(200),
     confirmPassword: z.string().min(1),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'Passwords do not match',
     path: ['confirmPassword'],
   })
 

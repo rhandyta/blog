@@ -25,21 +25,19 @@ function confirmationToken(): string {
 
 export async function subscribeEmail(
   email: string,
-  options: { source?: string; ip?: string; requireConfirmation?: boolean } = {},
+  options: { source?: string; ip?: string; requireConfirmation?: boolean; locale?: 'id' | 'en' } = {},
 ): Promise<SubscribeOutcome> {
   const normalized = normalizeEmail(email)
   if (!isValidEmail(normalized)) return { result: 'invalid' }
 
   const db = getDb()
-  const existing = (
-    await db.select().from(subscribers).where(eq(subscribers.email, normalized)).limit(1)
-  )[0]
+  const existing = (await db.select().from(subscribers).where(eq(subscribers.email, normalized)).limit(1))[0]
   const now = new Date()
   const nowIso = now.toISOString()
   const source = options.source ?? 'site'
-  const ipHashValue =
-    options.ip && options.ip !== 'unknown' ? hashVisitor(options.ip, 'newsletter') : null
+  const ipHashValue = options.ip && options.ip !== 'unknown' ? hashVisitor(options.ip, 'newsletter') : null
   const requireConfirmation = options.requireConfirmation ?? false
+  const locale = options.locale ?? 'id'
 
   if (existing) {
     if (existing.status === 'subscribed' && existing.confirmedAt) {
@@ -56,6 +54,7 @@ export async function subscribeEmail(
           confirmationToken: null,
           confirmationSentAt: null,
           source,
+          locale,
           ...(ipHashValue ? { ipHash: ipHashValue } : {}),
         })
         .where(eq(subscribers.id, existing.id))
@@ -87,6 +86,7 @@ export async function subscribeEmail(
         confirmationToken: token,
         confirmationSentAt: nowIso,
         source,
+        locale,
         ...(ipHashValue ? { ipHash: ipHashValue } : {}),
       })
       .where(eq(subscribers.id, existing.id))
@@ -100,6 +100,7 @@ export async function subscribeEmail(
     status: 'subscribed',
     unsubscribeToken: confirmationToken(),
     source,
+    locale,
     ipHash: ipHashValue,
     createdAt: nowIso,
     unsubscribedAt: null,
@@ -180,11 +181,7 @@ export async function confirmSubscriber(token: string): Promise<string | null> {
 
 export async function unsubscribeByToken(token: string): Promise<string | null> {
   const db = getDb()
-  const rows = await db
-    .select()
-    .from(subscribers)
-    .where(eq(subscribers.unsubscribeToken, token))
-    .limit(1)
+  const rows = await db.select().from(subscribers).where(eq(subscribers.unsubscribeToken, token)).limit(1)
   const row = rows[0]
   if (!row) return null
   if (row.status !== 'unsubscribed') {
@@ -201,12 +198,14 @@ export async function unsubscribeByToken(token: string): Promise<string | null> 
   return row.email
 }
 
-export async function listSubscribers(options: {
-  q?: string
-  status?: 'subscribed' | 'pending' | 'unsubscribed' | 'all'
-  limit?: number
-  offset?: number
-} = {}) {
+export async function listSubscribers(
+  options: {
+    q?: string
+    status?: 'subscribed' | 'pending' | 'unsubscribed' | 'all'
+    limit?: number
+    offset?: number
+  } = {},
+) {
   const { q, status = 'all', limit = 50, offset = 0 } = options
   const conditions = []
   if (q) conditions.push(like(subscribers.email, `%${q}%`))
@@ -219,13 +218,7 @@ export async function listSubscribers(options: {
   }
   const where = conditions.length ? and(...conditions) : undefined
   const [items, totals] = await Promise.all([
-    getDb()
-      .select()
-      .from(subscribers)
-      .where(where)
-      .orderBy(desc(subscribers.createdAt))
-      .limit(limit)
-      .offset(offset),
+    getDb().select().from(subscribers).where(where).orderBy(desc(subscribers.createdAt)).limit(limit).offset(offset),
     getDb().select({ n: count() }).from(subscribers).where(where),
   ])
   return { items, total: totals[0]?.n ?? 0 }
@@ -284,24 +277,22 @@ export async function recordNewsletterBroadcast(input: {
   kind?: 'manual' | 'digest'
   periodKey?: string | null
 }): Promise<void> {
-  await getDb().insert(newsletterBroadcasts).values({
-    id: crypto.randomUUID(),
-    subject: input.subject,
-    body: input.body,
-    recipientCount: input.recipientCount,
-    sentCount: input.sentCount,
-    failedCount: input.failedCount,
-    createdAt: new Date().toISOString(),
-    createdBy: input.createdBy,
-    kind: input.kind ?? 'manual',
-    periodKey: input.periodKey ?? null,
-  })
+  await getDb()
+    .insert(newsletterBroadcasts)
+    .values({
+      id: crypto.randomUUID(),
+      subject: input.subject,
+      body: input.body,
+      recipientCount: input.recipientCount,
+      sentCount: input.sentCount,
+      failedCount: input.failedCount,
+      createdAt: new Date().toISOString(),
+      createdBy: input.createdBy,
+      kind: input.kind ?? 'manual',
+      periodKey: input.periodKey ?? null,
+    })
 }
 
 export async function listNewsletterBroadcasts(limit = 8) {
-  return getDb()
-    .select()
-    .from(newsletterBroadcasts)
-    .orderBy(desc(newsletterBroadcasts.createdAt))
-    .limit(limit)
+  return getDb().select().from(newsletterBroadcasts).orderBy(desc(newsletterBroadcasts.createdAt)).limit(limit)
 }

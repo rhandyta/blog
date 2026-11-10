@@ -12,7 +12,8 @@ const app = createApp()
 
 function cookieFrom(response: Response): string {
   const headers = response.headers as Headers & { getSetCookie?: () => string[] }
-  const values = headers.getSetCookie?.() ?? (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')!] : [])
+  const values =
+    headers.getSetCookie?.() ?? (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')!] : [])
   return values.map((value) => value.split(';')[0]).join('; ')
 }
 
@@ -47,8 +48,8 @@ describe('automation', () => {
     const response = await app.request('/admin/automation', { headers: { cookie } })
     expect(response.status).toBe(200)
     const html = await response.text()
-    expect(html).toContain('Automation')
-    expect(html).toContain('Generate draft sekarang')
+    expect(html).toContain('admin-shell')
+    expect(html).toContain('<html lang="id">')
   })
 })
 
@@ -58,7 +59,7 @@ describe('public pages', () => {
   })
 
   test('homepage renders server-rendered content and metadata', async () => {
-    const response = await app.request('/')
+    const response = await app.request('/id')
     expect(response.status).toBe(200)
     const html = await response.text()
     expect(html).toContain('<title>RhandytaVERSE — Rhandyta Briantama</title>')
@@ -70,7 +71,7 @@ describe('public pages', () => {
   })
 
   test('long article headlines drop the site suffix instead of overflowing', async () => {
-    const short = await (await app.request('/articles/test-published')).text()
+    const short = await (await app.request('/id/articles/test-published')).text()
     expect(short).toContain('<title>The Published Test Article — RhandytaVERSE</title>')
 
     await getDb()
@@ -78,7 +79,7 @@ describe('public pages', () => {
       .set({ title: 'A Very Long Headline That Already Fills The Space Available In Search Results' })
       .where(eq(articles.id, 'art_test_published'))
     try {
-      const long = await (await app.request('/articles/test-published')).text()
+      const long = await (await app.request('/id/articles/test-published')).text()
       const title = /<title>(.*?)<\/title>/.exec(long)?.[1] ?? ''
       expect(title.endsWith('— RhandytaVERSE')).toBe(false)
       expect(title).toBe('A Very Long Headline That Already Fills The Space Available In Search Results')
@@ -91,7 +92,7 @@ describe('public pages', () => {
   })
 
   test('meta descriptions are single-line and bounded', async () => {
-    for (const path of ['/', '/about', '/articles', '/archive', '/topics']) {
+    for (const path of ['/id', '/id/about', '/id/articles', '/id/archive', '/id/topics']) {
       const html = await (await app.request(path)).text()
       const description = /<meta name="description" content="([^"]*)">/.exec(html)?.[1]
       expect({ path, present: Boolean(description) }).toEqual({ path, present: true })
@@ -107,21 +108,18 @@ describe('public pages', () => {
       .set({ canonicalUrl: 'https://syndication.example/articles/test-published' })
       .where(eq(articles.id, 'art_test_published'))
     try {
-      const response = await app.request('/articles/test-published')
+      const response = await app.request('/id/articles/test-published')
       const html = await response.text()
       expect(html).toContain('href="https://syndication.example/articles/test-published"')
       expect(html).toContain('property="og:url" content="https://syndication.example/articles/test-published"')
       expect(html).toContain('"@id":"https://syndication.example/articles/test-published"')
     } finally {
-      await getDb()
-        .update(articles)
-        .set({ canonicalUrl: null })
-        .where(eq(articles.id, 'art_test_published'))
+      await getDb().update(articles).set({ canonicalUrl: null }).where(eq(articles.id, 'art_test_published'))
     }
   })
 
   test('article page contains structured data, canonical, and TOC anchors', async () => {
-    const response = await app.request('/articles/test-published')
+    const response = await app.request('/id/articles/test-published')
     expect(response.status).toBe(200)
     const html = await response.text()
     expect(html).toContain('BlogPosting')
@@ -146,13 +144,13 @@ describe('public pages', () => {
 
     // 1 piece: the hero promotes it, so the list below is empty — that must not
     // render "No pieces in this section yet", and Latest must show its date.
-    const one = await (await app.request('/category/test-section')).text()
+    const one = await (await app.request('/id/category/test-section')).text()
     expect(one).toContain('Pilihan')
     expect(one).not.toContain('Belum ada tulisan di rubrik ini')
     expect(one).not.toContain('<div>Terbaru<strong>—</strong></div>')
 
     // 0 pieces: an honest empty state plus noindex, since the page is thin.
-    const empty = await app.request('/category/empty-section')
+    const empty = await app.request('/id/category/empty-section')
     expect(empty.status).toBe(200)
     const emptyHtml = await empty.text()
     expect(emptyHtml).toContain('Belum ada tulisan di rubrik ini')
@@ -168,24 +166,24 @@ describe('public pages', () => {
   })
 
   test('draft and scheduled articles are not publicly visible', async () => {
-    expect((await app.request('/articles/test-draft')).status).toBe(404)
-    expect((await app.request('/articles/test-scheduled')).status).toBe(404)
+    expect((await app.request('/id/articles/test-draft')).status).toBe(404)
+    expect((await app.request('/id/articles/test-scheduled')).status).toBe(404)
   })
 
   test('section, author, archive, topic and static pages render', async () => {
     for (const path of [
-      '/articles',
-      '/category/test-section',
-      '/author/test-author',
-      '/archive',
-      '/topics',
-      '/tags/test-tag',
-      '/search?q=notebook',
-      '/saved',
-      '/about',
-      '/privacy',
-      '/terms',
-      '/subscribe',
+      '/id/articles',
+      '/id/category/test-section',
+      '/id/author/test-author',
+      '/id/archive',
+      '/id/topics',
+      '/id/tags/test-tag',
+      '/id/search?q=notebook',
+      '/id/saved',
+      '/id/about',
+      '/id/privacy',
+      '/id/terms',
+      '/id/subscribe',
     ]) {
       const response = await app.request(path)
       expect({ path, status: response.status }).toEqual({ path, status: 200 })
@@ -193,7 +191,7 @@ describe('public pages', () => {
   })
 
   test('security headers are present', async () => {
-    const response = await app.request('/')
+    const response = await app.request('/id')
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(response.headers.get('x-frame-options')).toBe('DENY')
     expect(response.headers.get('content-security-policy')).toContain("default-src 'self'")
@@ -253,7 +251,11 @@ describe('public pages', () => {
     expect(first).toContain('<link rel="next" href="http://localhost:3000/articles?page=2">')
     expect(first).not.toContain('rel="prev"')
 
-    const middle = renderHead({ ...base, canonicalPath: '/articles?page=2', pagination: { prev: '/articles', next: '/articles?page=3' } })
+    const middle = renderHead({
+      ...base,
+      canonicalPath: '/articles?page=2',
+      pagination: { prev: '/articles', next: '/articles?page=3' },
+    })
     expect(middle).toContain('<link rel="prev" href="http://localhost:3000/articles">')
     expect(middle).toContain('<link rel="next" href="http://localhost:3000/articles?page=3">')
 
@@ -311,7 +313,9 @@ describe('newsletter', () => {
     expect(pending.items[0]?.ipHash).toMatch(/^[a-f0-9]{32}$/)
     expect(pending.items[0]?.ipHash).not.toBe('127.0.0.1')
 
-    const confirmed = await app.request(`/confirm?token=${encodeURIComponent(pending.items[0]?.confirmationToken ?? '')}`)
+    const confirmed = await app.request(
+      `/id/confirm?token=${encodeURIComponent(pending.items[0]?.confirmationToken ?? '')}`,
+    )
     expect(confirmed.status).toBe(200)
     expect(await confirmed.text()).toContain('Langganan terkonfirmasi.')
 
@@ -331,7 +335,7 @@ describe('newsletter', () => {
     expect(invalid.status).toBe(400)
 
     const oneClick = await app.request(
-      `/unsubscribe?token=${encodeURIComponent(pending.items[0]?.unsubscribeToken ?? '')}`,
+      `/id/unsubscribe?token=${encodeURIComponent(pending.items[0]?.unsubscribeToken ?? '')}`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -378,7 +382,7 @@ describe('newsletter', () => {
       body: new URLSearchParams({ email: 'form-reader@example.com', source: 'site' }).toString(),
     })
     expect(response.status).toBe(303)
-    expect(response.headers.get('location')).toBe('/subscribe?status=pending')
+    expect(response.headers.get('location')).toBe('/id/subscribe?status=pending')
   })
 })
 
@@ -407,7 +411,9 @@ describe('authentication and authorization', () => {
     const { cookie } = await login()
     const response = await app.request('/admin', { headers: { cookie } })
     expect(response.status).toBe(200)
-    expect(await response.text()).toContain('Overview')
+    const html = await response.text()
+    expect(html).toContain('admin-shell')
+    expect(html).toContain('<html lang="id">')
   })
 
   test('sidebar Articles draft count is consistent across all admin pages', async () => {
@@ -434,7 +440,8 @@ describe('authentication and authorization', () => {
       const response = await app.request(path, { headers: { cookie } })
       expect({ path, status: response.status }).toEqual({ path, status: 200 })
       const html = await response.text()
-      const match = /<a href="\/admin\/articles"[^>]*><span>Articles<\/span><span class="count"[^>]*>(\d+)<\/span><\/a>/.exec(html)
+      const match =
+        /<a href="\/admin\/articles"[^>]*><span>[^<]+<\/span><span class="count"[^>]*>(\d+)<\/span><\/a>/.exec(html)
       expect({ path, badge: match?.[1] }).toEqual({ path, badge: '1' })
     }
   })
@@ -490,7 +497,10 @@ describe('CMS pipeline', () => {
       body: {
         type: 'doc',
         content: [
-          { type: 'paragraph', content: [{ type: 'text', text: 'Integration test body with notebooks and interfaces.' }] },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Integration test body with notebooks and interfaces.' }],
+          },
           { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Testing section' }] },
         ],
       },
@@ -513,7 +523,7 @@ describe('CMS pipeline', () => {
     expect(createdJson.article.slug).toBe('integration-test-article')
     expect(createdJson.article.status).toBe('draft')
 
-    const draftPage = await app.request(`/articles/${createdJson.article.slug}`)
+    const draftPage = await app.request(`/id/articles/${createdJson.article.slug}`)
     expect(draftPage.status).toBe(404)
 
     const preview = await app.request(`/preview/${createdJson.article.id}?token=${createdJson.previewToken}`)
@@ -531,7 +541,7 @@ describe('CMS pipeline', () => {
     const publishedJson = (await published.json()) as { article: { status: string } }
     expect(publishedJson.article.status).toBe('published')
 
-    const livePage = await app.request(`/articles/${createdJson.article.slug}`)
+    const livePage = await app.request(`/id/articles/${createdJson.article.slug}`)
     expect(livePage.status).toBe(200)
 
     const conflict = await app.request(`/api/admin/articles/${createdJson.article.id}`, {
@@ -555,7 +565,7 @@ describe('CMS pipeline', () => {
     })
     expect(deleted.status).toBe(200)
 
-    const afterDelete = await app.request(`/articles/${createdJson.article.slug}`)
+    const afterDelete = await app.request(`/id/articles/${createdJson.article.slug}`)
     expect(afterDelete.status).toBe(404)
 
     const row = await getDb().select().from(articles).where(eq(articles.slug, createdJson.article.slug)).limit(1)
@@ -611,11 +621,7 @@ describe('CMS pipeline', () => {
   })
 
   test('promotes scheduled articles once their time has passed', async () => {
-    const created = await getDb()
-      .select()
-      .from(articles)
-      .where(eq(articles.id, 'art_test_scheduled'))
-      .limit(1)
+    const created = await getDb().select().from(articles).where(eq(articles.id, 'art_test_scheduled')).limit(1)
     expect(created.length).toBe(1)
     await scheduleArticle('art_test_scheduled', new Date(Date.now() - 60_000).toISOString())
     const promoted = await publishDueArticles()

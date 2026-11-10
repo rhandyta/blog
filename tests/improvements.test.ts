@@ -31,8 +31,7 @@ const ONE_PIXEL_PNG = Buffer.from(
 function cookieFrom(response: Response): string {
   const headers = response.headers as Headers & { getSetCookie?: () => string[] }
   const values =
-    headers.getSetCookie?.() ??
-    (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')!] : [])
+    headers.getSetCookie?.() ?? (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')!] : [])
   return values.map((value) => value.split(';')[0]).join('; ')
 }
 
@@ -80,7 +79,7 @@ describe('poin 1: GTM, strict production CSP, and privacy alignment', () => {
     expect(asset.status).toBe(200)
     expect(await asset.text()).toContain('window.dataLayer')
 
-    for (const path of ['/', '/articles/test-published', '/about', '/privacy']) {
+    for (const path of ['/id', '/id/articles/test-published', '/id/about', '/id/privacy']) {
       const response = await app.request(path)
       expect(response.status).toBe(200)
       const html = await response.text()
@@ -98,7 +97,10 @@ describe('poin 1: GTM, strict production CSP, and privacy alignment', () => {
       { path: '/admin/login', headers: {} as Record<string, string> },
       { path: '/admin', headers: { cookie } },
       { path: '/admin/account', headers: { cookie } },
-      { path: `/preview/art_test_draft?token=${encodeURIComponent(previewToken)}`, headers: {} as Record<string, string> },
+      {
+        path: `/preview/art_test_draft?token=${encodeURIComponent(previewToken)}`,
+        headers: {} as Record<string, string>,
+      },
     ]
     for (const item of isolatedPaths) {
       const response = await app.request(item.path, { headers: item.headers })
@@ -119,7 +121,7 @@ describe('poin 1: GTM, strict production CSP, and privacy alignment', () => {
       process.env.NODE_ENV = 'production'
       resetConfigCache()
 
-      const pub = await app.request('/')
+      const pub = await app.request('/id')
       const pubCsp = cspDirectives(pub.headers.get('content-security-policy'))
       const pubScript = pubCsp.get('script-src') ?? ''
       expect(pubScript).toContain("'self'")
@@ -144,12 +146,12 @@ describe('poin 1: GTM, strict production CSP, and privacy alignment', () => {
   })
 
   test('privacy and about pages accurately disclose GTM alongside internal analytics', async () => {
-    const privacyHtml = await (await app.request('/privacy')).text()
+    const privacyHtml = await (await app.request('/id/privacy')).text()
     expect(privacyHtml).toContain('Google Tag Manager')
     expect(privacyHtml).toContain('googletagmanager.com')
     expect(privacyHtml).toContain('tanpa cookie analitik internal')
 
-    const aboutHtml = await (await app.request('/about')).text()
+    const aboutHtml = await (await app.request('/id/about')).text()
     expect(aboutHtml).toContain('Google Tag Manager')
     expect(aboutHtml).toContain('tanpa cookie analitik')
   })
@@ -196,25 +198,36 @@ describe('poin 2: caching, TTL invalidation, and non-blocking views', () => {
     const { cookie } = await loginAs()
     const previewToken = createPreviewToken('art_test_draft')
 
-    for (const path of ['/', '/articles', '/articles/test-published', '/about', '/privacy', '/terms', '/topics', '/archive']) {
+    for (const path of [
+      '/id',
+      '/id/articles',
+      '/id/articles/test-published',
+      '/id/about',
+      '/id/privacy',
+      '/id/terms',
+      '/id/topics',
+      '/id/archive',
+    ]) {
       const res = await app.request(path)
       expect(res.status).toBe(200)
-      expect(res.headers.get('cache-control')).toBe(
-        'public, max-age=0, s-maxage=60, stale-while-revalidate=300',
-      )
+      expect(res.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=60, stale-while-revalidate=300')
     }
 
-    for (const path of ['/search?q=notebook', '/saved', '/does-not-exist-anywhere']) {
+    for (const path of ['/id/search?q=notebook', '/id/saved', '/does-not-exist-anywhere']) {
       const res = await app.request(path)
       expect(res.headers.get('cache-control')).toBe('no-cache')
     }
 
-    for (const path of ['/admin/login', '/subscribe', `/preview/art_test_draft?token=${encodeURIComponent(previewToken)}`]) {
+    for (const path of [
+      '/admin/login',
+      '/id/subscribe',
+      `/preview/art_test_draft?token=${encodeURIComponent(previewToken)}`,
+    ]) {
       const res = await app.request(path)
       expect(res.headers.get('cache-control')).toBe('private, no-store')
     }
 
-    for (const path of ['/', '/admin', '/admin/account']) {
+    for (const path of ['/id', '/admin', '/admin/account']) {
       const res = await app.request(path, { headers: { cookie } })
       expect(res.headers.get('cache-control')).toBe('private, no-store')
     }
@@ -222,7 +235,7 @@ describe('poin 2: caching, TTL invalidation, and non-blocking views', () => {
 
   test('anonymous article view still increments article analytics', async () => {
     const before = (await getArticleAnalytics('art_test_published', 30))?.lifetimeViews ?? 0
-    const res = await app.request('/articles/test-published', {
+    const res = await app.request('/id/articles/test-published', {
       headers: {
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/130.0',
         'x-forwarded-for': '203.0.113.42',
@@ -278,11 +291,7 @@ describe('poin 3: user management, account security, media ownership RBAC, and l
     expect(createdUser).toBeDefined()
     expect(createdUser!.role).toBe('author')
 
-    const [linkedAuthor] = await getDb()
-      .select()
-      .from(authors)
-      .where(eq(authors.userId, createdUser!.id))
-      .limit(1)
+    const [linkedAuthor] = await getDb().select().from(authors).where(eq(authors.userId, createdUser!.id)).limit(1)
     expect(linkedAuthor).toBeDefined()
     expect(linkedAuthor!.displayName).toBe('Author Poin Tiga')
 
@@ -305,9 +314,7 @@ describe('poin 3: user management, account security, media ownership RBAC, and l
     const authorSession1 = await loginAs('author-poin3@example.com', 'author-password-1')
     const authorSession2 = await loginAs('author-poin3@example.com', 'author-password-1')
 
-    const authorDashHtml = await (
-      await app.request('/admin', { headers: { cookie: authorSession1.cookie } })
-    ).text()
+    const authorDashHtml = await (await app.request('/admin', { headers: { cookie: authorSession1.cookie } })).text()
     expect(authorDashHtml).not.toContain('/admin/automation')
     expect(authorDashHtml).not.toContain('/admin/users')
     expect(authorDashHtml).toContain('/admin/account')
@@ -335,7 +342,9 @@ describe('poin 3: user management, account security, media ownership RBAC, and l
     expect(shouldNotExist).toBeUndefined()
 
     // Author can access /admin/account, update profile, change password (rejecting wrong currentPassword), and keep current session while revoking others
-    const accountPage = await app.request('/admin/account', { headers: { cookie: authorSession1.cookie } })
+    const accountPage = await app.request('/admin/account', {
+      headers: { cookie: authorSession1.cookie, 'accept-language': 'en-US' },
+    })
     expect(accountPage.status).toBe(200)
     const accountHtml = await accountPage.text()
     expect(accountHtml).toContain('Author Poin Tiga')
@@ -502,12 +511,12 @@ describe('poin 3: user management, account security, media ownership RBAC, and l
   })
 
   test('visitor-facing UI remnants are localized cleanly in Indonesian', async () => {
-    const articleHtml = await (await app.request('/articles/test-published')).text()
+    const articleHtml = await (await app.request('/id/articles/test-published')).text()
     expect(articleHtml).toContain('>Beranda</a>')
     expect(articleHtml).toContain('"name":"Beranda"')
     expect(articleHtml).toContain('— beranda"')
 
-    const tagHtml = await (await app.request('/tags/test-tag')).text()
+    const tagHtml = await (await app.request('/id/tags/test-tag')).text()
     expect(tagHtml).toContain('<title>Bertanda “Test Tag” — RhandytaVERSE</title>')
   })
 })

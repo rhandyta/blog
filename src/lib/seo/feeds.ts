@@ -1,11 +1,23 @@
 import { escapeHtml } from '../content/html'
 
-export type SitemapEntry = { loc: string; lastmod?: string; changefreq?: string; priority?: number }
+export type SitemapEntry = {
+  loc: string
+  lastmod?: string
+  changefreq?: string
+  priority?: number
+  /** Language alternates advertised with xhtml:link. */
+  alternates?: Array<{ hreflang: string; href: string }>
+}
 
 export function renderSitemap(entries: SitemapEntry[]): string {
   const urls = entries
     .map((entry) => {
       const parts = [`<loc>${escapeHtml(entry.loc)}</loc>`]
+      for (const alternate of entry.alternates ?? []) {
+        parts.push(
+          `<xhtml:link rel="alternate" hreflang="${escapeHtml(alternate.hreflang)}" href="${escapeHtml(alternate.href)}"/>`,
+        )
+      }
       if (entry.lastmod) parts.push(`<lastmod>${escapeHtml(entry.lastmod)}</lastmod>`)
       if (entry.changefreq) parts.push(`<changefreq>${entry.changefreq}</changefreq>`)
       if (entry.priority !== undefined) parts.push(`<priority>${entry.priority.toFixed(1)}</priority>`)
@@ -13,7 +25,7 @@ export function renderSitemap(entries: SitemapEntry[]): string {
     })
     .join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${urls}
 </urlset>`
 }

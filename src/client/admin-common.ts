@@ -8,5 +8,11 @@ document.addEventListener('submit', (event) => {
   const message = submitter?.dataset.confirm ?? form.dataset.confirm
   if (message && !window.confirm(message)) {
     event.preventDefault()
+    return
+  }
+  // Form posts cannot carry a fragment; keep it when switching language.
+  if (form.matches('[data-lang-switch]') && window.location.hash) {
+    const input = form.querySelector<HTMLInputElement>('input[name="next"]')
+    if (input && !input.value.includes('#')) input.value = `${input.value}${window.location.hash}`
   }
 })

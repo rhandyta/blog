@@ -26,8 +26,7 @@ const app = createApp()
 function cookieFrom(response: Response): string {
   const headers = response.headers as Headers & { getSetCookie?: () => string[] }
   const values =
-    headers.getSetCookie?.() ??
-    (response.headers.get('set-cookie') ? [response.headers.get('set-cookie') ?? ''] : [])
+    headers.getSetCookie?.() ?? (response.headers.get('set-cookie') ? [response.headers.get('set-cookie') ?? ''] : [])
   return values.map((value) => value.split(';')[0]).join('; ')
 }
 
@@ -482,14 +481,26 @@ describe('poin 4C: Markdown export, PKZIP archive, backup JSON & system RBAC', (
       expect((await app.request('/admin/system', { redirect: 'manual' })).status).toBe(302)
       expect((await app.request('/admin/system/backup.json', { redirect: 'manual' })).status).toBe(302)
       expect((await app.request('/admin/system/articles.zip', { redirect: 'manual' })).status).toBe(302)
-      expect((await app.request('/admin/articles/art_test_published/export.md', { redirect: 'manual' })).status).toBe(302)
+      expect((await app.request('/admin/articles/art_test_published/export.md', { redirect: 'manual' })).status).toBe(
+        302,
+      )
 
       // Editor blocked from /admin/system routes and sidebar omits System
       const editorSession = await loginAs('ops-editor@example.com', 'editor-password-123')
-      expect((await (await app.request('/admin', { headers: { cookie: editorSession.cookie } })).text()).includes('/admin/system')).toBe(false)
-      expect((await app.request('/admin/system', { headers: { cookie: editorSession.cookie }, redirect: 'manual' })).status).toBe(303)
-      expect((await app.request('/admin/system/backup.json', { headers: { cookie: editorSession.cookie } })).status).toBe(403)
-      expect((await app.request('/admin/system/articles.zip', { headers: { cookie: editorSession.cookie } })).status).toBe(403)
+      expect(
+        (await (await app.request('/admin', { headers: { cookie: editorSession.cookie } })).text()).includes(
+          '/admin/system',
+        ),
+      ).toBe(false)
+      expect(
+        (await app.request('/admin/system', { headers: { cookie: editorSession.cookie }, redirect: 'manual' })).status,
+      ).toBe(303)
+      expect(
+        (await app.request('/admin/system/backup.json', { headers: { cookie: editorSession.cookie } })).status,
+      ).toBe(403)
+      expect(
+        (await app.request('/admin/system/articles.zip', { headers: { cookie: editorSession.cookie } })).status,
+      ).toBe(403)
       expect(
         (
           await app.request('/admin/system/test-alert', {
@@ -510,14 +521,21 @@ describe('poin 4C: Markdown export, PKZIP archive, backup JSON & system RBAC', (
       expect(ownExport.headers.get('content-type')).toContain('text/markdown')
       expect(await ownExport.text()).toContain('Owned content.')
       expect(
-        (await app.request('/admin/articles/art_test_published/export.md', { headers: { cookie: authorSession.cookie } }))
-          .status,
+        (
+          await app.request('/admin/articles/art_test_published/export.md', {
+            headers: { cookie: authorSession.cookie },
+          })
+        ).status,
       ).toBe(403)
-      expect((await app.request('/admin/system/backup.json', { headers: { cookie: authorSession.cookie } })).status).toBe(403)
+      expect(
+        (await app.request('/admin/system/backup.json', { headers: { cookie: authorSession.cookie } })).status,
+      ).toBe(403)
 
       // Admin sees System link in sidebar and can download JSON backup, ZIP archive, and prune events
       const adminSession = await loginAs()
-      const sysPage = await app.request('/admin/system', { headers: { cookie: adminSession.cookie } })
+      const sysPage = await app.request('/admin/system', {
+        headers: { cookie: adminSession.cookie, 'accept-language': 'en-US' },
+      })
       expect(sysPage.status).toBe(200)
       const sysHtml = await sysPage.text()
       expect(sysHtml).toContain('System &amp; backups')

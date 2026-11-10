@@ -1,6 +1,6 @@
 import type { OpsEvent, User } from '../../lib/db/schema'
 import type { OpsLevel } from '../../lib/ops/monitor'
-import { formatDate } from '../../lib/content/html'
+import { useI18n } from '../../lib/i18n'
 import { AdminLayout } from '../../components/layout'
 import { CsrfField, type Flash, PaginationNav } from './shared'
 
@@ -25,10 +25,11 @@ function LevelBadge({ level }: { level: OpsEvent['level'] }) {
   )
 }
 
-function ReadyBadge({ ready, yes = 'Configured', no = 'Missing' }: { ready: boolean; yes?: string; no?: string }) {
+function ReadyBadge({ ready, yes, no }: { ready: boolean; yes?: string; no?: string }) {
+  const { t } = useI18n()
   return (
     <span className="status" data-status={ready ? 'published' : 'draft'}>
-      {ready ? yes : no}
+      {ready ? (yes ?? t('adminSystem.system.configured')) : (no ?? t('adminSystem.system.missing'))}
     </span>
   )
 }
@@ -56,19 +57,20 @@ export function SystemPage({
   session: { csrfToken: string }
   flash: Flash
 }) {
+  const { t, formatDate, href } = useI18n()
   return (
     <AdminLayout
       user={user}
       path="/admin/system"
-      title="System & backups"
-      subtitle="Runtime health, exports, and operational monitoring"
+      title={t('adminSystem.system.title')}
+      subtitle={t('adminSystem.system.subtitle')}
       actions={
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <a className="btn btn--ghost" href="/admin/audit">
-            Audit log →
+          <a className="btn btn--ghost" href={href('/admin/audit')}>
+            {t('adminSystem.system.auditLog')}
           </a>
-          <a className="btn btn--solid" href="/admin/system/backup.json">
-            Download JSON backup
+          <a className="btn btn--solid" href={href('/admin/system/backup.json')}>
+            {t('adminSystem.system.downloadJson')}
           </a>
         </div>
       }
@@ -78,35 +80,54 @@ export function SystemPage({
       <div className="admin-grid" style={{ marginBottom: '1.5rem' }}>
         <div className="admin-card" style={{ gridColumn: 'span 3' }}>
           <div className="stat">
-            <span className="stat__value">{status.db.ok ? 'OK' : 'ERR'}</span>
-            <span className="stat__label">Database ({status.db.mode})</span>
-            <span className="stat__delta">{status.db.latencyMs} ms ping</span>
+            <span className="stat__value">
+              {status.db.ok ? t('adminSystem.system.ok') : t('adminSystem.system.err')}
+            </span>
+            <span className="stat__label">{t('adminSystem.system.database', { mode: status.db.mode })}</span>
+            <span className="stat__delta">{t('adminSystem.system.ping', { ms: status.db.latencyMs })}</span>
           </div>
         </div>
         <div className="admin-card" style={{ gridColumn: 'span 3' }}>
           <div className="stat">
             <span className="stat__value">{summary.errors24h}</span>
-            <span className="stat__label">Errors (24h)</span>
-            <span className="stat__delta">{summary.warns24h} warnings · {summary.total} logged</span>
-          </div>
-        </div>
-        <div className="admin-card" style={{ gridColumn: 'span 3' }}>
-          <div className="stat">
-            <span className="stat__value">{latestCron ? (latestCron.level === 'error' ? 'FAIL' : 'OK') : '—'}</span>
-            <span className="stat__label">Last cron heartbeat</span>
+            <span className="stat__label">{t('adminSystem.system.errors24h')}</span>
             <span className="stat__delta">
-              {latestCron ? formatDate(latestCron.createdAt, 'short') : 'No cron run recorded'}
+              {t('adminSystem.system.errorsDelta', {
+                warnings: summary.warns24h,
+                total: summary.total,
+              })}
             </span>
           </div>
         </div>
         <div className="admin-card" style={{ gridColumn: 'span 3' }}>
           <div className="stat">
-            <span className="stat__value">{status.alertWebhookConfigured || status.alertEmailConfigured ? 'ON' : 'LOG'}</span>
-            <span className="stat__label">Alert delivery</span>
+            <span className="stat__value">
+              {latestCron
+                ? latestCron.level === 'error'
+                  ? t('adminSystem.system.fail')
+                  : t('adminSystem.system.ok')
+                : t('adminSystem.system.none')}
+            </span>
+            <span className="stat__label">{t('adminSystem.system.lastCron')}</span>
             <span className="stat__delta">
-              {status.alertWebhookConfigured ? 'Webhook ' : ''}
-              {status.alertEmailConfigured ? 'Email' : ''}
-              {!status.alertWebhookConfigured && !status.alertEmailConfigured ? 'Console + DB only' : ''}
+              {latestCron ? formatDate(latestCron.createdAt, 'short') : t('adminSystem.system.noCron')}
+            </span>
+          </div>
+        </div>
+        <div className="admin-card" style={{ gridColumn: 'span 3' }}>
+          <div className="stat">
+            <span className="stat__value">
+              {status.alertWebhookConfigured || status.alertEmailConfigured
+                ? t('adminSystem.system.on')
+                : t('adminSystem.system.log')}
+            </span>
+            <span className="stat__label">{t('adminSystem.system.alertDelivery')}</span>
+            <span className="stat__delta">
+              {status.alertWebhookConfigured ? `${t('adminSystem.system.webhook')} ` : ''}
+              {status.alertEmailConfigured ? t('adminSystem.system.email') : ''}
+              {!status.alertWebhookConfigured && !status.alertEmailConfigured
+                ? t('adminSystem.system.consoleOnly')
+                : ''}
             </span>
           </div>
         </div>
@@ -114,28 +135,26 @@ export function SystemPage({
 
       <div className="admin-grid" style={{ marginBottom: '1.5rem' }}>
         <section className="admin-card" style={{ gridColumn: 'span 6' }}>
-          <h2>Backups &amp; content export</h2>
+          <h2>{t('adminSystem.system.backupsHeading')}</h2>
           <p className="hint" style={{ marginBottom: '1rem' }}>
-            Download a portable backup directly from the editorial desk. Content backups exclude password hashes,
-            active session tokens, and unsubscribe secrets.
+            {t('adminSystem.system.backupHint')}
           </p>
           <div className="form-actions">
-            <a className="btn btn--solid" href="/admin/system/backup.json">
-              Download JSON backup
+            <a className="btn btn--solid" href={href('/admin/system/backup.json')}>
+              {t('adminSystem.system.downloadJson')}
             </a>
-            <a className="btn btn--ghost" href="/admin/system/articles.zip">
-              Download Markdown archive (.zip)
+            <a className="btn btn--ghost" href={href('/admin/system/articles.zip')}>
+              {t('adminSystem.system.downloadArchive')}
             </a>
           </div>
           <p className="hint" style={{ marginTop: '0.9rem' }}>
-            Individual articles can also be exported as frontmatter Markdown from the Articles list or Revision
-            history.
+            {t('adminSystem.system.exportHint')}
           </p>
         </section>
 
         <section className="admin-card" style={{ gridColumn: 'span 6' }}>
           <div className="admin-card__head">
-            <h2>Integrations &amp; alert routing</h2>
+            <h2>{t('adminSystem.system.integrations')}</h2>
             <form method="post" action="/admin/system/test-alert">
               <CsrfField token={session.csrfToken} />
               <button
@@ -143,7 +162,7 @@ export function SystemPage({
                 type="submit"
                 disabled={!status.alertWebhookConfigured && !status.alertEmailConfigured}
               >
-                Send test alert
+                {t('adminSystem.system.sendTestAlert')}
               </button>
             </form>
           </div>
@@ -151,43 +170,61 @@ export function SystemPage({
             <table className="admin-table" style={{ minWidth: '18rem' }}>
               <tbody>
                 <tr>
-                  <td>Media storage</td>
-                  <td className="muted-cell">{status.storage === 'blob' ? 'Vercel Blob' : 'Local disk'}</td>
-                </tr>
-                <tr>
-                  <td>Cron auth secret</td>
-                  <td>
-                    <ReadyBadge ready={status.cronSecretConfigured} yes="Protected" no="Missing" />
+                  <td>{t('adminSystem.system.mediaStorage')}</td>
+                  <td className="muted-cell">
+                    {status.storage === 'blob' ? t('adminSystem.system.vercelBlob') : t('adminSystem.system.localDisk')}
                   </td>
                 </tr>
                 <tr>
-                  <td>Resend mailer / webhook</td>
+                  <td>{t('adminSystem.system.cronSecret')}</td>
+                  <td>
+                    <ReadyBadge
+                      ready={status.cronSecretConfigured}
+                      yes={t('adminSystem.system.protected')}
+                      no={t('adminSystem.system.missing')}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td>{t('adminSystem.system.resendMailer')}</td>
                   <td>
                     <ReadyBadge
                       ready={status.emailConfigured && status.webhookConfigured}
-                      yes="Ready"
-                      no={status.emailConfigured ? 'No webhook secret' : 'Missing'}
+                      yes={t('adminSystem.system.ready')}
+                      no={
+                        status.emailConfigured
+                          ? t('adminSystem.system.noWebhookSecret')
+                          : t('adminSystem.system.missing')
+                      }
                     />
                   </td>
                 </tr>
                 <tr>
-                  <td>AI providers (Gemini / Cloudflare)</td>
+                  <td>{t('adminSystem.system.aiProviders')}</td>
                   <td>
                     <ReadyBadge
                       ready={status.geminiConfigured}
-                      yes={status.cloudflareConfigured ? 'Gemini + CF' : 'Gemini only'}
-                      no="Not configured"
+                      yes={
+                        status.cloudflareConfigured
+                          ? t('adminSystem.system.geminiCF')
+                          : t('adminSystem.system.geminiOnly')
+                      }
+                      no={t('adminSystem.system.notConfigured')}
                     />
                   </td>
                 </tr>
                 <tr>
-                  <td>Alert webhook (<code>OPS_ALERT_WEBHOOK_URL</code>)</td>
+                  <td>
+                    {t('adminSystem.system.alertWebhook')} (<code>OPS_ALERT_WEBHOOK_URL</code>)
+                  </td>
                   <td>
                     <ReadyBadge ready={status.alertWebhookConfigured} />
                   </td>
                 </tr>
                 <tr>
-                  <td>Alert email (<code>OPS_ALERT_EMAIL</code>)</td>
+                  <td>
+                    {t('adminSystem.system.alertEmail')} (<code>OPS_ALERT_EMAIL</code>)
+                  </td>
                   <td>
                     <ReadyBadge ready={status.alertEmailConfigured} />
                   </td>
@@ -200,27 +237,27 @@ export function SystemPage({
 
       <section className="admin-card">
         <div className="admin-card__head">
-          <h2>Operational events &amp; cron history</h2>
+          <h2>{t('adminSystem.system.eventsHeading')}</h2>
           <form method="post" action="/admin/system/prune-events">
             <CsrfField token={session.csrfToken} />
             <button className="btn btn--ghost btn--small" type="submit">
-              Prune older than 30d
+              {t('adminSystem.system.prune')}
             </button>
           </form>
         </div>
 
         <form className="filter-bar" method="get" action="/admin/system">
           <div className="field">
-            <label htmlFor="ops-level">Level</label>
+            <label htmlFor="ops-level">{t('adminSystem.system.level')}</label>
             <select className="select" id="ops-level" name="level" defaultValue={level}>
-              <option value="all">All levels</option>
-              <option value="error">Errors</option>
-              <option value="warn">Warnings</option>
-              <option value="info">Info / Heartbeat</option>
+              <option value="all">{t('adminSystem.system.allLevels')}</option>
+              <option value="error">{t('adminSystem.system.errors')}</option>
+              <option value="warn">{t('adminSystem.system.warnings')}</option>
+              <option value="info">{t('adminSystem.system.infoHeartbeat')}</option>
             </select>
           </div>
           <button className="btn btn--ghost btn--small" type="submit">
-            Filter
+            {t('adminSystem.system.filter')}
           </button>
         </form>
 
@@ -228,12 +265,12 @@ export function SystemPage({
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Level</th>
-                <th>Source / Code</th>
-                <th>Message</th>
-                <th>Path</th>
-                <th>Alert</th>
+                <th>{t('adminSystem.system.time')}</th>
+                <th>{t('adminSystem.system.level')}</th>
+                <th>{t('adminSystem.system.sourceCode')}</th>
+                <th>{t('adminSystem.system.message')}</th>
+                <th>{t('adminSystem.system.path')}</th>
+                <th>{t('adminSystem.system.alert')}</th>
               </tr>
             </thead>
             <tbody>
@@ -256,16 +293,18 @@ export function SystemPage({
                     ) : null}
                   </td>
                   <td className="muted-cell">
-                    {event.path ?? '—'}
+                    {event.path ?? t('adminSystem.system.none')}
                     {event.requestId ? ` (${event.requestId})` : ''}
                   </td>
-                  <td className="muted-cell">{event.notified ? 'Sent' : '—'}</td>
+                  <td className="muted-cell">
+                    {event.notified ? t('adminSystem.system.sent') : t('adminSystem.system.none')}
+                  </td>
                 </tr>
               ))}
               {!events.length ? (
                 <tr>
                   <td colSpan={6} className="hint" style={{ padding: '1.5rem' }}>
-                    No operational events recorded yet.
+                    {t('adminSystem.system.noEvents')}
                   </td>
                 </tr>
               ) : null}

@@ -4,7 +4,15 @@ import type { Hono } from 'hono'
 import { getConnInfo } from 'hono/bun'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { getConfig, isBlobStorage, isProd } from '../../lib/config'
-import { collectMediaIds, docToText, isDoc, makeExcerpt, parseDoc, readingMinutes, slugify } from '../../lib/content/doc'
+import {
+  collectMediaIds,
+  docToText,
+  isDoc,
+  makeExcerpt,
+  parseDoc,
+  readingMinutes,
+  slugify,
+} from '../../lib/content/doc'
 import { createPreviewToken } from '../../lib/seo/preview-token'
 import {
   csrfMatches,
@@ -19,7 +27,14 @@ import {
   updateUserPassword,
   verifyPassword,
 } from '../../lib/auth/session'
-import { canEditArticle, canEditMediaAsset, canManageContent, canManageSettings, canManageUsers, isAdmin } from '../../lib/auth/permissions'
+import {
+  canEditArticle,
+  canEditMediaAsset,
+  canManageContent,
+  canManageSettings,
+  canManageUsers,
+  isAdmin,
+} from '../../lib/auth/permissions'
 import { rateLimit } from '../../lib/auth/rate-limit'
 import {
   archiveArticle,
@@ -150,6 +165,8 @@ import {
   type OpsLevel,
 } from '../../lib/ops/monitor'
 import { AdminNavStatsProvider, type AdminNavStats } from '../../components/layout'
+import { DEFAULT_LOCALE, localizedPath, parseLocale, type TranslationKey } from '../../lib/i18n'
+import { formatZodIssue, formatZodIssues } from '../../lib/validation/i18n'
 import { baseHead } from '../head'
 import { renderPageResponse } from '../render-page'
 import type { AppEnv } from '../types'
@@ -163,7 +180,14 @@ import { ArticleListPage, DashboardPage, RevisionsPage } from '../../pages/admin
 import { LoginPage } from '../../pages/admin/login'
 import { SettingsPage, SubscribersPage } from '../../pages/admin/settings'
 import { SystemPage } from '../../pages/admin/system'
-import { AuthorsPage, AuthorEditPage, CategoryEditPage, CategoriesPage, TagEditPage, TagsPage } from '../../pages/admin/taxonomy'
+import {
+  AuthorsPage,
+  AuthorEditPage,
+  CategoryEditPage,
+  CategoriesPage,
+  TagEditPage,
+  TagsPage,
+} from '../../pages/admin/taxonomy'
 import { AccountPage, UserEditPage, UsersPage } from '../../pages/admin/users'
 import type { Flash } from '../../pages/admin/shared'
 
@@ -178,68 +202,89 @@ async function getDummyPasswordHash(): Promise<string> {
   return dummyPasswordHash
 }
 
-const FLASH_MESSAGES: Record<string, Flash> = {
-  saved: { tone: 'success', message: 'Saved.' },
-  created: { tone: 'success', message: 'Created.' },
-  deleted: { tone: 'success', message: 'Deleted.' },
-  restored: { tone: 'success', message: 'Revision restored.' },
-  published: { tone: 'success', message: 'Article published.' },
-  scheduled: { tone: 'success', message: 'Article scheduled.' },
-  unpublished: { tone: 'success', message: 'Article returned to draft.' },
-  archived: { tone: 'success', message: 'Article archived.' },
-  'error': { tone: 'error', message: 'That action could not be completed.' },
-  'error-slug': { tone: 'error', message: 'That slug is already in use.' },
-  'error-fields': { tone: 'error', message: 'Please check the form fields and try again.' },
-  'error-in-use': { tone: 'error', message: 'That image is still used by an article or author and cannot be deleted.' },
-  'error-has-articles': { tone: 'error', message: 'This author still has articles. Reassign or delete them first.' },
-  'error-csrf': { tone: 'error', message: 'The form expired. Please try again.' },
-  'error-conflict': { tone: 'error', message: 'This article changed elsewhere. Reload before saving again.' },
-  'automation-saved': { tone: 'success', message: 'Automation settings saved.' },
-  'automation-activity-saved': { tone: 'success', message: 'Activity saved.' },
-  'automation-generated': { tone: 'success', message: 'Draft generated. Review it before the auto-publish window closes.' },
-  'automation-disabled': { tone: 'error', message: 'Automation is disabled.' },
-  'newsletter-sent': { tone: 'success', message: 'Newsletter sent.' },
-  'newsletter-partial': { tone: 'error', message: 'Some recipients failed. Check the recent sends table.' },
-  'newsletter-empty': { tone: 'error', message: 'There are no confirmed subscribers yet.' },
-  'newsletter-not-configured': { tone: 'error', message: 'Email delivery is not configured.' },
-  'newsletter-too-many': { tone: 'error', message: 'The free tier is limited to 100 recipients per send.' },
-  'newsletter-error': { tone: 'error', message: 'The newsletter could not be sent.' },
-  'schedule-saved': { tone: 'success', message: 'Newsletter schedule saved.' },
-  'digest-sent': { tone: 'success', message: 'Digest sent.' },
-  'digest-empty': { tone: 'error', message: 'No articles had activity in this period.' },
-  'digest-already': { tone: 'error', message: 'The digest for this period has already been sent.' },
-  'digest-no-subscribers': { tone: 'error', message: 'There are no confirmed subscribers.' },
-  'digest-error': { tone: 'error', message: 'The digest could not be sent.' },
-  'subscriber-deleted': { tone: 'success', message: 'Subscriber removed.' },
-  'confirmation-resent': { tone: 'success', message: 'Confirmation email sent again.' },
-  'confirmation-error': { tone: 'error', message: 'The confirmation email could not be sent.' },
-  'newsletter-test-sent': { tone: 'success', message: 'Test email sent.' },
-  'newsletter-test-error': { tone: 'error', message: 'The test email could not be sent.' },
-  'automation-no-key': { tone: 'error', message: 'GEMINI_API_KEY is not configured.' },
-  'automation-limit': { tone: 'error', message: 'The daily generation limit has been reached.' },
-  'automation-no-category': { tone: 'error', message: 'Create at least one category before generating.' },
-  'automation-error': { tone: 'error', message: 'The draft could not be generated. Check the automation history.' },
-  'profile-saved': { tone: 'success', message: 'Profile saved.' },
-  'password-changed': { tone: 'success', message: 'Password updated.' },
-  'error-current-password': { tone: 'error', message: 'Your current password is incorrect.' },
-  'error-password-mismatch': { tone: 'error', message: 'The new passwords do not match.' },
-  'session-revoked': { tone: 'success', message: 'Session signed out.' },
-  'sessions-revoked': { tone: 'success', message: 'Other active sessions signed out.' },
-  'user-created': { tone: 'success', message: 'User created.' },
-  'user-saved': { tone: 'success', message: 'User details saved.' },
-  'error-email-taken': { tone: 'error', message: 'That email address is already in use by another account.' },
-  'error-self-lockout': { tone: 'error', message: 'You cannot disable or demote your own administrator account.' },
-  'error-last-admin': { tone: 'error', message: 'At least one active administrator must remain.' },
-  'error-author-taken': { tone: 'error', message: 'That author profile is already linked to another user.' },
-  'alert-test-sent': { tone: 'success', message: 'Test alert delivered.' },
-  'alert-test-not-configured': { tone: 'error', message: 'Configure OPS_ALERT_WEBHOOK_URL or OPS_ALERT_EMAIL first.' },
-  'alert-test-error': { tone: 'error', message: 'Test alert delivery failed. Check the operational events table.' },
-  'events-pruned': { tone: 'success', message: 'Old operational events pruned.' },
+type FlashSpec = { tone: 'success' | 'error'; key: TranslationKey }
+
+// Flash codes are part of URLs, so they stay English identifiers; only the
+// message shown to the editor is translated.
+const FLASH_MESSAGES: Record<string, FlashSpec> = {
+  saved: { tone: 'success', key: 'admin.flash.saved' },
+  created: { tone: 'success', key: 'admin.flash.created' },
+  deleted: { tone: 'success', key: 'admin.flash.deleted' },
+  restored: { tone: 'success', key: 'admin.flash.restored' },
+  published: { tone: 'success', key: 'admin.flash.published' },
+  scheduled: { tone: 'success', key: 'admin.flash.scheduled' },
+  unpublished: { tone: 'success', key: 'admin.flash.unpublished' },
+  archived: { tone: 'success', key: 'admin.flash.archived' },
+  error: { tone: 'error', key: 'admin.flash.error' },
+  'error-slug': { tone: 'error', key: 'admin.flash.errorSlug' },
+  'error-fields': { tone: 'error', key: 'admin.flash.errorFields' },
+  'error-in-use': { tone: 'error', key: 'admin.flash.errorInUse' },
+  'error-has-articles': { tone: 'error', key: 'admin.flash.errorHasArticles' },
+  'error-csrf': { tone: 'error', key: 'admin.flash.errorCsrf' },
+  'error-conflict': { tone: 'error', key: 'admin.flash.errorConflict' },
+  'automation-saved': { tone: 'success', key: 'admin.flash.automationSaved' },
+  'automation-activity-saved': { tone: 'success', key: 'admin.flash.automationActivitySaved' },
+  'automation-generated': { tone: 'success', key: 'admin.flash.automationGenerated' },
+  'automation-disabled': { tone: 'error', key: 'admin.flash.automationDisabled' },
+  'newsletter-sent': { tone: 'success', key: 'admin.flash.newsletterSent' },
+  'newsletter-partial': { tone: 'error', key: 'admin.flash.newsletterPartial' },
+  'newsletter-empty': { tone: 'error', key: 'admin.flash.newsletterEmpty' },
+  'newsletter-not-configured': { tone: 'error', key: 'admin.flash.newsletterNotConfigured' },
+  'newsletter-too-many': { tone: 'error', key: 'admin.flash.newsletterTooMany' },
+  'newsletter-error': { tone: 'error', key: 'admin.flash.newsletterError' },
+  'schedule-saved': { tone: 'success', key: 'admin.flash.scheduleSaved' },
+  'digest-sent': { tone: 'success', key: 'admin.flash.digestSent' },
+  'digest-empty': { tone: 'error', key: 'admin.flash.digestEmpty' },
+  'digest-already': { tone: 'error', key: 'admin.flash.digestAlready' },
+  'digest-no-subscribers': { tone: 'error', key: 'admin.flash.digestNoSubscribers' },
+  'digest-error': { tone: 'error', key: 'admin.flash.digestError' },
+  'subscriber-deleted': { tone: 'success', key: 'admin.flash.subscriberDeleted' },
+  'confirmation-resent': { tone: 'success', key: 'admin.flash.confirmationResent' },
+  'confirmation-error': { tone: 'error', key: 'admin.flash.confirmationError' },
+  'newsletter-test-sent': { tone: 'success', key: 'admin.flash.newsletterTestSent' },
+  'newsletter-test-error': { tone: 'error', key: 'admin.flash.newsletterTestError' },
+  'automation-no-key': { tone: 'error', key: 'admin.flash.automationNoKey' },
+  'automation-limit': { tone: 'error', key: 'admin.flash.automationLimit' },
+  'automation-no-category': { tone: 'error', key: 'admin.flash.automationNoCategory' },
+  'automation-error': { tone: 'error', key: 'admin.flash.automationError' },
+  'profile-saved': { tone: 'success', key: 'admin.flash.profileSaved' },
+  'password-changed': { tone: 'success', key: 'admin.flash.passwordChanged' },
+  'error-current-password': { tone: 'error', key: 'admin.flash.errorCurrentPassword' },
+  'error-password-mismatch': { tone: 'error', key: 'admin.flash.errorPasswordMismatch' },
+  'session-revoked': { tone: 'success', key: 'admin.flash.sessionRevoked' },
+  'sessions-revoked': { tone: 'success', key: 'admin.flash.sessionsRevoked' },
+  'user-created': { tone: 'success', key: 'admin.flash.userCreated' },
+  'user-saved': { tone: 'success', key: 'admin.flash.userSaved' },
+  'error-email-taken': { tone: 'error', key: 'admin.flash.errorEmailTaken' },
+  'error-self-lockout': { tone: 'error', key: 'admin.flash.errorSelfLockout' },
+  'error-last-admin': { tone: 'error', key: 'admin.flash.errorLastAdmin' },
+  'error-author-taken': { tone: 'error', key: 'admin.flash.errorAuthorTaken' },
+  'alert-test-sent': { tone: 'success', key: 'admin.flash.alertTestSent' },
+  'alert-test-not-configured': { tone: 'error', key: 'admin.flash.alertTestNotConfigured' },
+  'alert-test-error': { tone: 'error', key: 'admin.flash.alertTestError' },
+  'events-pruned': { tone: 'success', key: 'admin.flash.eventsPruned' },
 }
 
 function flashFrom(c: Context<AppEnv>): Flash {
   const code = c.req.query('flash')
-  return code ? FLASH_MESSAGES[code] ?? null : null
+  const spec = code ? FLASH_MESSAGES[code] : undefined
+  return spec ? { tone: spec.tone, message: c.get('t')(spec.key) } : null
+}
+
+type ApiErrorStatus = 400 | 401 | 403 | 404 | 409 | 500
+
+/** Machine-readable code derived from the translation key. */
+function apiCode(key: string): string {
+  const name = key.split('.').pop() ?? 'ERROR'
+  return name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase()
+}
+
+/**
+ * Localized JSON error in the desk's existing `{ error }` shape, with a stable
+ * `code` added so clients do not have to match on translated prose.
+ */
+function apiError(c: Context<AppEnv>, key: TranslationKey, status: ApiErrorStatus) {
+  return c.json({ error: c.get('t')(key), code: apiCode(key) }, status)
 }
 
 function clientIp(c: Context<AppEnv>): string {
@@ -272,21 +317,16 @@ async function renderAdminPage(
   ])
   const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
   return renderPageResponse(c, {
-    element: resolvedStats ? (
-      <AdminNavStatsProvider stats={resolvedStats}>{element}</AdminNavStatsProvider>
-    ) : (
-      element
-    ),
+    element: resolvedStats ? <AdminNavStatsProvider stats={resolvedStats}>{element}</AdminNavStatsProvider> : element,
     entry,
     head: baseHead({
       settings,
       origin,
-      title: 'Editorial desk',
-      description: 'Private editorial tools.',
+      title: c.get('t')('admin.desk'),
+      description: c.get('t')('admin.desk'),
       path: c.req.path,
       robots: 'noindex, nofollow',
-      lang: 'en',
-      locale: 'en_US',
+      locale: c.get('locale'),
     }),
   })
 }
@@ -331,11 +371,11 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   app.use('/admin/*', pageGuard)
 
   app.use('/api/admin/*', async (c, next) => {
-    if (!c.get('user')) return c.json({ error: 'Unauthorized' }, 401)
+    if (!c.get('user')) return apiError(c, 'api.unauthorized', 401)
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(c.req.method)) {
       const session = c.get('session')
       if (!session || !csrfMatches(session.csrfToken, c.req.header('x-csrf-token'))) {
-        return c.json({ error: 'Invalid CSRF token' }, 403)
+        return apiError(c, 'api.csrf', 403)
       }
     }
     await next()
@@ -377,21 +417,16 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
       secure: isProd(),
     })
     return renderPageResponse(c, {
-      element: (
-        <LoginPage
-          settings={settings}
-          csrf={csrf}
-          next={c.req.query('next')}
-        />
-      ),
+      element: <LoginPage settings={settings} csrf={csrf} next={c.req.query('next')} />,
       entry: 'admin-common',
       head: baseHead({
         settings,
         origin: getConfig().PUBLIC_ORIGIN.replace(/\/$/, ''),
-        title: 'Sign in',
-        description: 'Editorial sign in.',
+        title: c.get('t')('admin.login.signIn'),
+        description: c.get('t')('admin.login.desk'),
         path: '/admin/login',
         robots: 'noindex, nofollow',
+        locale: c.get('locale'),
       }),
     })
   })
@@ -420,27 +455,28 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         head: baseHead({
           settings,
           origin: getConfig().PUBLIC_ORIGIN.replace(/\/$/, ''),
-          title: 'Sign in',
-          description: 'Editorial sign in.',
+          title: c.get('t')('admin.login.signIn'),
+          description: c.get('t')('admin.login.desk'),
           path: '/admin/login',
           robots: 'noindex, nofollow',
+          locale: c.get('locale'),
         }),
       })
     }
 
     if (!csrfCookie || !csrfMatches(csrfCookie, text(body._csrf))) {
-      return renderError('The sign-in form expired. Please try again.', 403)
+      return renderError(c.get('t')('admin.login.errorExpired'), 403)
     }
 
     const ip = clientIp(c)
     const limit = await rateLimit(`login:${ip}:${email}`, 5, 15 * 60 * 1000)
     if (!limit.allowed) {
-      return renderError('Too many sign-in attempts. Please wait a few minutes and try again.', 429)
+      return renderError(c.get('t')('admin.login.errorTooMany'), 429)
     }
 
     const parsed = loginSchema.safeParse({ email, password })
     if (!parsed.success) {
-      return renderError('Enter a valid email address and password.', 400)
+      return renderError(c.get('t')('admin.login.errorInvalidForm'), 400)
     }
 
     const user = await getUserByEmail(email)
@@ -454,7 +490,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         detail: 'Invalid credentials',
         ipHash: hashVisitor(ip, 'audit'),
       }).catch(() => undefined)
-      return renderError('Those credentials do not match an active account.', 401)
+      return renderError(c.get('t')('admin.login.errorCredentials'), 401)
     }
 
     await touchLogin(user.id)
@@ -562,12 +598,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     if (!data) return c.notFound()
     return renderAdminPage(
       c,
-      <ArticleAnalyticsPage
-        user={user}
-        csrfToken={c.get('session')!.csrfToken}
-        data={data}
-        days={days}
-      />,
+      <ArticleAnalyticsPage user={user} csrfToken={c.get('session')!.csrfToken} data={data} days={days} />,
     )
   })
 
@@ -602,7 +633,12 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
       c,
       <ArticleListPage
         user={user}
-        articles={result.items.map(({ article, author, category, audience }) => ({ article, author, category, audience }))}
+        articles={result.items.map(({ article, author, category, audience }) => ({
+          article,
+          author,
+          category,
+          audience,
+        }))}
         total={result.total}
         page={page}
         totalPages={totalPages}
@@ -649,16 +685,23 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     const ownAuthor = await getAuthorForUser(user.id)
     if (!canEditArticle(user, article, ownAuthor?.id)) {
       return renderPageResponse(c, {
-        element: <div style={{ padding: '2rem' }}><h1>Not your article</h1><p>You can only edit pieces you authored.</p><a href="/admin/articles">Back</a></div>,
+        element: (
+          <div style={{ padding: '2rem' }}>
+            <h1>{c.get('t')('api.forbiddenArticle')}</h1>
+            <p>{c.get('t')('api.forbiddenArticleBody')}</p>
+            <a href="/admin/articles">{c.get('t')('api.backToArticles')}</a>
+          </div>
+        ),
         entry: 'admin-common',
         status: 403,
         head: {
-          title: 'Forbidden',
+          title: c.get('t')('api.forbidden'),
           description: '',
           canonicalPath: c.req.path,
           robots: 'noindex, nofollow',
           siteName: 'RhandytaVERSE',
           origin: getConfig().PUBLIC_ORIGIN,
+          lang: c.get('locale'),
           jsonLd: [],
         },
       })
@@ -747,10 +790,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     const ownAuthor = await getAuthorForUser(user.id)
     if (!canEditArticle(user, article, ownAuthor?.id)) return c.redirect('/admin/articles?flash=error', 303)
     const restored = await restoreRevision(article.id, c.req.param('revisionId'), user.id)
-    return c.redirect(
-      `/admin/articles/${article.id}/revisions?flash=${restored ? 'restored' : 'error'}`,
-      303,
-    )
+    return c.redirect(`/admin/articles/${article.id}/revisions?flash=${restored ? 'restored' : 'error'}`, 303)
   })
 
   app.get('/admin/articles/:id/export.md', async (c) => {
@@ -759,7 +799,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     if (!article) return c.notFound()
     const ownAuthor = await getAuthorForUser(user.id)
     if (!canEditArticle(user, article, ownAuthor?.id)) {
-      return c.text('Forbidden', 403)
+      return c.text(c.get('t')('api.forbidden'), 403)
     }
     const [author, category, articleTags, mediaMap] = await Promise.all([
       getAuthorById(article.authorId),
@@ -792,7 +832,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   ) {
     const user = c.get('user')!
     if (!isDoc(payload.body)) {
-      return { error: 'The article body is not a valid document.', status: 400 as const }
+      return { errorKey: 'api.bodyInvalid' as const, status: 400 as const }
     }
     const bodyText = docToText(payload.body)
     const slugBase = slugify(payload.slug || payload.title)
@@ -803,7 +843,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     if (user.role !== 'author') {
       if (payload.authorId) {
         const author = await getAuthorById(payload.authorId)
-        if (!author) return { error: 'Unknown author.', status: 400 as const }
+        if (!author) return { errorKey: 'api.unknownAuthor' as const, status: 400 as const }
         authorId = author.id
       }
       if (!authorId) {
@@ -811,27 +851,27 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
         authorId = authors[0]?.id ?? null
       }
     }
-    if (!authorId) return { error: 'No author profile is available for this account.', status: 400 as const }
+    if (!authorId) return { errorKey: 'api.noAuthorProfile' as const, status: 400 as const }
 
     if (payload.categoryId) {
       const category = await getCategoryById(payload.categoryId)
-      if (!category) return { error: 'Unknown section.', status: 400 as const }
+      if (!category) return { errorKey: 'api.unknownSection' as const, status: 400 as const }
     }
     if (payload.featuredMediaId) {
       const media = await getMediaById(payload.featuredMediaId)
-      if (!media) return { error: 'Unknown featured image.', status: 400 as const }
+      if (!media) return { errorKey: 'api.unknownFeaturedImage' as const, status: 400 as const }
     }
     if (payload.ogMediaId) {
       const media = await getMediaById(payload.ogMediaId)
-      if (!media) return { error: 'Unknown social image.', status: 400 as const }
+      if (!media) return { errorKey: 'api.unknownSocialImage' as const, status: 400 as const }
     }
     if (payload.canonicalUrl && !validHttpUrl(payload.canonicalUrl)) {
-      return { error: 'The canonical URL must be a valid http(s) address.', status: 400 as const }
+      return { errorKey: 'api.invalidCanonicalUrl' as const, status: 400 as const }
     }
     const tagIds = payload.tagIds ?? []
     if (tagIds.length) {
       const known = new Set((await listTags({ limit: 500 })).map((tag) => tag.id))
-      if (tagIds.some((id) => !known.has(id))) return { error: 'Unknown tag.', status: 400 as const }
+      if (tagIds.some((id) => !known.has(id))) return { errorKey: 'api.unknownTag' as const, status: 400 as const }
     }
 
     let status = existing?.status ?? 'draft'
@@ -874,7 +914,15 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     }
   }
 
-  function articleResponse(article: { id: string; slug: string; title: string; status: string; updatedAt: string; publishedAt: string | null; scheduledFor: string | null }) {
+  function articleResponse(article: {
+    id: string
+    slug: string
+    title: string
+    status: string
+    updatedAt: string
+    publishedAt: string | null
+    scheduledFor: string | null
+  }) {
     return {
       article: {
         id: article.id,
@@ -891,19 +939,23 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
 
   async function handleArticleSave(c: Context<AppEnv>, mode: 'create' | 'update' | 'autosave') {
     const user = c.get('user')!
-    if (!canManageContent(user) && user.role !== 'author') return c.json({ error: 'Forbidden' }, 403)
+    if (!canManageContent(user) && user.role !== 'author') return apiError(c, 'api.forbidden', 403)
     let json: unknown
     try {
       json = await c.req.json()
     } catch {
-      return c.json({ error: 'Expected JSON' }, 400)
+      return apiError(c, 'api.expectedJson', 400)
     }
     const parsed = articlePayloadSchema.safeParse(json)
     if (!parsed.success) {
       return c.json(
         {
-          error: 'Validation failed',
-          issues: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
+          error: c.get('t')('api.validationError'),
+          code: 'VALIDATION_ERROR',
+          issues: parsed.error.issues.map((issue) => ({
+            path: issue.path.join('.'),
+            message: formatZodIssue(c.get('t'), issue),
+          })),
         },
         400,
       )
@@ -911,38 +963,37 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
 
     if (mode === 'create') {
       const resolved = await resolveArticleFields(c, parsed.data)
-      if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status)
+      if ('errorKey' in resolved && resolved.errorKey) return apiError(c, resolved.errorKey, resolved.status)
       const article = await createArticle({
         id: crypto.randomUUID(),
         ...resolved.fields,
         tagIds: resolved.tagIds,
       } as Parameters<typeof createArticle>[0])
-      if (!article) return c.json({ error: 'Could not create the article.' }, 500)
+      if (!article) return apiError(c, 'api.couldNotCreate', 500)
       return c.json(articleResponse(article), 201)
     }
 
     const existing = await getArticleById(c.req.param('id') ?? '')
-    if (!existing) return c.json({ error: 'Not found' }, 404)
+    if (!existing) return apiError(c, 'api.notFoundShort', 404)
     const ownAuthor = await getAuthorForUser(user.id)
-    if (!canEditArticle(user, existing, ownAuthor?.id)) return c.json({ error: 'Forbidden' }, 403)
+    if (!canEditArticle(user, existing, ownAuthor?.id)) return apiError(c, 'api.forbidden', 403)
 
     if (mode !== 'autosave' && parsed.data.updatedAt && parsed.data.updatedAt !== existing.updatedAt) {
-      return c.json({ error: 'conflict', article: { updatedAt: existing.updatedAt } }, 409)
+      return c.json(
+        { error: c.get('t')('api.conflict'), code: 'CONFLICT', article: { updatedAt: existing.updatedAt } },
+        409,
+      )
     }
 
     const resolved = await resolveArticleFields(c, parsed.data, existing)
-    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status)
+    if ('errorKey' in resolved && resolved.errorKey) return apiError(c, resolved.errorKey, resolved.status)
 
-    const article = await updateArticle(
-      existing.id,
-      resolved.fields,
-      {
-        tagIds: resolved.tagIds,
-        actorId: mode === 'autosave' ? null : user.id,
-        revisionNote: mode === 'autosave' ? undefined : 'Saved from the editor',
-      },
-    )
-    if (!article) return c.json({ error: 'Could not save the article.' }, 500)
+    const article = await updateArticle(existing.id, resolved.fields, {
+      tagIds: resolved.tagIds,
+      actorId: mode === 'autosave' ? null : user.id,
+      revisionNote: mode === 'autosave' ? undefined : 'Saved from the editor',
+    })
+    if (!article) return apiError(c, 'api.couldNotSave', 500)
     return c.json(articleResponse(article))
   }
 
@@ -953,9 +1004,9 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   app.delete('/api/admin/articles/:id', async (c) => {
     const user = c.get('user')!
     const article = await getArticleById(c.req.param('id'))
-    if (!article) return c.json({ error: 'Not found' }, 404)
+    if (!article) return apiError(c, 'api.notFoundShort', 404)
     const ownAuthor = await getAuthorForUser(user.id)
-    if (!canEditArticle(user, article, ownAuthor?.id)) return c.json({ error: 'Forbidden' }, 403)
+    if (!canEditArticle(user, article, ownAuthor?.id)) return apiError(c, 'api.forbidden', 403)
     await deleteArticle(article.id)
     return c.json({ ok: true })
   })
@@ -963,52 +1014,52 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   app.post('/api/admin/articles/:id/publish', async (c) => {
     const user = c.get('user')!
     const article = await getArticleById(c.req.param('id'))
-    if (!article) return c.json({ error: 'Not found' }, 404)
+    if (!article) return apiError(c, 'api.notFoundShort', 404)
     const ownAuthor = await getAuthorForUser(user.id)
-    if (!canEditArticle(user, article, ownAuthor?.id)) return c.json({ error: 'Forbidden' }, 403)
+    if (!canEditArticle(user, article, ownAuthor?.id)) return apiError(c, 'api.forbidden', 403)
     const published = await publishArticle(article.id)
-    if (!published) return c.json({ error: 'Could not publish.' }, 500)
+    if (!published) return apiError(c, 'api.couldNotPublish', 500)
     return c.json(articleResponse(published))
   })
 
   app.post('/api/admin/articles/:id/unpublish', async (c) => {
     const user = c.get('user')!
     const article = await getArticleById(c.req.param('id'))
-    if (!article) return c.json({ error: 'Not found' }, 404)
+    if (!article) return apiError(c, 'api.notFoundShort', 404)
     const ownAuthor = await getAuthorForUser(user.id)
-    if (!canEditArticle(user, article, ownAuthor?.id)) return c.json({ error: 'Forbidden' }, 403)
+    if (!canEditArticle(user, article, ownAuthor?.id)) return apiError(c, 'api.forbidden', 403)
     const draft = await unpublishArticle(article.id)
-    if (!draft) return c.json({ error: 'Could not unpublish.' }, 500)
+    if (!draft) return apiError(c, 'api.couldNotUnpublish', 500)
     return c.json(articleResponse(draft))
   })
 
   app.post('/api/admin/articles/:id/archive', async (c) => {
     const user = c.get('user')!
     const article = await getArticleById(c.req.param('id'))
-    if (!article) return c.json({ error: 'Not found' }, 404)
+    if (!article) return apiError(c, 'api.notFoundShort', 404)
     const ownAuthor = await getAuthorForUser(user.id)
-    if (!canEditArticle(user, article, ownAuthor?.id)) return c.json({ error: 'Forbidden' }, 403)
+    if (!canEditArticle(user, article, ownAuthor?.id)) return apiError(c, 'api.forbidden', 403)
     const archived = await archiveArticle(article.id)
-    if (!archived) return c.json({ error: 'Could not archive.' }, 500)
+    if (!archived) return apiError(c, 'api.couldNotArchive', 500)
     return c.json(articleResponse(archived))
   })
 
   app.post('/api/admin/articles/:id/schedule', async (c) => {
     const user = c.get('user')!
     const article = await getArticleById(c.req.param('id'))
-    if (!article) return c.json({ error: 'Not found' }, 404)
+    if (!article) return apiError(c, 'api.notFoundShort', 404)
     const ownAuthor = await getAuthorForUser(user.id)
-    if (!canEditArticle(user, article, ownAuthor?.id)) return c.json({ error: 'Forbidden' }, 403)
+    if (!canEditArticle(user, article, ownAuthor?.id)) return apiError(c, 'api.forbidden', 403)
     let payload: { scheduledFor?: unknown }
     try {
       payload = (await c.req.json()) as { scheduledFor?: unknown }
     } catch {
-      return c.json({ error: 'Expected JSON' }, 400)
+      return apiError(c, 'api.expectedJson', 400)
     }
     const iso = parseScheduleDate(typeof payload.scheduledFor === 'string' ? payload.scheduledFor : '')
-    if (!iso) return c.json({ error: 'Choose a valid date and time.' }, 400)
+    if (!iso) return apiError(c, 'api.invalidDateTime', 400)
     const scheduled = await scheduleArticle(article.id, iso)
-    if (!scheduled) return c.json({ error: 'Could not schedule.' }, 500)
+    if (!scheduled) return apiError(c, 'api.couldNotSchedule', 500)
     return c.json(articleResponse(scheduled))
   })
 
@@ -1019,16 +1070,9 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   app.get('/admin/media', async (c) => {
     const user = c.get('user')!
     const media = await listMedia({ limit: 100 })
-    const settings = await getSiteSettings()
     return renderAdminPage(
       c,
-      <MediaLibraryPage
-        user={user}
-        settings={settings}
-        media={media}
-        csrfToken={c.get('session')!.csrfToken}
-        flash={flashFrom(c)}
-      />,
+      <MediaLibraryPage user={user} media={media} csrfToken={c.get('session')!.csrfToken} flash={flashFrom(c)} />,
       'admin',
     )
   })
@@ -1058,13 +1102,13 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     try {
       body = (await c.req.parseBody()) as Record<string, unknown>
     } catch {
-      return c.json({ error: 'Upload could not be read.' }, 400)
+      return apiError(c, 'api.uploadUnreadable', 400)
     }
     const file = body.file
-    if (!(file instanceof File)) return c.json({ error: 'Choose an image file.' }, 400)
-    if (file.size > MAX_UPLOAD_BYTES) return c.json({ error: 'Images must be 8 MB or smaller.' }, 400)
+    if (!(file instanceof File)) return apiError(c, 'api.chooseImage', 400)
+    if (file.size > MAX_UPLOAD_BYTES) return apiError(c, 'api.imageTooLarge', 400)
     const buffer = Buffer.from(await file.arrayBuffer())
-    if (!sniffImage(buffer)) return c.json({ error: 'That file is not a supported image.' }, 400)
+    if (!sniffImage(buffer)) return apiError(c, 'api.notImage', 400)
     try {
       const media = await saveUpload(buffer, {
         originalName: file.name.slice(0, 200),
@@ -1092,48 +1136,45 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
       )
     } catch (error) {
       console.error('[media] upload failed', error)
-      return c.json({ error: 'The image could not be processed.' }, 400)
+      return apiError(c, 'api.imageProcessFailed', 400)
     }
   })
 
   app.patch('/api/admin/media/:id', async (c) => {
     const user = c.get('user')!
     const asset = await getMediaById(c.req.param('id'))
-    if (!asset) return c.json({ error: 'Not found.' }, 404)
+    if (!asset) return apiError(c, 'api.notFound', 404)
     if (!canEditMediaAsset(user, asset)) {
-      return c.json({ error: 'You can only update media you uploaded.' }, 403)
+      return apiError(c, 'api.mediaNotOwned', 403)
     }
     let json: unknown
     try {
       json = await c.req.json()
     } catch {
-      return c.json({ error: 'Expected JSON' }, 400)
+      return apiError(c, 'api.expectedJson', 400)
     }
     const parsed = mediaPatchSchema.safeParse(json)
-    if (!parsed.success) return c.json({ error: 'Invalid media details.' }, 400)
+    if (!parsed.success) return apiError(c, 'api.invalidMediaDetails', 400)
     const ok = await updateMedia(asset.id, {
       ...(parsed.data.alt !== undefined ? { alt: parsed.data.alt } : {}),
       ...(parsed.data.caption !== undefined ? { caption: parsed.data.caption } : {}),
       ...(parsed.data.originalName !== undefined ? { originalName: parsed.data.originalName } : {}),
     })
-    if (!ok) return c.json({ error: 'Not found.' }, 404)
+    if (!ok) return apiError(c, 'api.notFound', 404)
     return c.json({ ok: true })
   })
 
   app.delete('/api/admin/media/:id', async (c) => {
     const user = c.get('user')!
     const asset = await getMediaById(c.req.param('id'))
-    if (!asset) return c.json({ error: 'Not found.' }, 404)
+    if (!asset) return apiError(c, 'api.notFound', 404)
     if (!canEditMediaAsset(user, asset)) {
-      return c.json({ error: 'You can only delete media you uploaded.' }, 403)
+      return apiError(c, 'api.mediaNotOwnedDelete', 403)
     }
     const usage = await mediaUsage(asset.id)
     if (usage.articles > 0 || usage.authors > 0 || usage.settings > 0) {
       const references = await getMediaReferences(asset.id)
-      return c.json(
-        { error: 'This image is still in use.', references },
-        409,
-      )
+      return c.json({ error: c.get('t')('api.imageInUse'), code: 'IMAGE_IN_USE', references }, 409)
     }
     await deleteStoredFiles(asset)
     await deleteMedia(asset.id)
@@ -1333,7 +1374,8 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     if (!parsed.success) return c.redirect(`/admin/categories/${category.id}?flash=error-fields`, 303)
     const slug = slugify(parsed.data.slug || parsed.data.name)
     const conflict = await getCategoryBySlug(slug)
-    if (conflict && conflict.id !== category.id) return c.redirect(`/admin/categories/${category.id}?flash=error-slug`, 303)
+    if (conflict && conflict.id !== category.id)
+      return c.redirect(`/admin/categories/${category.id}?flash=error-slug`, 303)
     await upsertCategory({
       id: category.id,
       slug,
@@ -1405,7 +1447,11 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     if (!formCsrfOk(c.get('session')!, body)) return c.redirect('/admin/tags?flash=error-csrf', 303)
     const tag = await getTagById(c.req.param('id'))
     if (!tag) return c.notFound()
-    const parsed = tagInputSchema.safeParse({ name: text(body.name), slug: text(body.slug), description: text(body.description) })
+    const parsed = tagInputSchema.safeParse({
+      name: text(body.name),
+      slug: text(body.slug),
+      description: text(body.description),
+    })
     if (!parsed.success) return c.redirect(`/admin/tags/${tag.id}?flash=error-fields`, 303)
     const slug = slugify(parsed.data.slug || parsed.data.name)
     const conflict = await getTagBySlug(slug)
@@ -1433,7 +1479,10 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     const user = c.get('user')!
     if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
     const authors = await listAuthors({ withCounts: true })
-    return renderAdminPage(c, <AuthorsPage user={user} authors={authors} session={c.get('session')!} flash={flashFrom(c)} />)
+    return renderAdminPage(
+      c,
+      <AuthorsPage user={user} authors={authors} session={c.get('session')!} flash={flashFrom(c)} />,
+    )
   })
 
   function authorFormValues(body: Record<string, unknown>) {
@@ -1450,7 +1499,11 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
 
   function authorPayload(parsed: ReturnType<typeof authorInputSchema.parse>) {
     const expertise = parsed.expertise
-      ? parsed.expertise.split(',').map((item) => item.trim()).filter(Boolean).slice(0, 12)
+      ? parsed.expertise
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .slice(0, 12)
       : []
     const socialLinks: Record<string, string> = {}
     if (parsed.website) socialLinks.website = parsed.website
@@ -1487,7 +1540,10 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     if (!canManageContent(user)) return c.redirect('/admin?flash=error', 303)
     const author = await getAuthorById(c.req.param('id'))
     if (!author) return c.notFound()
-    return renderAdminPage(c, <AuthorEditPage user={user} author={author} session={c.get('session')!} flash={flashFrom(c)} />)
+    return renderAdminPage(
+      c,
+      <AuthorEditPage user={user} author={author} session={c.get('session')!} flash={flashFrom(c)} />,
+    )
   })
 
   app.post('/admin/authors/:id', async (c) => {
@@ -1562,21 +1618,21 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     const settings = await getSiteSettings()
     const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
     const subscriber = await getSubscriberByEmail(testEmail)
+    // Test sends follow the recipient's saved language, falling back to the desk.
+    const testLocale = parseLocale(subscriber?.locale) ?? c.get('locale')
     const unsubscribeUrl = subscriber
-      ? `${origin}/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribeToken)}`
-      : `${origin}/unsubscribe`
+      ? `${origin}${localizedPath(testLocale, `/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribeToken)}`)}`
+      : `${origin}${localizedPath(testLocale, '/unsubscribe')}`
     const mail = newsletterEmail({
       siteTitle: settings.title,
       origin,
       subject,
       body: message,
       unsubscribeUrl,
+      locale: testLocale,
     })
     const result = await sendEmail({ to: testEmail, ...mail })
-    return c.redirect(
-      `/admin/newsletter?flash=${result.ok ? 'newsletter-test-sent' : 'newsletter-test-error'}`,
-      303,
-    )
+    return c.redirect(`/admin/newsletter?flash=${result.ok ? 'newsletter-test-sent' : 'newsletter-test-error'}`, 303)
   })
 
   app.post('/admin/newsletter/schedule', async (c) => {
@@ -1587,9 +1643,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
 
     const cadenceRaw = text(body.cadence, 'weekly')
     const cadence =
-      cadenceRaw === 'daily' || cadenceRaw === 'weekly' || cadenceRaw === 'monthly'
-        ? cadenceRaw
-        : 'weekly'
+      cadenceRaw === 'daily' || cadenceRaw === 'weekly' || cadenceRaw === 'monthly' ? cadenceRaw : 'weekly'
     const weekday = Number(text(body.weekday, '1'))
     const hourUtc = Number(text(body.hourUtc, '2'))
     const metricRaw = text(body.metric, 'readers')
@@ -1662,7 +1716,8 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     const settings = await getSiteSettings()
     const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
     const messages = recipients.map((subscriber) => {
-      const unsubscribeUrl = `${origin}/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribeToken)}`
+      const locale = parseLocale(subscriber.locale) ?? DEFAULT_LOCALE
+      const unsubscribeUrl = `${origin}${localizedPath(locale, `/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribeToken)}`)}`
       return {
         to: subscriber.email,
         ...newsletterEmail({
@@ -1671,6 +1726,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
           subject,
           body: message,
           unsubscribeUrl,
+          locale,
         }),
         headers: {
           'List-Unsubscribe': `<${unsubscribeUrl}>`,
@@ -1701,9 +1757,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     const page = pageParam(c.req.query('page'))
     const statusRaw = c.req.query('status') ?? 'all'
     const status =
-      statusRaw === 'subscribed' || statusRaw === 'pending' || statusRaw === 'unsubscribed'
-        ? statusRaw
-        : 'all'
+      statusRaw === 'subscribed' || statusRaw === 'pending' || statusRaw === 'unsubscribed' ? statusRaw : 'all'
     const [result, stats] = await Promise.all([
       listSubscribers({
         q: c.req.query('q')?.trim() || undefined,
@@ -1733,7 +1787,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
 
   app.get('/admin/subscribers.csv', async (c) => {
     const user = c.get('user')!
-    if (!canManageContent(user)) return c.text('Forbidden', 403)
+    if (!canManageContent(user)) return c.text(c.get('t')('api.forbidden'), 403)
     const csv = await exportSubscribersCsv()
     c.header('Content-Type', 'text/csv; charset=utf-8')
     c.header('Content-Disposition', 'attachment; filename="rhandytaverse-subscribers.csv"')
@@ -1759,10 +1813,12 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     if (!issued) return c.redirect('/admin/subscribers?flash=confirmation-error', 303)
     const settings = await getSiteSettings()
     const origin = getConfig().PUBLIC_ORIGIN.replace(/\/$/, '')
+    const issuedSubscriber = await getSubscriberByEmail(issued.email)
     const mail = confirmationEmail({
       siteTitle: settings.title,
       origin,
       token: issued.token,
+      locale: parseLocale(issuedSubscriber?.locale) ?? c.get('locale'),
     })
     const result = await sendEmail({ to: issued.email, ...mail })
     if (!result.ok) {
@@ -1834,7 +1890,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
 
   app.get('/admin/system/backup.json', async (c) => {
     const user = c.get('user')!
-    if (!isAdmin(user)) return c.text('Forbidden', 403)
+    if (!isAdmin(user)) return c.text(c.get('t')('api.forbidden'), 403)
     const backup = await buildContentBackup()
     await recordAudit({
       actorId: user.id,
@@ -1851,7 +1907,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
 
   app.get('/admin/system/articles.zip', async (c) => {
     const user = c.get('user')!
-    if (!isAdmin(user)) return c.text('Forbidden', 403)
+    if (!isAdmin(user)) return c.text(c.get('t')('api.forbidden'), 403)
     const archive = await buildMarkdownArchive()
     await recordAudit({
       actorId: user.id,
@@ -1896,7 +1952,10 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     const user = c.get('user')!
     if (!canManageSettings(user)) return c.redirect('/admin?flash=error', 303)
     const settings = await getSiteSettings()
-    return renderAdminPage(c, <SettingsPage user={user} settings={settings} session={c.get('session')!} flash={flashFrom(c)} />)
+    return renderAdminPage(
+      c,
+      <SettingsPage user={user} settings={settings} session={c.get('session')!} flash={flashFrom(c)} />,
+    )
   })
 
   app.post('/admin/settings', async (c) => {
@@ -1933,10 +1992,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   app.get('/admin/account', async (c) => {
     const user = c.get('user')!
     const session = c.get('session')!
-    const [linkedAuthor, sessions] = await Promise.all([
-      getAuthorForUser(user.id),
-      listUserSessions(user.id),
-    ])
+    const [linkedAuthor, sessions] = await Promise.all([getAuthorForUser(user.id), listUserSessions(user.id)])
     return renderAdminPage(
       c,
       <AccountPage
@@ -2013,10 +2069,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     const user = c.get('user')!
     if (!canManageUsers(user)) return c.redirect('/admin?flash=error', 303)
     const users = await listUsers()
-    return renderAdminPage(
-      c,
-      <UsersPage user={user} users={users} session={c.get('session')!} flash={flashFrom(c)} />,
-    )
+    return renderAdminPage(c, <UsersPage user={user} users={users} session={c.get('session')!} flash={flashFrom(c)} />)
   })
 
   app.post('/admin/users', async (c) => {

@@ -1,5 +1,12 @@
 import { describe, expect, test, beforeEach } from 'bun:test'
-import { canEditArticle, canManageContent, canManageSettings, canManageUsers, isAdmin, roleLabel } from '../src/lib/auth/permissions'
+import {
+  canEditArticle,
+  canManageContent,
+  canManageSettings,
+  canManageUsers,
+  isAdmin,
+  roleKey,
+} from '../src/lib/auth/permissions'
 import { rateLimit, resetRateLimits } from '../src/lib/auth/rate-limit'
 import { csrfMatches, hashToken, signValue, verifySignedValue } from '../src/lib/auth/session'
 import { createPreviewToken, verifyPreviewToken } from '../src/lib/seo/preview-token'
@@ -12,6 +19,7 @@ const admin: User = {
   name: 'Admin',
   role: 'admin',
   active: true,
+  locale: null,
   createdAt: '',
   updatedAt: '',
   lastLoginAt: null,
@@ -26,7 +34,7 @@ describe('permissions', () => {
     expect(canManageContent(author)).toBe(false)
     expect(canManageUsers(editor)).toBe(false)
     expect(canManageSettings(admin)).toBe(true)
-    expect(roleLabel('author')).toBe('Author')
+    expect(roleKey('author')).toBe('admin.roleAuthor')
   })
 
   test('authors may only edit their own articles', () => {

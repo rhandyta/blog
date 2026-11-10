@@ -133,7 +133,9 @@ The server refuses to boot in production with the placeholder session secret.
 
 **Public**
 
-`/` · `/articles` (+ `?page=`) · `/articles/:slug` · `/category/:slug` · `/topics` · `/author/:slug` · `/archive` · `/tags/:slug` · `/search?q=` · `/saved` · `/about` · `/subscribe` · `/unsubscribe?token=` · `/preview/:id?token=` (signed draft previews) · `/og/:seed/:accent.jpg` (generated social cards) · `/rss.xml` · `/feed.xml` · `/sitemap.xml` · `/robots.txt` · styled 404 / 500.
+Every reader-facing route exists twice: `/id/...` (Indonesian, the default) and `/en/...`. Prefix-free URLs such as `/articles` redirect (`302`, `Vary: Accept-Language, Cookie`) to the negotiated language, so old links keep working. `POST /locale` persists the choice.
+
+`/` · `/articles` (+ `?page=`) · `/articles/:slug` · `/category/:slug` · `/topics` · `/author/:slug` · `/archive` · `/tags/:slug` · `/search?q=` · `/saved` · `/about` · `/privacy` · `/terms` · `/subscribe` · `/confirm?token=` · `/unsubscribe?token=` · `/preview/:id?token=` (signed draft previews) · `/og/:seed/:accent.jpg` (generated social cards) · `/rss.xml` · `/feed.xml` · `/sitemap.xml` · `/robots.txt` · styled 404 / 500.
 
 **Editorial**
 
@@ -187,13 +189,29 @@ The renderer is covered by unit tests for scripts, event handlers, unsafe URLs, 
 
 - Semantic landmarks, one `h1` per page, `<time datetime>`, breadcrumbs.
 - Unique titles/descriptions, canonical URLs, Open Graph and Twitter cards with image dimensions.
-- **Language** — each article carries its own `id`/`en` language (auto-detected from the body when unset). `<html lang>`, `og:locale`, `og:locale:alternate`, JSON-LD `inLanguage`, and RSS `<dc:language>` follow the content, so Indonesian and English can coexist. Navigation pages use the default site language set in Settings; the editorial desk is always English.
+- **Language** — the interface is bilingual (`id` default, `en`). `<html lang>` and `og:locale` follow the interface language; every indexable page declares `rel="canonical"` plus `hreflang` alternates for `id`, `en`, and `x-default`. Each article additionally carries its own `id`/`en` content language (auto-detected from the body when unset), surfaced through `<article lang>`, JSON-LD `inLanguage`, and RSS `<dc:language>`.
 - **Social images** — an article uses its own OG crop when one exists and otherwise gets a deterministic procedural card at `/og/:seed/:accentHex.jpg` (1200×630, immutable cache), so no page shares without an image.
 - JSON-LD: `WebSite` + `SearchAction`, `BlogPosting`, `BreadcrumbList`, `Person`, `CollectionPage`.
-- `sitemap.xml` (excludes drafts, scheduled, archived, and no-indexed articles), `robots.txt`, and RSS 2.0 with full `content:encoded` and absolute URLs.
+- `sitemap.xml` lists both language variants of every page with `xhtml:link` alternates (excludes drafts, scheduled, archived, and no-indexed articles), plus `robots.txt`, and RSS 2.0 with full `content:encoded` and absolute URLs.
 - Clean URLs; internal links between articles, sections, authors, and tags.
 
 Rankings are not promised — the technical foundation is in place.
+
+---
+
+## Internationalization
+
+Indonesian (`id`) is the default language; English (`en`) is a first-class equal. Nothing is hard-coded in components.
+
+- **Resources** — `src/lib/i18n/messages/*` holds one namespace per domain (`common`, `nav`, `home`, `article`, `listing`, `search`, `saved`, `subscribe`, `about`, `legal`, `seo`, `validation`, `api`, `mail`, `admin*`, `adminEditor`). Indonesian is the source of truth for the key set and each English namespace is typed against it, so a missing key fails `tsc`.
+- **Runtime** — `src/lib/i18n/translate.ts` resolves dot paths, `{{placeholders}}`, and plural forms (`_one`); it falls back to Indonesian and then to the key. Every call takes an explicit locale — no global mutable language, so concurrent requests cannot contaminate each other.
+- **Rendering** — `renderPageResponse` wraps the tree in `<I18nProvider>`; components use `useI18n()` for `t`, locale-aware `Intl` formatters, and `href()` (which adds the `/id` or `/en` prefix on public pages). The editorial desk keeps unprefixed URLs but uses the same catalogue.
+- **Negotiation** — URL segment → `?lang=` → `lang` cookie → the signed-in user's profile → `Accept-Language` → Indonesian. Only supported values are accepted; `in` is normalised to `id`. Suggestions from the client serialise their copy into a `<script type="application/json" id="page-i18n">` bundle.
+- **Formatting** — `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.RelativeTimeFormat`, and `Intl.ListFormat` through `src/lib/i18n/format.ts`. Dates render in UTC so the server and the browser agree.
+- **Backend** — `src/server/locale.ts` sets `locale`, `t`, and `localPath` per request and emits `Content-Language`; API errors and validation messages are translated at the response boundary (Zod schemas stay language-neutral).
+- **Email** — confirmation, digest, and newsletter templates are localized; the subscriber's saved language and links (`/id/confirm`, `/en/unsubscribe`) are used.
+
+To add a string: add the key to the Indonesian namespace, then to the English one (`bun run typecheck` proves parity), and call `t('namespace.key')`. Full details in [`docs/i18n.md`](docs/i18n.md).
 
 ---
 
@@ -225,7 +243,8 @@ The suite uses an in-memory SQLite database seeded with fixtures. It covers:
 - login, session cookies, role permissions, CSRF rejection, unauthenticated API access;
 - the full CMS pipeline: create → preview → publish → conflict → schedule → delete;
 - image upload validation, metadata patching, and deletion;
-- language detection, per-article `<html lang>`/`og:locale`, generated OG cards, code-block copy buttons, and per-article analytics.
+- language detection, per-article `<html lang>`/`og:locale`, generated OG cards, code-block copy buttons, and per-article analytics;
+- internationalization: key parity across `id`/`en`, interpolation and plural forms, fallback behaviour, locale negotiation (URL, query, cookie, profile, `Accept-Language`), legacy redirects, the language switcher, localized API errors and emails, hreflang output, and concurrent requests in different languages.
 
 Manual QA shapes: 390 / 768 / 1024 / 1440 widths, both themes, keyboard-only navigation, editor and media library.
 

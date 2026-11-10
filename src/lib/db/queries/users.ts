@@ -17,10 +17,7 @@ export type UserSummary = {
   authorSlug: string | null
 }
 
-export type UserSessionSummary = Pick<
-  Session,
-  'id' | 'createdAt' | 'expiresAt' | 'userAgent' | 'ipHash'
->
+export type UserSessionSummary = Pick<Session, 'id' | 'createdAt' | 'expiresAt' | 'userAgent' | 'ipHash'>
 
 const ROLE_ORDER: Record<User['role'], number> = { admin: 0, editor: 1, author: 2 }
 
@@ -66,9 +63,7 @@ export async function listUsers(): Promise<UserSummary[]> {
       })
     }
   }
-  const sessionsByUserId = new Map<string, number>(
-    sessionCounts.map((row) => [row.userId, row.n]),
-  )
+  const sessionsByUserId = new Map<string, number>(sessionCounts.map((row) => [row.userId, row.n]))
 
   return userRows
     .map((user) => {
@@ -97,6 +92,14 @@ export async function updateUserProfile(userId: string, input: { name: string })
     .update(users)
     .set({ name: input.name.trim(), updatedAt: new Date().toISOString() })
     .where(eq(users.id, userId))
+}
+
+/**
+ * Stores the interface language on the account so the choice follows the user
+ * to other browsers. Only validated locale codes are ever written.
+ */
+export async function updateUserLocale(userId: string, locale: 'id' | 'en'): Promise<void> {
+  await getDb().update(users).set({ locale, updatedAt: new Date().toISOString() }).where(eq(users.id, userId))
 }
 
 export async function updateUserByAdmin(

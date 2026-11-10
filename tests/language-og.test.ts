@@ -15,7 +15,8 @@ const slug = 'language-and-og-test'
 
 function cookieFrom(response: Response): string {
   const headers = response.headers as Headers & { getSetCookie?: () => string[] }
-  const values = headers.getSetCookie?.() ?? (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')!] : [])
+  const values =
+    headers.getSetCookie?.() ?? (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')!] : [])
   return values.map((value) => value.split(';')[0]).join('; ')
 }
 
@@ -95,7 +96,12 @@ describe('article language and Open Graph output', () => {
       bodyJson: JSON.stringify({
         type: 'doc',
         content: [
-          { type: 'paragraph', content: [{ type: 'text', text: 'Ini adalah artikel tentang sistem yang sudah berjalan dan tidak berhenti.' }] },
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'Ini adalah artikel tentang sistem yang sudah berjalan dan tidak berhenti.' },
+            ],
+          },
           {
             type: 'codeBlock',
             attrs: { language: 'ts' },
@@ -126,16 +132,25 @@ describe('article language and Open Graph output', () => {
     })
   })
 
-  test('sets html lang from the article language', async () => {
-    const response = await app.request(`/articles/${slug}`)
+  test('separates the interface language from the article content language', async () => {
+    const response = await app.request(`/id/articles/${slug}`)
     const html = await response.text()
     expect(html).toContain('<html lang="id">')
+    expect(html).toContain('<article lang="id"')
     expect(html).toContain('<meta property="og:locale" content="id_ID">')
     expect(html).toContain('"inLanguage":"id"')
+
+    // The same Indonesian article on the English interface keeps an English
+    // document language while marking the body itself as Indonesian.
+    const english = await (await app.request(`/en/articles/${slug}`)).text()
+    expect(english).toContain('<html lang="en">')
+    expect(english).toContain('<article lang="id"')
+    expect(english).toContain('<meta property="og:locale" content="en_US">')
+    expect(english).toContain('"inLanguage":"id"')
   })
 
   test('falls back to the procedural cover for the social image', async () => {
-    const html = await (await app.request(`/articles/${slug}`)).text()
+    const html = await (await app.request(`/id/articles/${slug}`)).text()
     expect(html).toMatch(/property="og:image" content="https?:\/\/[^"]+\/og\/\d+\/[0-9a-f]{6}\.jpg"/)
   })
 
@@ -150,9 +165,9 @@ describe('article language and Open Graph output', () => {
   })
 
   test('renders a copy button for code blocks', async () => {
-    const html = await (await app.request(`/articles/${slug}`)).text()
+    const html = await (await app.request(`/id/articles/${slug}`)).text()
     expect(html).toContain('data-copy-code')
-    expect(html).toContain('aria-label="Copy code to clipboard"')
+    expect(html).toContain('aria-label="Salin kode ke papan klip"')
   })
 
   test('shows per-article readership to editors only', async () => {
@@ -173,7 +188,9 @@ describe('article language and Open Graph output', () => {
 
     expect((await app.request(`/admin/analytics/${articleId}`, { redirect: 'manual' })).status).toBe(302)
     const cookie = await login()
-    const page = await app.request(`/admin/analytics/${articleId}`, { headers: { cookie } })
+    const page = await app.request(`/admin/analytics/${articleId}`, {
+      headers: { cookie, 'accept-language': 'en-US' },
+    })
     expect(page.status).toBe(200)
     const html = await page.text()
     expect(html).toContain('Bahasa dan Gambar Sosial')
@@ -186,11 +203,17 @@ describe('article language and Open Graph output', () => {
 describe('editor language field', () => {
   test('persists, updates and clears the language through the admin API', async () => {
     const cookie = await login()
-    const session = (await (
-      await app.request('/api/admin/session', { headers: { cookie } })
-    ).json()) as { csrfToken: string }
+    const session = (await (await app.request('/api/admin/session', { headers: { cookie } })).json()) as {
+      csrfToken: string
+    }
     const body = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Halo.' }] }] }
-    const base = { title: 'Language roundtrip', slug: 'language-roundtrip', body, categoryId: 'cat_test', authorId: 'author_test' }
+    const base = {
+      title: 'Language roundtrip',
+      slug: 'language-roundtrip',
+      body,
+      categoryId: 'cat_test',
+      authorId: 'author_test',
+    }
 
     const created = await app.request('/api/admin/articles', {
       method: 'POST',
@@ -205,7 +228,9 @@ describe('editor language field', () => {
     expect(await stored()).toBe('id')
 
     async function put(payload: Record<string, unknown>) {
-      const current = (await getDb().select({ updatedAt: articles.updatedAt }).from(articles).where(eq(articles.id, id)))[0]
+      const current = (
+        await getDb().select({ updatedAt: articles.updatedAt }).from(articles).where(eq(articles.id, id))
+      )[0]
       return app.request(`/api/admin/articles/${id}`, {
         method: 'PUT',
         headers: { cookie, 'content-type': 'application/json', 'x-csrf-token': session.csrfToken },

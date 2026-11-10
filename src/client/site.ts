@@ -1,7 +1,13 @@
 import '../styles/base.css'
 import '../styles/site.css'
+import { clientMessages, fill, formatDateFor } from './client-i18n'
 
 const SAVED_KEY = 'commonplace:saved'
+
+const messages = clientMessages()
+/** Locale-prefixed URL helper for client-rendered links. */
+const prefix = messages?.prefix ?? '/id'
+const localized = (path: string): string => `${prefix}${path}`
 
 function readSaved(): string[] {
   try {
@@ -34,7 +40,11 @@ function updateSavedIndicators(): void {
     button.dataset.active = isSaved ? 'true' : 'false'
     button.setAttribute('aria-pressed', isSaved ? 'true' : 'false')
     const label = button.querySelector<HTMLElement>('[data-bookmark-label]')
-    if (label) label.textContent = isSaved ? 'Tersimpan' : 'Simpan untuk nanti'
+    if (label) {
+      const savedLabel = button.dataset.savedLabel ?? messages?.bookmarks.saved ?? 'Saved'
+      const saveLabel = button.dataset.saveLabel ?? messages?.bookmarks.save ?? 'Save for later'
+      label.textContent = isSaved ? savedLabel : saveLabel
+    }
   })
 }
 
@@ -49,7 +59,11 @@ function setupTheme(): void {
   const apply = (theme: 'light' | 'dark') => {
     document.documentElement.dataset.theme = theme
     document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]').forEach((button) => {
-      button.setAttribute('aria-label', theme === 'dark' ? 'Ganti ke tema terang' : 'Ganti ke tema gelap')
+      const label =
+        theme === 'dark'
+          ? (messages?.theme.light ?? 'Switch to light theme')
+          : (messages?.theme.dark ?? 'Switch to dark theme')
+      button.setAttribute('aria-label', label)
       button.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false')
     })
   }
@@ -100,9 +114,7 @@ function setupMobileMenu(): void {
       return
     }
     if (event.key !== 'Tab') return
-    const focusable = Array.from(
-      menu.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
-    )
+    const focusable = Array.from(menu.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'))
     const first = focusable[0]
     const last = focusable[focusable.length - 1]
     if (!first || !last) return
@@ -201,12 +213,12 @@ function setupShare(): void {
           return
         }
         await navigator.clipboard.writeText(url)
-        if (label) label.textContent = 'Tautan disalin'
+        if (label) label.textContent = messages?.share.copied ?? 'Link copied'
         window.setTimeout(() => {
           if (label) label.textContent = original
         }, 1800)
       } catch {
-        if (label) label.textContent = 'Salin dari bilah alamat'
+        if (label) label.textContent = messages?.share.manual ?? 'Copy from the address bar'
         window.setTimeout(() => {
           if (label) label.textContent = original
         }, 2200)
@@ -221,17 +233,19 @@ function setupCodeCopy(): void {
       const block = button.closest('.code-block')
       const code = block?.querySelector('code')
       if (!code) return
-      const original = button.textContent ?? 'Salin'
+      const original = button.textContent ?? messages?.copy.copy ?? 'Copy'
+      const copied = button.dataset.copiedLabel ?? messages?.copy.copied ?? 'Copied'
+      const manual = button.dataset.manualLabel ?? messages?.copy.manual ?? 'Select manually'
       try {
         await navigator.clipboard.writeText(code.textContent ?? '')
-        button.textContent = 'Tersalin'
+        button.textContent = copied
         button.dataset.copied = 'true'
         window.setTimeout(() => {
           button.textContent = original
           delete button.dataset.copied
         }, 1800)
       } catch {
-        button.textContent = 'Pilih manual'
+        button.textContent = manual
         window.setTimeout(() => {
           button.textContent = original
         }, 2200)
@@ -253,14 +267,14 @@ function setupNewsletter(): void {
       message.textContent = ''
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
         message.dataset.state = 'error'
-        message.textContent = 'Masukkan alamat surel yang valid.'
+        message.textContent = messages?.newsletter.invalid ?? 'Enter a valid email address.'
         form.querySelector<HTMLInputElement>('input[name="email"]')?.focus()
         return
       }
       const original = submit?.textContent ?? ''
       if (submit) {
         submit.disabled = true
-        submit.textContent = 'Mendaftar…'
+        submit.textContent = messages?.newsletter.subscribing ?? 'Signing up…'
       }
       try {
         const response = await fetch('/api/subscribe', {
@@ -275,25 +289,25 @@ function setupNewsletter(): void {
         const payload = (await response.json()) as { status?: string }
         if (response.ok && payload.status === 'pending') {
           message.dataset.state = 'success'
-          message.textContent = 'Cek kotak masukmu dan klik tautan konfirmasi untuk bergabung.'
+          message.textContent = messages?.newsletter.pending ?? 'Check your inbox to confirm.'
           form.reset()
         } else if (response.ok && payload.status === 'ok') {
           message.dataset.state = 'success'
-          message.textContent = 'Kamu sudah masuk daftar. Terima kasih sudah berlangganan.'
+          message.textContent = messages?.newsletter.ok ?? 'You are on the list.'
           form.reset()
         } else if (response.ok && payload.status === 'exists') {
           message.dataset.state = 'success'
-          message.textContent = 'Alamat itu sudah berlangganan.'
+          message.textContent = messages?.newsletter.exists ?? 'That address is already subscribed.'
         } else if (response.status === 429) {
           message.dataset.state = 'error'
-          message.textContent = 'Terlalu banyak percobaan. Coba lagi nanti.'
+          message.textContent = messages?.newsletter.tooMany ?? 'Too many attempts. Try again later.'
         } else {
           message.dataset.state = 'error'
-          message.textContent = 'Mohon periksa alamatnya dan coba lagi.'
+          message.textContent = messages?.newsletter.check ?? 'Please check the address and try again.'
         }
       } catch {
         message.dataset.state = 'error'
-        message.textContent = 'Koneksi gagal. Coba lagi.'
+        message.textContent = messages?.newsletter.connection ?? 'The connection failed.'
       } finally {
         if (submit) {
           submit.disabled = false
@@ -326,16 +340,14 @@ function renderSavedArticle(article: SavedArticle, onRemove: () => void): HTMLEl
   category.textContent = article.category
   const date = document.createElement('span')
   date.className = 'meta'
-  date.textContent = article.publishedAt
-    ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(article.publishedAt))
-    : ''
+  date.textContent = formatDateFor(messages?.dateLocale ?? 'id-ID', article.publishedAt)
   meta.append(category, date)
 
   const body = document.createElement('div')
   body.className = 'article-row__body'
   const titleLink = document.createElement('a')
   titleLink.className = 'article-row__title'
-  titleLink.href = `/articles/${article.slug}`
+  titleLink.href = localized(`/articles/${article.slug}`)
   titleLink.textContent = article.title
   const excerpt = document.createElement('p')
   excerpt.className = 'article-row__excerpt'
@@ -348,12 +360,12 @@ function renderSavedArticle(article: SavedArticle, onRemove: () => void): HTMLEl
   actions.style.gap = '0.5rem'
   const read = document.createElement('a')
   read.className = 'text-link'
-  read.href = `/articles/${article.slug}`
-  read.textContent = 'Baca →'
+  read.href = localized(`/articles/${article.slug}`)
+  read.textContent = `${messages?.bookmarks.read ?? 'Read'} →`
   const remove = document.createElement('button')
   remove.type = 'button'
   remove.className = 'btn btn--ghost btn--small'
-  remove.textContent = 'Hapus'
+  remove.textContent = messages?.bookmarks.remove ?? 'Remove'
   remove.addEventListener('click', () => {
     toggleBookmark(article.slug)
     onRemove()
@@ -375,7 +387,14 @@ async function setupSavedPage(): Promise<void> {
   const render = async () => {
     const saved = readSaved()
     updateSavedIndicators()
-    if (meta) meta.textContent = saved.length ? `${saved.length} artikel tersimpan` : 'Belum ada artikel tersimpan'
+    if (meta) {
+      if (!saved.length) {
+        meta.textContent = messages?.bookmarks.emptyCount ?? ''
+      } else {
+        const template = saved.length === 1 ? messages?.bookmarks.countOne : messages?.bookmarks.count
+        meta.textContent = template ? fill(template, { count: saved.length }) : String(saved.length)
+      }
+    }
     list.replaceChildren()
     if (!saved.length) {
       empty.hidden = false
@@ -384,10 +403,11 @@ async function setupSavedPage(): Promise<void> {
     empty.hidden = true
     const loading = document.createElement('p')
     loading.className = 'meta'
-    loading.textContent = 'Memuat daftar bacaanmu…'
+    loading.textContent = messages?.bookmarks.listLoading ?? 'Loading…'
     list.append(loading)
     try {
-      const response = await fetch(`/api/articles?slugs=${encodeURIComponent(saved.join(','))}`)
+      const query = `slugs=${encodeURIComponent(saved.join(','))}&lang=${messages?.locale ?? 'id'}`
+      const response = await fetch(`/api/articles?${query}`)
       if (!response.ok) throw new Error('Request failed')
       const payload = (await response.json()) as { articles: SavedArticle[] }
       list.replaceChildren()
@@ -399,11 +419,24 @@ async function setupSavedPage(): Promise<void> {
         list.append(renderSavedArticle(article, render))
       }
     } catch {
-      loading.textContent = 'Artikel tersimpanmu tidak dapat dimuat. Muat ulang halaman ini.'
+      loading.textContent = messages?.bookmarks.loadError ?? 'Saved articles could not be loaded.'
     }
   }
 
   await render()
+}
+
+function setupLanguageSwitch(): void {
+  // Form posts cannot carry a fragment, so append it before submitting to keep
+  // deep links like /en/articles/foo#section intact across a language change.
+  document.querySelectorAll<HTMLFormElement>('[data-lang-switch]').forEach((form) => {
+    form.addEventListener('submit', () => {
+      const input = form.querySelector<HTMLInputElement>('input[name="next"]')
+      if (input && window.location.hash && !input.value.includes('#')) {
+        input.value = `${input.value}${window.location.hash}`
+      }
+    })
+  })
 }
 
 function init(): void {
@@ -415,6 +448,7 @@ function init(): void {
   setupShare()
   setupCodeCopy()
   setupNewsletter()
+  setupLanguageSwitch()
   void setupSavedPage()
 }
 

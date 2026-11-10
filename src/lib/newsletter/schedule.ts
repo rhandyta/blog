@@ -1,4 +1,5 @@
 import type { NewsletterSchedule } from '../db/schema'
+import { DEFAULT_LOCALE, getTranslator, type Locale } from '../i18n'
 
 export type Cadence = NewsletterSchedule['cadence']
 
@@ -33,29 +34,32 @@ export function isDigestDue(schedule: NewsletterSchedule, now = new Date()): boo
   } else {
     const weekday = Math.min(6, Math.max(0, schedule.weekday))
     const diff = (now.getUTCDay() - weekday + 7) % 7
-    scheduled = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diff, hour),
-    )
+    scheduled = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diff, hour))
     graceMs = 26 * 3_600_000
   }
   const elapsed = now.getTime() - scheduled.getTime()
   return elapsed >= 0 && elapsed <= graceMs
 }
 
-export function digestSubject(cadence: Cadence): string {
-  if (cadence === 'daily') return 'Today on RhandytaVERSE'
-  if (cadence === 'monthly') return 'This month on RhandytaVERSE'
-  return 'This week on RhandytaVERSE'
+/** Digest subject line in the requested language. */
+export function digestSubject(cadence: Cadence, locale: Locale = DEFAULT_LOCALE, siteTitle = 'RhandytaVERSE'): string {
+  const t = getTranslator(locale)
+  const vars = { site: siteTitle }
+  if (cadence === 'daily') return t('mail.digestDailySubject', vars)
+  if (cadence === 'monthly') return t('mail.digestMonthlySubject', vars)
+  return t('mail.digestWeeklySubject', vars)
 }
 
-export function digestIntro(cadence: Cadence): string {
-  if (cadence === 'daily') return 'A short look at what readers have been reading today.'
-  if (cadence === 'monthly') return 'A short look at what readers have been reading this month.'
-  return 'A short look at what readers have been reading this week.'
+export function digestIntro(cadence: Cadence, locale: Locale = DEFAULT_LOCALE): string {
+  const t = getTranslator(locale)
+  if (cadence === 'daily') return t('mail.digestDailyIntro')
+  if (cadence === 'monthly') return t('mail.digestMonthlyIntro')
+  return t('mail.digestWeeklyIntro')
 }
 
-export function cadenceLabel(cadence: Cadence): string {
-  if (cadence === 'daily') return 'Daily'
-  if (cadence === 'monthly') return 'Monthly'
-  return 'Weekly'
+export function cadenceLabel(cadence: Cadence, locale: Locale = DEFAULT_LOCALE): string {
+  const t = getTranslator(locale)
+  if (cadence === 'daily') return t('mail.cadenceDaily')
+  if (cadence === 'monthly') return t('mail.cadenceMonthly')
+  return t('mail.cadenceWeekly')
 }
