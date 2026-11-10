@@ -518,6 +518,7 @@ hr {
   font-size: 0.6rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  text-align: center!important;
   min-width: 2.15rem;
   min-height: 1.55rem;
   padding: 0.3rem 0.4rem;
